@@ -1,0 +1,58 @@
+﻿.personal-space-page{--personal-gutter:max(5%,calc((100% - 1400px) / 2));--space-blue:#5fa9df}
+.personal-space-page .space-cover{min-height:clamp(200px,12vw,245px);padding-inline:var(--personal-gutter)}
+.personal-space-page .space-nav,.personal-space-page .space-body{padding-inline:var(--personal-gutter)}
+.personal-space-page .space-nav{gap:clamp(12px,2vw,32px)}
+.personal-space-page #space-tabs{position:relative;gap:clamp(12px,1.8vw,30px);min-width:0}
+.personal-space-page #space-tabs a.active{color:var(--blue)}
+.personal-space-page #space-tabs .active::after{content:none}
+.personal-space-page .search-tab-indicator{transition:transform .42s ease-in-out,width .42s ease-in-out}
+@media(prefers-reduced-motion:reduce){.personal-space-page .search-tab-indicator{transition:none}}
+.personal-space-page #space-tabs [data-tab="lists"] svg{color:#7bc6e7}
+.personal-space-page #space-tabs [data-tab="favorites"] svg{color:#efad42}
+.personal-space-page .space-counts{gap:clamp(12px,1.5vw,28px)}
+.personal-space-page .author-profile:not(.space-lists) .space-body{grid-template-columns:minmax(0,1fr) clamp(205px,16vw,240px)}
+.personal-space-page .space-sidebar section{margin-bottom:10px}
+.personal-space-page .space-identity{min-width:0}
+.personal-space-page .space-identity>div:last-child{min-width:0}
+.personal-space-page .space-name h1{overflow-wrap:anywhere}
+.personal-signature{max-width:100%;padding:2px 4px;color:inherit;text-align:left;overflow-wrap:anywhere}
+.personal-signature:hover{background:#fff2;border-radius:4px}
+.personal-creator{text-align:center}
+.personal-creator h2{display:flex;justify-content:center;align-items:center;gap:6px;color:var(--space-blue);font-weight:600;margin:8px 0 16px}
+.personal-creator h2 svg{width:20px;height:20px}
+.personal-creator-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border:1px solid var(--line);border-radius:8px}
+.personal-creator-action{display:flex;justify-content:center;align-items:center;gap:5px;padding:10px 4px;font-size:13px;white-space:nowrap}
+.personal-creator-action + .personal-creator-action{border-left:1px solid var(--line)}
+.personal-creator-action:hover{color:var(--blue);background:#fff}
+.personal-creator-action svg{width:16px;height:16px;flex:none}
+.personal-settings,.personal-choices-controls{display:flex;gap:12px;flex-wrap:wrap}
+.personal-primary{display:inline-flex;align-items:center;justify-content:center;padding:8px 14px;border-radius:6px;background:var(--space-blue);color:white;white-space:nowrap}
+.personal-primary:hover{filter:brightness(.94)}
+.personal-featured-prompt{min-height:150px;display:flex;align-items:center;justify-content:center;gap:24px;padding:12px 0}
+.personal-featured-prompt img{width:112px;height:100px;object-fit:contain}
+.personal-featured-prompt p{max-width:320px;margin:0 0 12px;color:var(--muted);line-height:1.55}
+.personal-featured>.space-section{padding:16px 0 0;margin-bottom:0;border:0}
+.personal-space-page .author-profile:not(.space-lists) .space-heading{justify-content:flex-start}
+.personal-space-page .author-profile:not(.space-lists) .space-heading>a{margin-left:auto}
+.personal-private{color:var(--muted);font-size:13px}
+.personal-editor,.personal-choices{display:grid;gap:12px}
+.personal-editor input{width:100%;padding:8px;border:1px solid var(--line);border-radius:6px;font:inherit}
+.personal-editor button{justify-self:end}
+.personal-choices button{text-align:left;padding:8px}
+.personal-choices-controls{margin-top:12px}
+.personal-space-status{text-align:center;padding:70px 0}
+.personal-space-status h1{font-size:20px;font-weight:500}
+@media(max-width:1230px){
+  .personal-space-page .space-nav{height:auto;min-height:66px;flex-wrap:wrap;padding-bottom:12px}
+  .personal-space-page #space-tabs{flex-basis:100%;height:56px;overflow-x:auto}
+  .personal-space-page .space-counts{margin-left:auto}
+}
+@media(max-width:800px){
+  .personal-space-page .author-profile:not(.space-lists) .space-body{grid-template-columns:minmax(0,1fr)}
+  .personal-space-page .space-sidebar{grid-row:auto}
+  .personal-space-page .space-sidebar section{display:block;padding:16px}
+  .personal-space-page .space-sidebar h2{margin-bottom:14px}
+  .personal-space-page .space-nav #space-search{margin-left:0}
+  .personal-space-page #space-tabs a{font-size:14px}
+}
+

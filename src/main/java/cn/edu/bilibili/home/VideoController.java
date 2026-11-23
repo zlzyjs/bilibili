@@ -32,11 +32,13 @@ class VideoController {
     private final MysqlVideoCatalog catalog;
     private final Path mediaRoot;
     private final OssMedia oss;
+    private final AuthController auth;
     private final ViewerRegistry viewers = new ViewerRegistry();
 
-    VideoController(MysqlVideoCatalog catalog, @Value("${app.media-root}") String mediaRoot, OssMedia oss) {
+    VideoController(MysqlVideoCatalog catalog, @Value("${app.media-root}") String mediaRoot, OssMedia oss, AuthController auth) {
         this.catalog = catalog;
         this.oss = oss;
+        this.auth = auth;
         this.mediaRoot = Path.of(mediaRoot).toAbsolutePath().normalize();
     }
 
@@ -175,11 +177,17 @@ class VideoController {
     }
 
     @GetMapping("/videos/{id}/comments")
-    MysqlVideoCatalog.CommentPage comments(@PathVariable String id, @RequestParam(defaultValue="hot") String sort) {
+    MysqlVideoCatalog.CommentPage comments(@PathVariable String id, @RequestParam(defaultValue="hot") String sort,
+                                           @RequestParam(defaultValue="1") int page,
+                                           jakarta.servlet.http.HttpServletRequest request,
+                                           jakarta.servlet.http.HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
         find(id);
+        if (page < 1 || page > 10000) throw new ResponseStatusException(BAD_REQUEST, "无效的页码");
         if (!sort.equals("hot") && !sort.equals("latest")) throw new ResponseStatusException(BAD_REQUEST, "无效的评论排序");
-        if (sort.equals("latest")) throw new ResponseStatusException(UNAUTHORIZED, "登录后查看最新评论");
-        return catalog.comments(id);
+        boolean member = auth.currentMember(request) != null;
+        if (!member && sort.equals("latest")) throw new ResponseStatusException(UNAUTHORIZED, "登录后查看最新评论");
+        return catalog.comments(id, sort.equals("latest"), page, member);
     }
 
     @PostMapping("/videos/{id}/viewers")
@@ -223,7 +231,7 @@ class VideoController {
         return image(path, "covers/");
     }
 
-    private ResponseEntity<Resource> image(String path, String directory) {
+    ResponseEntity<Resource> image(String path, String directory) {
         URI remote = oss.location(path, directory);
         if (remote != null) return redirect(remote);
         Path file = underMediaRoot(path, "media/" + directory);

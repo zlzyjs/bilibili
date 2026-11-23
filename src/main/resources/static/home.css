@@ -300,18 +300,37 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:30px 0}
 .close-login:hover{color:var(--ink)}
 .login-form{position:relative;z-index:1;width:380px;max-width:100%;margin:0 auto}
 .login-fields{border-radius:10px;overflow:hidden;background:white;box-shadow:inset 0 0 0 1px var(--line)}
-.login-fields label{position:relative;display:flex;align-items:center;gap:14px;padding:0 18px;min-height:58px}
-.login-fields label:first-child{border-radius:10px 10px 0 0}
-.login-fields label:last-child{border-radius:0 0 10px 10px}
-.login-fields label+label{border-top:1px solid var(--line)}
-.login-fields label>span{flex:none;font-size:15px}
+.login-fields > :is(label,.password-field){position:relative;display:flex;align-items:center;gap:14px;padding:0 18px;min-height:58px}
+.login-fields > :first-child{border-radius:10px 10px 0 0}
+.login-fields > :last-child{border-radius:0 0 10px 10px}
+.login-fields > * + *{border-top:1px solid var(--line)}
+.login-fields > label > span,.password-field > label{flex:none;font-size:15px}
 .login-fields input{width:100%;min-width:0;border:0;outline:0;background:none;font-size:15px;padding:14px 0}
+.password-field input::-ms-reveal{display:none}
 .login-fields input::placeholder{color:#b6b9bd}
-.login-fields label:focus-within::after{content:"";position:absolute;inset:0;border:1px solid #62ace2;border-radius:inherit;pointer-events:none}
-.login-fields button{flex:none;font-size:12px;color:var(--muted);padding:4px 0}
+.login-fields > :focus-within::after{content:"";position:absolute;inset:0;border:1px solid #62ace2;border-radius:inherit;pointer-events:none}
+.password-field{column-gap:8px}
+.password-toggle{display:grid;flex:none;place-items:center;width:36px;height:36px;border-radius:6px;color:var(--muted)}
+.password-toggle:hover{background:var(--wash);color:var(--ink)}
+.password-toggle[aria-pressed="false"] .password-toggle-slash{display:none}
 .login-message{min-height:20px;margin:10px 0;color:#f25d8e;font-size:13px;line-height:20px}
+#register-message{color:#b42318}
 .login-actions{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .login-actions .secondary{display:grid;place-items:center;font-size:16px;border-radius:8px}
+.login-actions :disabled{opacity:.6;cursor:wait}
+.register-uid{display:grid;gap:8px;color:var(--muted)}
+.register-uid input{width:100%;padding:12px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:20px;font-weight:600;color:var(--ink)}
+.nav-account{position:relative;display:flex;align-items:center;gap:3px;flex:none}
+.nav-account-avatar{display:block;width:38px;height:38px;overflow:hidden;border:2px solid #fff;border-radius:50%;background:#e9f4fa}
+.nav-account-avatar img{display:block;width:100%;height:100%;object-fit:cover}
+.nav-account summary{display:grid;place-items:center;width:14px;height:32px;cursor:pointer;list-style:none}
+.nav-account summary svg{width:11px;height:11px;transform:rotate(90deg)}
+.nav-account summary::-webkit-details-marker{display:none}
+.nav-account-panel{position:absolute;right:0;top:calc(100% + 8px);z-index:12;display:grid;min-width:145px;padding:6px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);box-shadow:0 6px 20px #0002}
+.nav-account-panel>*{text-align:left;padding:8px 10px;white-space:nowrap;border-radius:6px}
+.nav-account-panel span{color:var(--muted);font-size:12px}
+.nav-account-panel a:hover,.nav-account-panel button:hover{background:#f1f3f5}
+.account-notice{position:fixed;z-index:30;bottom:24px;left:50%;transform:translateX(-50%);padding:10px 16px;border-radius:8px;background:#24272e;color:white;white-space:nowrap}
 .login-mascot{position:absolute;bottom:0;width:130px;pointer-events:none;user-select:none}
 .mascot-left{left:0}.mascot-right{right:0}
 @media(max-width:700px){.login-popover{padding:18px 16px}.login-benefits{font-size:12px;gap:18px 10px}.login-dialog{width:500px;min-height:410px;padding:44px 24px 110px}.login-mascot{width:100px}}

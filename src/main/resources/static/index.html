@@ -5,31 +5,38 @@
   <base target="_self">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>dilidili · 第二组课程项目</title>
-  <link rel="stylesheet" href="/home.css?v=35">
+  <link rel="stylesheet" href="/home.css?v=39">
   <link rel="stylesheet" href="/watch.css?v=23">
   <link rel="stylesheet" href="/watch-fullscreen.css?v=3">
   <link rel="stylesheet" href="/banner-leaves.css?v=1">
   <script src="/banner-leaves.js?v=3" defer></script>
   <link rel="stylesheet" href="/watch-comments.css?v=9">
+  <link rel="stylesheet" href="/interactions.css?v=1">
   <link rel="stylesheet" href="/space.css?v=10">
-  <script src="/space.js?v=5" defer></script>
+  <script src="/space.js?v=7" defer></script>
+  <link rel="stylesheet" href="/personal-space.css?v=4">
+  <script src="/personal-space.js?v=6" defer></script>
   <link rel="stylesheet" href="/search.css?v=6">
   <script src="/search.js?v=5" defer></script>
   <script src="/watch-preferences.js?v=7" defer></script>
   <script src="/watch-sidebar.js?v=2" defer></script>
   <script src="/viewer-presence.js?v=1" defer></script>
-  <script src="/watch-comments.js?v=7" defer></script>
-  <script src="/watch.js?v=23" defer></script>
-  <script src="/home.js?v=36" defer></script>
-  <script src="/login.js?v=3" defer></script>
+  <script src="/watch-comments.js?v=8" defer></script>
+  <script src="/watch.js?v=25" defer></script>
+  <script src="/home.js?v=37" defer></script>
+  <script src="/login.js?v=10" defer></script>
+  <script src="/interactions.js?v=1" defer></script>
 </head>
 <body>
   <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-home-outline" viewBox="0 0 24 24"><path d="m2 11 10-8 10 8m-18 0v9h16v-9M8 13c1 2 2 3 4 3s3-1 4-3"/></symbol>
+    <symbol id="i-settings-outline" viewBox="0 0 24 24"><path d="m12 2 8 5v10l-8 5-8-5V7z"/><circle cx="12" cy="12" r="3"/></symbol>
     <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><rect x="15" y="15" width="6" height="6" rx="1"/></symbol>
     <symbol id="i-rows" viewBox="0 0 24 24"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><path d="M13 4h8m-8 4h6m-6 8h8m-8 4h6"/></symbol>
     <symbol id="i-uid" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="4"/><text x="12" y="15" text-anchor="middle" font-family="Arial,sans-serif" font-size="8" stroke="none" fill="currentColor">UID</text></symbol>
     <symbol id="i-cake" viewBox="0 0 24 24"><path d="M4 14h16v7H4zM4 17c2 2 3-2 5 0s3-2 5 0 4-2 6 0M6 14V9h12v5M8 9V6m4 3V5m4 4V6M8 3v1m4-2v1m4 0v1"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></symbol>
+    <symbol id="i-password-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></symbol>
     <symbol id="i-tv" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="m8 2 4 4 4-4M8 12l2 1m6-1-2 1"/></symbol>
     <symbol id="i-play" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></symbol>
     <symbol id="i-list" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M6 9h5m3 0h4M8 13h5m3 0h2"/></symbol>
@@ -40,6 +47,7 @@
     <symbol id="i-upload" viewBox="0 0 24 24"><path d="M4 16v4h16v-4M12 16V4m-4 4 4-4 4 4"/></symbol>
     <symbol id="i-article" viewBox="0 0 24 24"><path d="M11 21H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v6M7 7h7M7 11h4M7 15h3m8 7V13m-3 3 3-3 3 3"/></symbol>
     <symbol id="i-video-upload" viewBox="0 0 24 24"><rect x="2" y="4" width="19" height="15" rx="2"/><path d="m9 8 5 3-5 3zM18 22v-7m-3 3 3-3 3 3"/></symbol>
+    <symbol id="i-creator-bulb" viewBox="0 0 24 24"><path d="M8.4 17.4v-1.2a2.6 2.6 0 0 0-.9-1.9A6.7 6.7 0 1 1 16.5 14.3a2.6 2.6 0 0 0-.9 1.9v1.2m-7.2 0h7.2v1.8a1.7 1.7 0 0 1-1.7 1.7h-3.8a1.7 1.7 0 0 1-1.7-1.7zM12 14v-3l-2-2m2 2 2-2"/></symbol>
     <symbol id="i-manage" viewBox="0 0 24 24"><path d="M10 21H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10l4 4v5M15 2v5h4m-2 6 4 2v4l-4 2-4-2v-4z"/></symbol>
     <symbol id="i-flame" viewBox="0 0 24 24"><path d="M13 2c1 5-3 6-3 10-2 0-3-2-3-4-3 3-4 5-3 8a8 8 0 0 0 16-1c0-4-3-8-7-13z"/><path d="M12 13c3 2 4 6 0 7-3-1-2-5 0-7z"/></symbol>
     <symbol id="i-rank" viewBox="0 0 24 24"><path d="M3 20h18M5 20v-7h4v7m1 0V5h4v15m1 0V9h4v11"/></symbol>
@@ -60,12 +68,26 @@
         <button aria-label="搜索"><svg><use href="#i-search"/></svg></button>
       </form>
       <div class="nav-right">
-        <button type="button" class="login" data-login="登录" aria-haspopup="dialog">登录</button>
-        <button type="button" class="nav-item" data-login="消息" aria-haspopup="dialog"><svg><use href="#i-mail"/></svg>消息</button>
-        <button type="button" class="nav-item" data-login="收藏" aria-haspopup="dialog"><svg><use href="#i-star"/></svg>收藏</button>
-        <button type="button" class="nav-item" data-login="历史" aria-haspopup="dialog"><svg><use href="#i-clock"/></svg>历史</button>
-        <button type="button" class="nav-item" data-login="创作中心" aria-haspopup="dialog"><svg><use href="#i-rank"/></svg>创作中心</button>
-        <button type="button" class="upload" data-login="投稿" aria-haspopup="dialog"><svg><use href="#i-upload"/></svg>投稿</button>
+        <button id="nav-login" type="button" class="login" data-login="登录" aria-haspopup="dialog">登录</button>
+        <div id="nav-account" class="nav-account" hidden>
+          <a id="nav-account-space" class="nav-account-avatar" href="/me" target="_self" aria-label="进入我的空间">
+            <img id="nav-account-image" alt="" width="38" height="38">
+          </a>
+          <details id="nav-account-menu">
+            <summary aria-label="账号菜单"><svg><use href="#i-right"/></svg></summary>
+            <div class="nav-account-panel">
+              <strong id="nav-account-name"></strong>
+              <span id="nav-account-uid"></span>
+              <a href="/me" target="_self">我的空间</a>
+              <button id="nav-logout" type="button">退出登录</button>
+            </div>
+          </details>
+        </div>
+        <button type="button" class="nav-item" data-interaction="messages" data-login="消息" aria-haspopup="dialog"><svg><use href="#i-mail"/></svg>消息</button>
+        <button type="button" class="nav-item" data-interaction="favorites" data-login="收藏" aria-haspopup="dialog"><svg><use href="#i-star"/></svg>收藏</button>
+        <button type="button" class="nav-item" data-interaction="history" data-login="历史" aria-haspopup="dialog"><svg><use href="#i-clock"/></svg>历史</button>
+        <a class="nav-item" href="/studio" target="_self"><svg><use href="#i-creator-bulb"/></svg>创作中心</a>
+        <a class="upload" href="/studio/upload" target="_self"><svg><use href="#i-upload"/></svg>投稿</a>
       </div>
     </nav>
     <div class="banner"><a href="/" target="_self" class="banner-logo" aria-label="dilidili 首页"><img src="/assets/dilidili.svg?v=2" alt="dilidili"></a></div>
@@ -85,19 +107,20 @@
       </div>
     </section>
 
+    <section id="personal-space-status" class="personal-space-status" aria-live="polite" hidden></section>
     <section id="author-profile" class="author-profile" aria-label="作者资料" hidden>
       <div class="space-cover">
         <div class="space-identity"><div id="author-avatar" class="author-avatar"></div>
           <div><div class="space-name"><h1 id="author-name"></h1><span id="author-level"></span></div><p id="author-signature"></p></div>
         </div>
         <div class="space-actions">
-          <button class="follow" data-login="关注" aria-haspopup="dialog">＋ 关注</button>
-          <button data-login="发消息" aria-haspopup="dialog">发消息</button>
+          <button class="follow" data-interaction="follow"><span data-follow-label>关注</span></button>
+          <button data-interaction="message" aria-haspopup="dialog">发消息</button>
           <div class="space-more">
             <button class="space-more-trigger" aria-label="更多操作" aria-controls="space-more-menu">⋮</button>
             <div id="space-more-menu" class="space-more-menu">
-              <button data-login="加入黑名单" aria-haspopup="dialog">加入黑名单</button>
-              <button data-login="举报" aria-haspopup="dialog">举报</button>
+              <button data-interaction="block">加入黑名单</button>
+              <button data-interaction="account-report" aria-haspopup="dialog">举报</button>
             </div>
           </div>
         </div>
@@ -106,8 +129,8 @@
         <div id="space-tabs"></div>
         <form id="space-search"><input name="keyword" placeholder="搜索视频" aria-label="搜索作者的视频" maxlength="80"><button aria-label="搜索作者的视频"><svg><use href="#i-search"/></svg></button></form>
         <div class="space-counts">
-          <button data-login="关注数" data-login-only aria-haspopup="dialog">关注数<strong id="author-following"></strong></button>
-          <button data-login="粉丝数" data-login-only aria-haspopup="dialog">粉丝数<strong id="author-followers"></strong></button>
+          <button type="button" aria-haspopup="dialog">关注数<strong id="author-following"></strong></button>
+          <button type="button" aria-haspopup="dialog">粉丝数<strong id="author-followers"></strong></button>
         </div>
       </nav>
       <div class="space-body"><div id="space-content"></div>
@@ -159,7 +182,7 @@
         <div id="player-shell-home"></div><div id="player-shell" class="player-shell"><div id="fullscreen-title" class="fullscreen-title"></div>
           <div id="mini-drag-handle" class="mini-drag-handle" aria-label="拖动小窗"></div><button id="mini-close" class="mini-close" aria-label="关闭小窗">×</button><button id="mini-play-toggle" class="mini-play-toggle" aria-label="播放或暂停小窗视频"><svg class="watch-icon mini-when-paused" aria-hidden="true"><use href="/assets/watch-icons.svg#big-play"/></svg><svg class="watch-icon mini-when-playing" aria-hidden="true"><use href="/assets/watch-icons.svg#big-pause"/></svg></button><video id="player" playsinline preload="metadata"></video>
           <div id="danmaku-overlay" class="danmaku-overlay" aria-hidden="true"></div>
-          <button class="player-follow" data-login="关注" data-login-only><img id="player-author-avatar" alt=""><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#plus"/></svg><span>关注</span></button>
+          <button class="player-follow" data-interaction="follow"><img id="player-author-avatar" alt=""><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#plus"/></svg><span data-follow-label>关注</span></button>
           <div class="player-tools"><button id="pip-top" data-tooltip="开启画中画"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#pip"/></svg></button><button id="wide-top" data-tooltip="宽屏模式"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#wide"/></svg></button></div>
           <div id="trial-tip" class="trial-tip"><button id="close-trial" aria-label="关闭试看提示"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#close"/></svg></button><button data-login="登录" data-login-only><em>登录</em> 免费享完整视频</button><button id="trial-start">试看30秒</button></div>
           <button id="big-play" class="big-play" aria-label="播放" data-tooltip="播放"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#big-play"/></svg></button>
@@ -202,24 +225,24 @@
 <label class="dm-slider">不透明度<input id="dm-opacity" type="range" min="10" max="100" value="80"><output id="dm-opacity-value">80%</output></label>
 <label class="dm-slider">弹幕字号<input id="dm-size" type="range" min="50" max="150" value="100"><output id="dm-size-value">100%</output></label>
 <label class="dm-slider">弹幕速度<input id="dm-speed" type="range" min="1" max="5" value="3"><output id="dm-speed-value">适中</output></label><button id="dm-advanced-open" class="panel-next">高级设置 <span>›</span></button></div>
-<div id="dm-settings-advanced" hidden><button id="dm-advanced-back" class="panel-back">‹ 更多弹幕设置</button><label class="dm-sync"><input id="dm-sync-rate" type="checkbox"> 弹幕速度同步播放倍数</label><label class="dm-font-label">弹幕字体</label><div class="dm-font-row"><select id="dm-font" aria-label="弹幕字体"><option value="heiti">黑体</option><option value="songti">宋体</option><option value="yahei">微软雅黑</option></select><label><input id="dm-bold" type="checkbox"> 粗体</label></div><strong class="dm-outline-label">描边类型</strong><div class="preference-segments"><button id="dm-outline-heavy">重墨</button><button id="dm-outline-stroke">描边</button><button id="dm-outline-shadow">45°投影</button></div><button id="dm-reset" class="subtitle-reset">恢复默认设置</button></div><div id="dm-settings-keywords" hidden><button id="dm-keywords-back" class="panel-back">‹ 屏蔽词设置</button><label class="dm-keywords">屏蔽关键词（每行一个）<textarea id="dm-keywords" rows="4" maxlength="1000"></textarea></label><button id="dm-keywords-save" class="panel-login">保存屏蔽词</button></div></div></div><div class="danmaku-input"><button class="danmaku-login" data-login="发送弹幕" data-login-only>请先 <em>登录</em> 或 <em>注册</em></button><button class="danmaku-etiquette" data-login="弹幕礼仪" data-login-only>弹幕礼仪 <svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#chevron"/></svg></button><button data-login="发送弹幕" data-login-only>发送</button></div></div>
+<div id="dm-settings-advanced" hidden><button id="dm-advanced-back" class="panel-back">‹ 更多弹幕设置</button><label class="dm-sync"><input id="dm-sync-rate" type="checkbox"> 弹幕速度同步播放倍数</label><label class="dm-font-label">弹幕字体</label><div class="dm-font-row"><select id="dm-font" aria-label="弹幕字体"><option value="heiti">黑体</option><option value="songti">宋体</option><option value="yahei">微软雅黑</option></select><label><input id="dm-bold" type="checkbox"> 粗体</label></div><strong class="dm-outline-label">描边类型</strong><div class="preference-segments"><button id="dm-outline-heavy">重墨</button><button id="dm-outline-stroke">描边</button><button id="dm-outline-shadow">45°投影</button></div><button id="dm-reset" class="subtitle-reset">恢复默认设置</button></div><div id="dm-settings-keywords" hidden><button id="dm-keywords-back" class="panel-back">‹ 屏蔽词设置</button><label class="dm-keywords">屏蔽关键词（每行一个）<textarea id="dm-keywords" rows="4" maxlength="1000"></textarea></label><button id="dm-keywords-save" class="panel-login">保存屏蔽词</button></div></div></div><div class="danmaku-input"><button id="danmaku-guest" class="danmaku-login" type="button">请先 <em>登录</em> 或 <em>注册</em></button><form id="danmaku-entry" class="danmaku-entry" hidden><input id="danmaku-text" aria-label="弹幕内容" placeholder="发一条弹幕" maxlength="100" required><button id="danmaku-send" type="submit">发送</button></form></div></div>
         <p id="player-status" class="status" role="status" hidden></p>
         <div class="video-actions">
-          <button data-login="点赞" data-login-only aria-label="点赞"><svg class="action-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#action-like"/></svg><span id="like-count">—</span></button>
-          <button data-login="投币" data-login-only aria-label="投币"><svg class="action-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#action-coin"/></svg><span id="coin-count">—</span></button>
-          <button data-login="收藏" data-login-only aria-label="收藏视频"><svg class="action-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#action-favorite"/></svg><span id="favorite-count">—</span></button>
-          <button data-login="转发" data-login-only aria-label="转发"><svg class="action-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#action-share"/></svg><span id="share-count">—</span></button>
-          <span class="control-spacer"></span><button data-login="稿件举报" data-login-only><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#report"/></svg><span>稿件举报</span></button><button data-login="记笔记" data-login-only><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#note"/></svg><span>记笔记</span></button><button data-login="更多" data-login-only aria-label="更多"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#more"/></svg></button>
+          <button id="video-like" aria-label="点赞"><svg class="action-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#action-like"/></svg><span id="like-count">—</span></button>
+          <button id="video-coin" aria-label="投币"><svg class="action-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#action-coin"/></svg><span id="coin-count">—</span></button>
+          <button id="video-favorite" aria-label="收藏视频"><svg class="action-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#action-favorite"/></svg><span id="favorite-count">—</span></button>
+          <button id="video-share" aria-label="转发"><svg class="action-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#action-share"/></svg><span id="share-count">—</span></button>
+          <span class="control-spacer"></span><button id="video-report"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#report"/></svg><span>稿件举报</span></button><button data-login="记笔记" data-login-only><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#note"/></svg><span>记笔记</span></button><button data-login="更多" data-login-only aria-label="更多"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#more"/></svg></button>
         </div>
         <p id="video-description"></p><div id="video-tags" class="video-tags"></div>
-        <section id="video-comments" class="video-comments" aria-label="评论"><div class="comments-heading"><h2>评论 <span id="comment-total"></span></h2><button id="comments-hot" aria-pressed="true">最热</button><span class="comments-divider">|</span><button id="comments-latest" aria-pressed="false">最新</button></div><div class="comment-compose"><img class="guest-avatar" src="/api/avatar/default" onerror="this.onerror=null;this.src='/assets/guest-avatar.gif'" alt="未登录默认头像" width="48" height="48"><button data-login="发表评论" data-login-only>请先 <b>登录</b> 后发表评论 (・ω・)</button></div><div id="comment-list" aria-live="polite"></div><button id="comments-more" class="comments-more" data-login="查看更多评论" data-login-only hidden>登录后查看更多评论</button></section>
+        <section id="video-comments" class="video-comments" aria-label="评论"><div class="comments-heading"><h2>评论 <span id="comment-total"></span></h2><button id="comments-hot" aria-pressed="true">最热</button><span class="comments-divider">|</span><button id="comments-latest" aria-pressed="false">最新</button></div><div class="comment-compose"><img class="guest-avatar" src="/api/avatar/default" onerror="this.onerror=null;this.src='/assets/guest-avatar.gif'" alt="未登录默认头像" width="48" height="48"><button id="comment-guest" type="button">请先 <b>登录</b> 后发表评论 (・ω・)</button><form id="comment-entry-form" class="comment-entry-form" hidden><textarea id="comment-text" aria-label="评论内容" placeholder="发一条评论" maxlength="1000" required></textarea><button id="comment-send" type="submit" class="login-primary">发布</button></form></div><div id="comment-list" aria-live="polite"></div><button id="comments-more" class="comments-more" type="button" hidden>登录后查看更多评论</button></section>
       </article>
       <aside class="watch-sidebar">
-        <div class="watch-author"><div class="watch-author-heading"><a id="watch-author-link"><img id="watch-avatar" alt="UP主头像"><strong id="watch-author-name"></strong></a><button data-login="发消息" data-login-only class="author-message"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#message"/></svg> 发消息</button></div><p id="watch-signature"></p><div><button data-login="充电" data-login-only class="charge-button"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#charge"/></svg> 充电</button><button data-login="关注" data-login-only class="follow-button"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#plus"/></svg> 关注 <span id="watch-followers"></span></button></div></div>
+        <div class="watch-author"><div class="watch-author-heading"><a id="watch-author-link"><img id="watch-avatar" alt="UP主头像"><strong id="watch-author-name"></strong></a><button data-interaction="message" class="author-message"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#message"/></svg> 发消息</button></div><p id="watch-signature"></p><div><button data-login="充电" data-login-only class="charge-button"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#charge"/></svg> 充电</button><button data-interaction="follow" class="follow-button"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#plus"/></svg> <span data-follow-label>关注</span> <span id="watch-followers"></span></button></div></div>
         <details id="danmaku-panel" class="danmaku-panel"><summary><span id="danmaku-sidebar-title">弹幕列表</span><span class="sidebar-menu-wrap"><button id="danmaku-sidebar-menu" aria-label="切换弹幕面板" aria-expanded="false"><svg class="watch-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#more"/></svg></button><span id="danmaku-sidebar-menu-items" class="sidebar-menu" hidden><button id="sidebar-view-list">弹幕列表</button><button id="sidebar-view-block">屏蔽设定</button><button id="sidebar-view-advanced">高级弹幕</button></span></span><i></i></summary><div id="sidebar-list-view"><div class="danmaku-columns"><span>时间</span><span>弹幕内容</span><span>发送时间</span></div><div id="danmaku-list" class="danmaku-list"></div><button class="history-danmaku" data-login="查看历史弹幕" data-login-only>查看历史弹幕</button></div>
 <div id="sidebar-block-view" class="sidebar-block-view" hidden><div class="block-heading"><label>屏蔽列表 <input id="shield-enabled" type="checkbox" role="switch" checked></label><button data-login="同步屏蔽列表" data-login-only>◌ 同步屏蔽列表</button></div><div id="shield-body"><div class="shield-input"><input id="shield-input" maxlength="100" placeholder='添加屏蔽词，正则以"/"开头"/"结尾'><button id="shield-add">添加</button></div><div class="shield-tabs" role="tablist"><button id="shield-tab-text" role="tab">屏蔽文本</button><button id="shield-tab-regex" role="tab">屏蔽正则</button><button id="shield-tab-user" role="tab">屏蔽用户</button></div><div class="shield-table"><div class="shield-table-head"><span id="shield-count">内容（-）</span><span>状态</span><span>操作</span></div><div id="shield-rows"></div></div></div></div>
 <div id="sidebar-advanced-view" class="sidebar-advanced-view" hidden><fieldset disabled><label>弹幕颜色<input type="color" value="#ffffff"></label><div class="advanced-fields"><label>字体大小<input type="number" value="36"></label><label>文本字体<select><option>黑体</option></select></label><label><input type="checkbox" checked> 文字描边</label><label>Z轴翻转<input type="number" value="0"></label><label>Y轴翻转<input type="number" value="0"></label><label>生存时间<input type="number" value="4.5"></label><label>衰弱透明度<input type="number" value="1"></label><label>运动耗时<input type="number" value="500"></label><label>延迟时间（毫秒）<input type="number" value="0"></label><label><input type="checkbox" checked> 线性加速</label></div><p>运动方式</p><button>起始位置</button><button>路径跟随</button><p>弹幕坐标　□ 按百分比</p><label>起始 X <input type="number" value="0"></label><label>结束 X <input type="number" value="0"></label></fieldset><button class="advanced-login" data-login="高级弹幕" data-login-only>登录后使用高级弹幕</button></div></details>
-        <details id="video-collection" class="video-collection" open hidden><summary><span id="collection-title"></span><small id="collection-position"></small><i></i></summary><div class="collection-meta"><span id="collection-plays"></span><button data-login="订阅合集" data-login-only>订阅合集</button></div><div id="collection-list" class="collection-list"></div></details><div class="related-heading"><h2>接下来播放</h2><label>自动连播 <input id="autoplay-next" type="checkbox" role="switch"></label></div><div id="related-videos"></div><button id="related-expand" class="related-expand" hidden>展开</button><div id="related-extra" hidden></div><button id="related-collapse" class="related-expand" hidden>收起</button>
+        <details id="video-collection" class="video-collection" open hidden><summary><span id="collection-title"></span><small id="collection-position"></small><i></i></summary><div class="collection-meta"><span id="collection-plays"></span><button id="video-subscribe" type="button">订阅合集</button></div><div id="collection-list" class="collection-list"></div></details><div class="related-heading"><h2>接下来播放</h2><label>自动连播 <input id="autoplay-next" type="checkbox" role="switch"></label></div><div id="related-videos"></div><button id="related-expand" class="related-expand" hidden>展开</button><div id="related-extra" hidden></div><button id="related-collapse" class="related-expand" hidden>收起</button>
       </aside>
     </section>
     <div id="sender-tooltip" class="sender-tooltip" role="tooltip" hidden></div>
@@ -242,12 +265,7 @@
         <span><svg><use href="#i-play"/></svg>热门番剧影视看不停</span>
       </div>
       <button type="button" class="login-primary" id="popover-login">立即登录</button>
-      <p id="popover-register" class="popover-register">首次使用？ <a href="/service/注册">点我注册</a></p>
-    </div>
-    <div id="upload-actions" class="upload-actions" hidden>
-      <button type="button"><svg><use href="#i-article"/></svg>专栏投稿</button>
-      <button type="button"><svg><use href="#i-video-upload"/></svg>视频投稿</button>
-      <button type="button"><svg><use href="#i-manage"/></svg>投稿管理</button>
+      <p id="popover-register" class="popover-register">首次使用？ <a href="/service/注册" target="_self" data-register>点我注册</a></p>
     </div>
   </section>
   <dialog id="login-dialog" class="login-dialog" aria-labelledby="login-title">
@@ -255,14 +273,41 @@
     <h2 id="login-title">密码登录</h2>
     <form id="login-form" class="login-form" method="post">
       <div class="login-fields">
-        <label><span>账号</span><input name="account" autocomplete="username" placeholder="请输入账号" required maxlength="80" autofocus></label>
-        <label><span>密码</span><input id="login-password" name="password" type="password" autocomplete="current-password" placeholder="请输入密码" required maxlength="128"><button type="button" id="toggle-password" aria-label="显示密码" aria-pressed="false">显示</button></label>
+        <label><span>UID</span><input name="uid" autocomplete="username" inputmode="numeric" placeholder="请输入注册时获得的 UID" required maxlength="20" pattern="[1-9][0-9]{0,19}" autofocus></label>
+        <div class="password-field">
+          <label for="login-password">密码</label>
+          <input id="login-password" name="password" type="password" autocomplete="current-password" placeholder="请输入密码" required maxlength="128">
+          <button type="button" class="password-toggle" aria-controls="login-password" aria-label="显示密码" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-password-eye"/><path class="password-toggle-slash" d="M3 3l18 18"/></svg></button>
+        </div>
       </div>
       <p id="login-message" class="login-message" role="status"></p>
-      <div class="login-actions"><a href="/service/注册" class="secondary">注册</a><button type="submit" class="login-primary">登录</button></div>
+      <div class="login-actions"><a href="/service/注册" target="_self" class="secondary" data-register>注册</a><button type="submit" class="login-primary">登录</button></div>
     </form>
+    <form id="register-form" class="login-form" method="post" novalidate hidden>
+      <div class="login-fields">
+        <label><span>昵称</span><input name="name" autocomplete="nickname" placeholder="请输入 1 至 16 个字符" required></label>
+        <div class="password-field">
+          <label for="register-password">密码</label>
+          <input id="register-password" name="password" type="password" autocomplete="new-password" placeholder="至少 8 个字符" aria-describedby="register-message" required>
+          <button type="button" class="password-toggle" aria-controls="register-password" aria-label="显示密码" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-password-eye"/><path class="password-toggle-slash" d="M3 3l18 18"/></svg></button>
+        </div>
+        <div class="password-field">
+          <label for="register-confirmation">确认密码</label>
+          <input id="register-confirmation" name="confirmation" type="password" autocomplete="new-password" placeholder="请再次输入密码" aria-describedby="register-message" required>
+          <button type="button" class="password-toggle" aria-controls="register-confirmation" aria-label="显示确认密码" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="#i-password-eye"/><path class="password-toggle-slash" d="M3 3l18 18"/></svg></button>
+        </div>
+      </div>
+      <p id="register-message" class="login-message" role="status"></p>
+      <div class="login-actions"><button type="button" id="back-to-login" class="secondary">返回登录</button><button type="submit" class="login-primary">注册</button></div>
+    </form>
+    <section id="register-result" class="login-form" hidden>
+      <label class="register-uid">下次登录请使用此 UID<input id="registered-uid" readonly></label>
+      <p id="copy-message" class="login-message" role="status"></p>
+      <div class="login-actions"><button id="copy-uid" type="button" class="secondary">复制 UID</button><a id="registered-space" class="login-primary" target="_self">进入我的空间</a></div>
+    </section>
     <img class="login-mascot mascot-left" src="/assets/login-22-open.png" alt="" aria-hidden="true">
     <img class="login-mascot mascot-right" src="/assets/login-33-open.png" alt="" aria-hidden="true">
   </dialog>
+  <p id="account-notice" class="account-notice" role="status" hidden></p>
 </body>
 </html>

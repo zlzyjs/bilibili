@@ -5,6 +5,8 @@
   const save = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
   // Each visit gets its own trial budget; previous visits never lock this one.
   let watched = 0;
+  let signedIn = typeof currentAccount !== 'undefined' && Boolean(currentAccount);
+  const trialExpired = () => !signedIn && watched >= 30;
   let blocked = new Set(read('bili-blocked-users', []));
   let danmaku = [], enabled = true, lastTick = performance.now(), lastVideoTime = 0, nextVideo = null, noticeTimer;
   const shown = new Set();
@@ -77,6 +79,9 @@
     shell.classList.add('inspecting-danmaku');
     const rect = line.getBoundingClientRect(), frame = shell.getBoundingClientRect();
     const toolbar = el('danmaku-actions'); toolbar.hidden = false;
+    if (typeof bindLike === 'function') {
+      bindLike(el('dm-action-like'), 'danmaku', d.id, () => {});
+    }
     const width = toolbar.offsetWidth || 150, height = toolbar.offsetHeight || 44;
     const left = Math.max(8, Math.min(rect.left - frame.left + rect.width / 2 - width / 2, frame.width - width - 8));
     const top = Math.max(8, Math.min(rect.bottom - frame.top + 10, frame.height - height - 8));
@@ -93,7 +98,13 @@
   el('danmaku-actions').addEventListener('focusin', () => clearTimeout(actionTimer));
   el('danmaku-actions').addEventListener('focusout', delayHideActions);
   el('dm-action-like').onclick = () => { if (activeDanmaku) openLogin(el('dm-action-like')); };
-  el('dm-action-report').onclick = () => { if (activeDanmaku) openLogin(el('dm-action-report')); };
+  el('dm-action-report').onclick = () => {
+    if (!activeDanmaku) return;
+    if (!signedIn || typeof reportInteraction !== 'function') return openLogin(el('dm-action-report'));
+    const target = activeDanmaku.id;
+    hideDanmakuActions();
+    reportInteraction('danmaku', target);
+  };
   el('dm-action-copy').onclick = async () => {
     if (!activeDanmaku) return;
     try { await navigator.clipboard.writeText(activeDanmaku.content); notice('弹幕已复制'); }
@@ -109,20 +120,33 @@
     hideDanmakuActions(); player.pause(); el('trial-ended').hidden = false; el('trial-tip').hidden = true;
     if (prompt && !el('login-dialog').open) openLogin(el('play-toggle'));
   }
+  window.addEventListener('accountchange', (event) => {
+    signedIn = Boolean(event.detail);
+    if (signedIn) {
+      el('trial-tip').hidden = true;
+      el('trial-ended').hidden = true;
+    } else if (trialExpired()) {
+      gate(false);
+    } else {
+      lastTick = performance.now();
+      lastVideoTime = player.currentTime;
+      el('trial-tip').hidden = false;
+    }
+  });
   async function play() {
-    if (watched >= 30) return gate();
+    if (trialExpired()) return gate();
     if (!player.paused) return player.pause();
     try { await player.play(); } catch (error) { if (error.name !== 'AbortError') notice('请点击播放；若无法播放，请检查视频文件'); }
   }
   el('play-toggle').onclick = play; el('big-play').onclick = play; el('mini-play-toggle').onclick = play; player.onclick = play;
   el('trial-start').onclick = play;
   el('close-trial').onclick = () => el('trial-tip').hidden = true;
-  player.addEventListener('play', () => { if (watched >= 30) return gate(); lastTick = performance.now(); shell.dataset.playing = 'true'; el('play-toggle').dataset.playing = 'true'; el('big-play').hidden = true; shell.classList.remove('paused-danmaku'); });
+  player.addEventListener('play', () => { if (trialExpired()) return gate(); lastTick = performance.now(); shell.dataset.playing = 'true'; el('play-toggle').dataset.playing = 'true'; el('big-play').hidden = true; shell.classList.remove('paused-danmaku'); });
   player.addEventListener('pause', () => { shell.dataset.playing = 'false'; el('play-toggle').dataset.playing = 'false'; el('big-play').hidden = false; shell.classList.add('paused-danmaku'); });
   // Count elapsed playing time, never the timeline position or the seek distance.
   const countTrial = () => {
     const now = performance.now(), elapsed = (now - lastTick) / 1000; lastTick = now;
-    if (!player.paused && !player.ended && !player.seeking && player.readyState >= 3 && player.currentTime !== lastVideoTime) {
+    if (!signedIn && !player.paused && !player.ended && !player.seeking && player.readyState >= 3 && player.currentTime !== lastVideoTime) {
       watched = Math.min(30, watched + Math.min(elapsed, Math.max(0, player.currentTime - lastVideoTime) / (player.playbackRate || 1)));
       if (watched >= 30) gate();
     }
@@ -138,7 +162,7 @@
     watched = 0; lastTick = performance.now(); lastVideoTime = 0;
     player.currentTime = 0;
     el('trial-ended').hidden = true;
-    el('trial-tip').hidden = false;
+    el('trial-tip').hidden = signedIn;
     timer = setInterval(countTrial, 100);
   });
   player.addEventListener('timeupdate', () => {
@@ -288,17 +312,28 @@
     el('video-tags').replaceChildren(link('/channel/' + video.categoryId, video.category), ...tags.map(t => link('/search?tag=' + encodeURIComponent(t), t)));
     el('fullscreen-title').textContent = video.title; el('watch-author-name').textContent = video.author; el('watch-author-link').href = '/space/' + video.authorId;
     el('watch-avatar').src = '/api/authors/' + video.authorId + '/avatar'; el('watch-avatar').onerror = e => { e.target.removeAttribute('src'); e.target.alt = 'UP'; };
-    api('/authors/' + video.authorId).then(a => { el('watch-signature').textContent = a.signature || '这个人很神秘，什么都没有写'; el('watch-followers').textContent = shortCount(a.followers); }).catch(() => el('watch-signature').textContent = '');
+    api('/authors/' + video.authorId).then(a => { el('watch-signature').textContent = a.signature || '这个人很神秘，什么都没有写'; }).catch(() => el('watch-signature').textContent = '');
     el('player-author-avatar').src = '/api/authors/' + video.authorId + '/avatar';
     el('player-author-avatar').onerror = e => { e.target.hidden = true; };
     player.poster = video.coverUrl;
     player.onerror = () => { el('player-status').hidden = false; el('player-status').textContent = '视频文件暂时不可用，请确认本地媒体文件与数据库路径一致'; };
     if (video.streamUrl) player.src = video.streamUrl;
     else { el('player-status').hidden = false; el('player-status').textContent = '暂无视频文件'; }
-    if (watched >= 30) gate(false);
+    if (trialExpired()) gate(false);
     else if (video.streamUrl && preferences.autoStart) { player.muted = preferences.muted; player.play().catch(() => {}); }
     api('/videos/' + id + '/engagement').then(stats => { for (const key of ['like','coin','favorite','share']) el(key + '-count').textContent = shortCount(stats[key]); }).catch(() => { document.querySelector('.video-actions').title = '互动数据暂时加载失败'; });
-    api('/videos/' + id + '/danmaku').then(rows => { danmaku = rows; renderDanmaku(); }).catch(() => el('danmaku-list').append(node('p', 'status', '弹幕加载失败，请刷新重试')));
+    api('/videos/' + id + '/danmaku').then(rows => {
+      danmaku = [...new Map([...rows, ...danmaku].map(row => [row.id, row])).values()];
+      renderDanmaku();
+    }).catch(() => el('danmaku-list').append(node('p', 'status', '弹幕加载失败，请刷新重试')));
+    if (typeof setupVideoInteractions === 'function') {
+      setupVideoInteractions(id, video.authorId, player, video.duration, row => {
+        danmaku.push(row);
+        renderDanmaku();
+        if (enabled && watchSidebar.allowed(row) && watchPreferences.allows('scroll')
+            && displayDanmaku(row, 'scroll')) shown.add(row.id);
+      });
+    }
   } catch (error) { el('video-title').textContent = error.message === '404' ? '视频不存在或已下架' : '视频加载失败'; el('player-status').hidden = false; el('player-status').textContent = '请返回首页选择其他视频'; }
   let collectionNext = null, collectionPrevious = null;
   try {
@@ -332,7 +367,7 @@
   } catch { el('related-videos').textContent = '暂无推荐视频'; }
   el('fullscreen-prev').onclick = () => { if (collectionPrevious) location.assign('/video/' + collectionPrevious.id); else notice('没有上一集'); };
   el('fullscreen-next').onclick = () => { if (collectionNext || nextVideo) location.assign('/video/' + (collectionNext || nextVideo).id); else notice('没有下一集'); };
-  player.addEventListener('ended', () => { if (el('autoplay-next').checked && (collectionNext || nextVideo) && watched < 30) location.assign('/video/' + (collectionNext || nextVideo).id); });
+  player.addEventListener('ended', () => { if (el('autoplay-next').checked && (collectionNext || nextVideo) && !trialExpired()) location.assign('/video/' + (collectionNext || nextVideo).id); });
 }
 
 function setupPlayerControlsIdle(shell) {

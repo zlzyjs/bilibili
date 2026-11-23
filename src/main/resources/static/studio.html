@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>创作中心 · dilidili</title>
+  <link rel="stylesheet" href="/studio.css?v=2">
+  <script src="/studio-upload.js?v=1" defer></script>
+  <script src="/studio.js?v=2" defer></script>
+</head>
+<body>
+  <svg class="studio-symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="studio-icon-upload" viewBox="0 0 24 24"><path d="M12 15V4m-4 4 4-4 4 4M5 14v5h14v-5"/></symbol>
+    <symbol id="studio-icon-home" viewBox="0 0 24 24"><path d="m3 11 9-7 9 7M6 10v10h12V10"/></symbol>
+    <symbol id="studio-icon-media" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><path d="m10 9 5 3-5 3z"/></symbol>
+    <symbol id="studio-icon-data" viewBox="0 0 24 24"><path d="M4 4v16h16M8 15l4-4 3 2 4-6"/></symbol>
+    <symbol id="studio-icon-followers" viewBox="0 0 24 24"><circle cx="10" cy="8" r="3"/><path d="M4 20v-2a6 6 0 0 1 10-4.5m4-1v7m-3.5-3.5h7"/></symbol>
+    <symbol id="studio-icon-income" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="13" rx="3"/><path d="M4 9h16m-5 5h2"/></symbol>
+  </svg>
+  <header class="studio-header">
+    <a class="studio-brand" href="/studio"><span>dilidili</span> 创作中心</a>
+    <a href="/" class="main-site">返回主站 ↗</a>
+    <a href="/me" id="studio-account" hidden><img alt="" width="32" height="32"><span></span></a>
+  </header>
+  <div class="studio-shell">
+    <nav class="studio-nav" aria-label="创作中心">
+      <a class="studio-upload-link" href="/studio/upload"><svg aria-hidden="true"><use href="#studio-icon-upload"/></svg>投稿</a>
+      <a href="/studio"><svg aria-hidden="true"><use href="#studio-icon-home"/></svg>首页</a>
+      <a href="/studio/videos"><svg aria-hidden="true"><use href="#studio-icon-media"/></svg>稿件管理</a>
+      <a href="/studio/analytics"><svg aria-hidden="true"><use href="#studio-icon-data"/></svg>数据概览</a>
+      <a href="/studio/fans"><svg aria-hidden="true"><use href="#studio-icon-followers"/></svg>粉丝管理</a>
+      <div class="studio-nav-group">
+        <span><svg aria-hidden="true"><use href="#studio-icon-income"/></svg>收益管理</span>
+        <a href="/studio/income">收益中心</a>
+        <a href="/studio/charge">充电计划</a>
+      </div>
+    </nav>
+    <main id="studio-content" class="studio-content" aria-busy="true">
+      <p role="status">正在加载创作中心…</p>
+    </main>
+  </div>
+</body>
+</html>
+

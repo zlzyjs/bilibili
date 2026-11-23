@@ -349,7 +349,7 @@ class MysqlVideoCatalog {
                 """).param("id", videoId).query(MysqlVideoCatalog::readVideo).list();
     }
 
-    CommentPage comments(String videoId) {
+    CommentPage comments(String videoId, boolean latest, int page, boolean member) {
         long total = jdbc.sql("SELECT COUNT(*) FROM commenttable WHERE VideoID=CAST(:id AS UNSIGNED) AND CommentStatus='active'")
                 .param("id", videoId).query(Long.class).single();
         var comments = jdbc.sql("""
@@ -358,8 +358,10 @@ class MysqlVideoCatalog {
                 FROM commenttable c JOIN usertable u ON u.UID=c.UID
                 LEFT JOIN userleveltable l ON l.LevelID=u.LevelID
                 WHERE c.VideoID=CAST(:id AS UNSIGNED) AND c.CommentStatus='active'
-                ORDER BY Likes DESC, c.CommentTime DESC, c.CommentID DESC LIMIT 2
-                """).param("id", videoId).query((rs, row) -> {
+                ORDER BY
+                """ + (latest ? "" : " Likes DESC, ") + " c.CommentTime DESC, c.CommentID DESC LIMIT :size OFFSET :offset")
+                .param("id", videoId).param("size", member ? 20 : 2).param("offset", member ? (page - 1) * 20 : 0)
+                .query((rs, row) -> {
                     var replies = previewReplies(rs.getString("CommentID"));
                     return new CommentPreview(rs.getString("CommentID"), rs.getString("UID"), rs.getString("Name"),
                         rs.getString("LevelName"), rs.getString("Content"), rs.getObject("CommentTime", LocalDateTime.class),
@@ -369,6 +371,10 @@ class MysqlVideoCatalog {
     }
 
     private List<ReplyPreview> previewReplies(String commentId) {
+        return replies(commentId, 2);
+    }
+
+    List<ReplyPreview> replies(String commentId, int limit) {
         return jdbc.sql("""
                 WITH RECURSIVE thread AS (
                   SELECT r.*, 1 AS depth FROM replytable r
@@ -382,8 +388,8 @@ class MysqlVideoCatalog {
                   (SELECT COUNT(*) FROM liketable k WHERE k.LikeTargetType=3 AND k.LikeTargetID=t.ReplyID) AS Likes,
                   COUNT(*) OVER() AS Total FROM thread t JOIN usertable u ON u.UID=t.UID
                 LEFT JOIN userleveltable l ON l.LevelID=u.LevelID
-                ORDER BY t.ReplyTime, t.ReplyID LIMIT 2
-                """).param("id", commentId).query((rs, row) -> new ReplyPreview(rs.getString("ReplyID"),
+                ORDER BY t.ReplyTime, t.ReplyID LIMIT :limit
+                """).param("id", commentId).param("limit", limit).query((rs, row) -> new ReplyPreview(rs.getString("ReplyID"),
                     rs.getString("UID"), rs.getString("Name"), rs.getString("LevelName"), rs.getString("Content"),
                     rs.getObject("ReplyTime", LocalDateTime.class), rs.getLong("Likes"), rs.getLong("Total"))).list();
     }
@@ -425,7 +431,7 @@ class MysqlVideoCatalog {
                 rs.getString("VideoContent"), rs.getString("CompilationTitle"));
     }
 
-    private static LocalDate today() {
+    static LocalDate today() {
         return LocalDate.now(ZoneId.of("Asia/Shanghai"));
     }
 

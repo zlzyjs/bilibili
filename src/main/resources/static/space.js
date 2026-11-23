@@ -1,14 +1,4 @@
-async function loadSpace() {
-  const base = '/space/' + encodeURIComponent(authorId);
-  const view = ['uploads', 'lists', 'collection'].includes(params.get('tab')) ? params.get('tab') : keyword ? 'uploads' : 'home';
-  const content = el('space-content');
-  const currentSort = ['popular', 'favorites'].includes(params.get('sort')) ? params.get('sort') : 'latest';
-  const url = (changes) => {
-    const query = new URLSearchParams(changes);
-    return base + '?' + query;
-  };
-  const videos = async (options = {}) => api('/videos?' + new URLSearchParams({ authorId, size: 20, sort: 'latest', ...options }));
-  const collectionUrl = (id) => url({ tab: 'collection', collection: id });
+function spaceViewTools(view, params, page, url) {
   const layoutToggle = (compact) => {
     const enabled = params.get('layout') === compact;
     const a = link(url({ ...Object.fromEntries(params), layout: enabled ? '' : compact }), null, 'space-layout-toggle');
@@ -29,7 +19,7 @@ async function loadSpace() {
     if (page) nav.append(link(url({ ...Object.fromEntries(params), page: page - 1 }), '上一页', 'secondary'));
     if (page || result.hasMore) nav.append(node('span', '', '第 ' + (page + 1) + ' 页'));
     if (result.hasMore) nav.append(link(url({ ...Object.fromEntries(params), page: page + 1 }), '下一页', 'secondary'));
-    content.append(nav);
+    return nav;
   };
   const grid = (entries) => {
     const list = view === 'uploads' && params.get('layout') === 'list';
@@ -62,6 +52,75 @@ async function loadSpace() {
     result.append(picture, node('p', '', message));
     return result;
   };
+  return { layoutToggle, playAll, pagination, section, empty };
+}
+
+async function spaceCollectionContent({ view, params, page, url, videos, collections, navigate }) {
+  const { layoutToggle, playAll, pagination, section, empty } = spaceViewTools(view, params, page, url);
+  const collectionUrl = (id) => url({ tab: 'collection', collection: id });
+  if (view === 'collection') {
+    const collection = collections.find((entry) => entry.id === params.get('collection'));
+    if (!collection) return [empty('合集不存在或不属于这位作者')];
+    const collectionSort = params.get('sort') === 'reverse' ? 'reverse' : 'sequence';
+    const result = await videos({ compilationId: collection.id, sort: collectionSort, page });
+    const block = section('合集·' + collection.title, result.items);
+    block.classList.add('space-collection-detail');
+    const back = link(url({ tab: 'lists' }), '‹ ', 'collection-back');
+    back.setAttribute('aria-label', '返回合集和系列');
+    block.firstChild.firstChild.prepend(back);
+    const tools = node('div', 'collection-tools');
+    const first = page ? (await videos({ compilationId: collection.id, sort: collectionSort, page: 0, size: 1 })).items[0] : result.items[0];
+    if (first) tools.append(playAll(first));
+    const order = node('select');
+    order.setAttribute('aria-label', '合集排序');
+    for (const [value, label] of [['sequence', '默认排序'], ['reverse', '倒序排序']]) {
+      const option = node('option', '', label); option.value = value; order.append(option);
+    }
+    order.value = collectionSort;
+    order.onchange = () => { navigate(url({ tab: 'collection', collection: collection.id, sort: order.value })); };
+    tools.append(order);
+    block.firstChild.after(node('p', 'collection-summary', '合集 · ' + collection.videos + ' 个视频'), tools);
+    return [block, pagination(result)];
+  }
+  const blocks = await Promise.all(collections.map(async (collection) => {
+    const result = await videos({ compilationId: collection.id, size: 6, sort: 'sequence' });
+    if (view === 'lists' && params.get('layout') === 'cards') {
+      const a = link(collectionUrl(collection.id), null, 'collection-tile');
+      const cover = node('div', 'card-cover'); const img = node('img'); img.alt = ''; img.loading = 'lazy';
+      cover.append(img, node('span', 'collection-count', '合集 ' + collection.videos + ' 个视频'));
+      if (result.items.length) attachCover(img, result.items[0].coverUrl, '合集');
+      else { img.hidden = true; cover.dataset.fallback = '合集'; }
+      a.append(cover, node('h3', '', collection.title)); return a;
+    }
+    const block = section('合集·' + collection.title + ' · ' + collection.videos, result.items);
+    block.classList.add('space-collection');
+    const actions = node('div', 'space-video-actions');
+    if (result.items.length) actions.append(playAll(result.items[0]));
+    actions.append(link(collectionUrl(collection.id), '查看更多 ›', 'secondary'));
+    block.firstChild.append(actions);
+    return block;
+  }));
+  if (view === 'home') return blocks;
+  const heading = node('div', 'space-heading');
+  heading.append(node('h2', '', '合集和系列'), layoutToggle('cards'));
+  if (!blocks.length) return [heading, empty('空间主人还没建过合集和系列，这里什么也没有...')];
+  if (params.get('layout') !== 'cards') return [heading, ...blocks];
+  const tiles = node('div', 'collection-tiles');
+  tiles.append(...blocks);
+  return [heading, tiles];
+}
+
+async function loadSpace() {
+  const base = '/space/' + encodeURIComponent(authorId);
+  const view = ['uploads', 'lists', 'collection'].includes(params.get('tab')) ? params.get('tab') : keyword ? 'uploads' : 'home';
+  const content = el('space-content');
+  const currentSort = ['popular', 'favorites'].includes(params.get('sort')) ? params.get('sort') : 'latest';
+  const url = (changes) => {
+    const query = new URLSearchParams(changes);
+    return base + '?' + query;
+  };
+  const videos = async (options = {}) => api('/videos?' + new URLSearchParams({ authorId, size: 20, sort: 'latest', ...options }));
+  const { layoutToggle, playAll, pagination, section, empty } = spaceViewTools(view, params, page, url);
   const videoSection = (title, result, firstVideo) => {
     const block = section(title, result.items);
     const heading = block.firstChild;
@@ -90,6 +149,11 @@ async function loadSpace() {
     el('author-uid').replaceChildren(icon('uid'), author.id);
     el('author-following').textContent = shortCount(author.following);
     el('author-followers').textContent = shortCount(author.followers);
+    setupAuthorInteractions(author.id, document.querySelector('.space-actions'), followers => {
+      el('author-followers').textContent = shortCount(followers);
+    });
+    setupPeopleList(el('author-following').parentElement, author.id, 'following', '关注列表');
+    setupPeopleList(el('author-followers').parentElement, author.id, 'followers', '粉丝列表');
     el('author-birthday').hidden = !author.birthday;
     el('author-birthday').replaceChildren(icon('cake'), author.birthday || '');
     const avatar = node('img');
@@ -114,35 +178,14 @@ async function loadSpace() {
       content.append(empty('空间主人还没投过稿，这里什么也没有...'));
       return;
     }
-    if (view === 'collection') {
-      const collection = collections.find((entry) => entry.id === params.get('collection'));
-      if (!collection) { content.append(empty('合集不存在或不属于这位作者')); return; }
-      const collectionSort = params.get('sort') === 'reverse' ? 'reverse' : 'sequence';
-      const result = await videos({ compilationId: collection.id, sort: collectionSort, page });
-      const block = section('合集·' + collection.title, result.items);
-      block.classList.add('space-collection-detail');
-      block.firstChild.firstChild.prepend(link(url({ tab: 'lists' }), '‹ ', 'collection-back'));
-      const tools = node('div', 'collection-tools');
-      const first = page ? (await videos({ compilationId: collection.id, sort: collectionSort, page: 0, size: 1 })).items[0] : result.items[0];
-      if (first) tools.append(playAll(first));
-      const order = node('select');
-      order.setAttribute('aria-label', '合集排序');
-      for (const [value, label] of [['sequence', '默认排序'], ['reverse', '倒序排序']]) {
-        const option = node('option', '', label); option.value = value; order.append(option);
-      }
-      order.value = collectionSort;
-      order.onchange = () => { location.href = url({ tab: 'collection', collection: collection.id, sort: order.value }); };
-      tools.append(order);
-      block.firstChild.after(node('p', 'collection-summary', '合集 · ' + collection.videos + ' 个视频'), tools);
-      content.append(block); pagination(result);
-    } else if (view === 'uploads') {
+    if (view === 'uploads') {
       const query = { page, sort: currentSort, q: keyword };
       if (params.get('collection')) query.compilationId = params.get('collection');
       const result = await videos(query);
       const collection = collections.find((entry) => entry.id === params.get('collection'));
       const first = page ? (await videos({ ...query, page: 0, size: 1 })).items[0] : result.items[0];
       content.append(videoSection(keyword ? '搜索：' + keyword : collection ? collection.title + ' · ' + collection.videos : '全部视频 · ' + author.videos, result, first));
-      pagination(result);
+      content.append(pagination(result));
     } else {
       if (view === 'home') {
         const featured = await videos({ sort: 'popular', size: 1 });
@@ -153,34 +196,8 @@ async function loadSpace() {
         const result = await videos({ sort: currentSort, size: 10 });
         content.append(videoSection('视频 · ' + author.videos, result, result.items[0]));
       }
-      const blocks = await Promise.all(collections.map(async (collection) => {
-        const result = await videos({ compilationId: collection.id, size: 6, sort: 'sequence' });
-        if (view === 'lists' && params.get('layout') === 'cards') {
-          const a = link(collectionUrl(collection.id), null, 'collection-tile');
-          const cover = node('div', 'card-cover'); const img = node('img'); img.alt = ''; img.loading = 'lazy';
-          cover.append(img, node('span', 'collection-count', '合集 ' + collection.videos + ' 个视频'));
-          if (result.items.length) attachCover(img, result.items[0].coverUrl, '合集');
-          else { img.hidden = true; cover.dataset.fallback = '合集'; }
-          a.append(cover, node('h3', '', collection.title)); return a;
-        }
-        const block = section('合集·' + collection.title + ' · ' + collection.videos, result.items);
-        block.classList.add('space-collection');
-        const actions = node('div', 'space-video-actions');
-        if (result.items.length) actions.append(playAll(result.items[0]));
-        actions.append(link(collectionUrl(collection.id), '查看更多 ›', 'secondary'));
-        block.firstChild.append(actions);
-        return block;
-      }));
-      if (view === 'lists' && params.get('layout') === 'cards') {
-        const tiles = node('div', 'collection-tiles'); tiles.append(...blocks); content.append(tiles);
-      } else content.append(...blocks);
-      if (view === 'lists') {
-        const heading = node('div', 'space-heading');
-        heading.append(node('h2', '', '合集和系列'));
-        heading.append(layoutToggle('cards'));
-        content.prepend(heading);
-        if (!blocks.length) content.append(empty('空间主人还没建过合集和系列，这里什么也没有...'));
-      }
+      content.append(...await spaceCollectionContent({ view, params, page, url, videos, collections,
+        navigate: (href) => { location.href = href; } }));
     }
   } catch (error) {
     content.replaceChildren(node('p', 'space-empty', error.message === '404' ? '作者不存在，请返回首页选择其他作者' : '空间加载失败，请稍后重试'));

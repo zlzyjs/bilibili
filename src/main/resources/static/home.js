@@ -14,6 +14,7 @@ const watching = path.startsWith('/video/');
 const service = path.startsWith('/service/');
 const category = path.startsWith('/channel/') ? path.split('/')[2] : null;
 const authorId = path.startsWith('/space/') ? path.split('/')[2] : null;
+const personalSpace = path === '/me';
 const sort = latestPage ? 'latest'
   : ['popular', 'latest', 'recommend', 'danmaku', 'favorites'].includes(params.get('sort')) ? params.get('sort')
   : authorId ? 'latest' : 'recommend';
@@ -484,10 +485,11 @@ async function init() {
   document.body.classList.toggle('channel-page', Boolean(category));
   document.body.classList.toggle('search-page', search);
   document.body.classList.toggle('author-page', Boolean(authorId));
-  document.querySelector('.channels').hidden = watching || service || discoveryPage || Boolean(authorId);
+  document.body.classList.toggle('personal-space-page', personalSpace);
+  document.querySelector('.channels').hidden = watching || service || discoveryPage || Boolean(authorId) || personalSpace;
   document.querySelector('.channel-links a[href="' + path + '"]')?.setAttribute('aria-current', 'page');
   el('author-profile').hidden = !authorId;
-  document.querySelector('.feed').hidden = watching || service || Boolean(authorId);
+  document.querySelector('.feed').hidden = watching || service || Boolean(authorId) || personalSpace;
   el('video-page').hidden = !watching;
   el('service-page').hidden = !service;
   el('featured').hidden = !home;
@@ -502,6 +504,7 @@ async function init() {
     return;
   }
   if (watching) return loadWatchPage();
+  if (personalSpace) return setupPersonalSpace();
   if (authorId) return loadSpace();
   if (search) return loadSearch();
   if (popularPage) {

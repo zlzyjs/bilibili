@@ -12,8 +12,14 @@ import org.springframework.web.bind.annotation.GetMapping;
 class PageController {
     private final Resource index = new ClassPathResource("static/index.html");
 
+    @GetMapping({"/studio", "/studio/{section}"})
+    ResponseEntity<Resource> studio() {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .contentType(MediaType.TEXT_HTML).body(new ClassPathResource("static/studio.html"));
+    }
+
     @GetMapping({"/", "/index.html", "/recommend", "/search", "/channel/{id}", "/popular", "/popular/must-watch", "/popular/rank", "/latest",
-            "/video/{id}", "/space/{id}", "/service/{name}", "/collections", "/creators"})
+            "/video/{id}", "/space/{id}", "/me", "/service/{name}", "/collections", "/creators"})
     ResponseEntity<Resource> page() {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())

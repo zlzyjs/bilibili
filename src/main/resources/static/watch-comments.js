@@ -1,46 +1,127 @@
 async function setupWatchComments(videoId) {
-  const list = el('comment-list');
-  let requestVersion = 0;
-  const loginButton = (text, className='') => { const button=node('button',className,text);button.onclick=()=>openLogin(button);return button; };
-  const svg = name => { const element=document.createElementNS('http://www.w3.org/2000/svg','svg');const use=document.createElementNS(element.namespaceURI,'use');use.setAttribute('href','/assets/watch-icons.svg#'+name);element.setAttribute('aria-hidden','true');element.append(use);return element; };
-  function avatar(entry) {
-    const a=link('/space/'+encodeURIComponent(entry.userId),null,'comment-avatar');
-    const img=node('img');img.alt=entry.author;img.loading='lazy';img.src='/api/authors/'+encodeURIComponent(entry.userId)+'/avatar';
-    img.onerror=()=>{img.hidden=true;a.textContent=entry.author.slice(0,1);};a.append(img);return a;
+  const list = el('comment-list'), moreComments = el('comments-more');
+  const endpoint = '/videos/' + encodeURIComponent(videoId) + '/comments';
+  const signedIn = () => typeof currentAccount !== 'undefined' && Boolean(currentAccount);
+  let requestVersion = 0, sort = 'hot', page = 1;
+  function action(text, className, callback) {
+    const button = node('button', className, text);
+    button.type = 'button';
+    if (typeof memberAction === 'function') memberAction(button, callback);
+    else button.onclick = () => openLogin(button);
+    return button;
   }
-  function renderEntry(entry, reply=false) {
-    const article=node('article',reply?'comment-reply':'comment-entry'),body=node('div','comment-body');
-    const byline=node('div','comment-byline');byline.append(link('/space/'+encodeURIComponent(entry.userId),entry.author));
-    if(entry.level)byline.append(node('span','comment-level',entry.level));
-    const content=node('p','comment-content',entry.content),actions=node('div','comment-actions');
-    actions.append(node('time','',(entry.sentAt||'').replace('T',' ').slice(0,16)));
-    const like=loginButton(shortCount(entry.likes));like.setAttribute('aria-label','点赞');like.prepend(svg('like-outline'));
-    const more=loginButton('⋮','comment-options');more.setAttribute('aria-label','评论更多操作');
-    actions.append(like,loginButton('回复'),more);body.append(byline,content,actions);article.append(avatar(entry),body);
-    if(!reply) {
-      const previews=node('div','comment-replies');
-      (entry.replies||[]).slice(0,2).forEach(r=>previews.append(renderEntry(r,true)));
-      if(entry.replyCount>0)previews.append(loginButton('共'+entry.replyCount+'条回复，点击查看','comment-view-replies'));
+  function svg(name) {
+    const element = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    const use = document.createElementNS(element.namespaceURI, 'use');
+    use.setAttribute('href', '/assets/watch-icons.svg#' + name);
+    element.setAttribute('aria-hidden', 'true');
+    element.append(use);
+    return element;
+  }
+  function avatar(entry) {
+    const a = link('/space/' + encodeURIComponent(entry.userId), null, 'comment-avatar');
+    const img = node('img');
+    img.alt = entry.author;
+    img.loading = 'lazy';
+    img.src = '/api/authors/' + encodeURIComponent(entry.userId) + '/avatar';
+    img.onerror = () => { img.hidden = true; a.textContent = entry.author.slice(0, 1); };
+    a.append(img);
+    return a;
+  }
+  function renderEntry(entry, reply = false, reload = () => load(sort)) {
+    const kind = reply ? 'reply' : 'comment';
+    const article = node('article', reply ? 'comment-reply' : 'comment-entry');
+    const body = node('div', 'comment-body'), byline = node('div', 'comment-byline');
+    byline.append(link('/space/' + encodeURIComponent(entry.userId), entry.author));
+    if (entry.level) byline.append(node('span', 'comment-level', entry.level));
+    const content = node('p', 'comment-content', entry.content), actions = node('div', 'comment-actions');
+    actions.append(node('time', '', (entry.sentAt || '').replace('T', ' ').slice(0, 16)));
+    const like = action('', '', () => {});
+    const count = node('span', '', shortCount(entry.likes));
+    like.setAttribute('aria-label', '点赞');
+    like.append(svg('like-outline'), count);
+    if (typeof bindLike === 'function') bindLike(like, kind, entry.id, value => { count.textContent = shortCount(value); });
+    const replyButton = action('回复', '', () => textInteraction('回复评论', '回复内容', 1000, async value => {
+      await interaction('/replies/' + kind + '/' + entry.id, 'POST', { value });
+      await reload();
+    }));
+    const report = action('举报', 'comment-options', () => reportInteraction(kind, entry.id));
+    actions.append(like, replyButton, report);
+    body.append(byline, content, actions);
+    article.append(avatar(entry), body);
+    if (!reply) {
+      const previews = node('div', 'comment-replies');
+      const expand = async () => {
+        const rows = await interaction('/comments/' + entry.id + '/replies');
+        previews.replaceChildren(...rows.map(row => renderEntry(row, true, expand)));
+      };
+      (entry.replies || []).slice(0, 2).forEach(row => previews.append(renderEntry(row, true, expand)));
+      if (entry.replyCount > 0) {
+        previews.append(action('共 ' + entry.replyCount + ' 条回复，点击查看', 'comment-view-replies', expand));
+      }
       body.append(previews);
     }
     return article;
   }
-  async function load(sort) {
-    const version=++requestVersion;
-    el('comments-hot').setAttribute('aria-pressed',String(sort==='hot'));el('comments-latest').setAttribute('aria-pressed',String(sort==='latest'));
-    list.setAttribute('data-preview','false');list.textContent='正在加载评论…';el('comments-more').hidden=true;
+
+  async function load(nextSort, nextPage = 1) {
+    const version = ++requestVersion;
+    const member = signedIn();
+    sort = nextSort;
+    el('comments-hot').setAttribute('aria-pressed', String(sort === 'hot'));
+    el('comments-latest').setAttribute('aria-pressed', String(sort === 'latest'));
+    if (nextPage === 1) {
+      list.setAttribute('data-preview', 'false');
+      list.textContent = '正在加载评论…';
+    }
+    moreComments.hidden = true;
     try {
-      const data=await api('/videos/'+encodeURIComponent(videoId)+'/comments?sort='+sort);if(version!==requestVersion)return;
-      el('comment-total').textContent=shortCount(data.total);
-      list.replaceChildren(...data.items.slice(0,2).map(c=>renderEntry(c)));
-      list.setAttribute('data-preview',String(data.items.length>0));
-      if(!data.items.length)list.append(node('p','comments-empty','还没有评论，登录后发条评论吧'));
-      el('comments-more').textContent='登录后查看 '+data.total+' 条评论';el('comments-more').hidden=data.total===0;
-    }catch {if(version===requestVersion)list.textContent='评论加载失败，请刷新重试';}
+      const data = await api(endpoint + '?sort=' + sort + '&page=' + nextPage);
+      if (version !== requestVersion) return;
+      page = nextPage;
+      el('comment-total').textContent = shortCount(data.total);
+      const rows = (member ? data.items : data.items.slice(0, 2)).map(entry => renderEntry(entry));
+      if (nextPage === 1) list.replaceChildren(...rows);
+      else list.append(...rows);
+      list.setAttribute('data-preview', String(!member && rows.length > 0));
+      if (nextPage === 1 && !rows.length) list.append(node('p', 'comments-empty', '还没有评论'));
+      moreComments.textContent = member ? '加载更多评论' : '登录后查看 ' + data.total + ' 条评论';
+      moreComments.hidden = member ? page * 20 >= data.total : data.total === 0;
+    } catch {
+      if (version !== requestVersion) return;
+      if (nextPage === 1) list.textContent = '评论加载失败，请刷新重试';
+      else { moreComments.hidden = false; accountNotice('评论加载失败，请重试'); }
+    }
   }
-  el('comments-hot').onclick=()=>load('hot');el('comments-latest').onclick=()=>openLogin(el('comments-latest'));
+
+  el('comments-hot').onclick = () => load('hot');
+  el('comments-latest').onclick = () => signedIn() ? load('latest') : openLogin(el('comments-latest'));
+  moreComments.onclick = () => signedIn() ? load(sort, page + 1) : openLogin(moreComments);
+  const guest = el('comment-guest'), form = el('comment-entry-form');
+  guest.onclick = () => openLogin(guest);
+  form.onsubmit = async event => {
+    event.preventDefault();
+    const input = el('comment-text'), send = el('comment-send');
+    if (!signedIn()) return openLogin(guest);
+    if (send.disabled || !input.value.trim()) return;
+    send.disabled = true;
+    try {
+      await interaction(endpoint, 'POST', { value: input.value });
+      input.value = '';
+      await load('latest');
+    } catch (error) { accountNotice(error.message); }
+    finally { send.disabled = false; }
+  };
+  function updateComposer() {
+    guest.hidden = signedIn();
+    form.hidden = !signedIn();
+  }
+  window.addEventListener('accountchange', () => { updateComposer(); load(signedIn() ? sort : 'hot'); });
+  updateComposer();
   await load('hot');
 }
+
+
 
 function setupRelatedExpansion(videos) {
   const first=videos.slice(0,20),extra=videos.slice(20);
