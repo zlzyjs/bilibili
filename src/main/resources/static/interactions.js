@@ -150,8 +150,9 @@ function setupAuthorInteractions(id, root, renderFollowers) {
     const state = await interaction(resource);
     apply(await interaction(resource + '/block', 'PUT', { enabled: !state.blocked }));
   });
-  if (message) memberAction(message, () => textInteraction('发私信', '消息', 1000,
-    value => interaction('/authors/' + id + '/messages', 'POST', { value })));
+  if (message) memberAction(message, () => {
+    location.assign('/messages?' + new URLSearchParams({ uid: id }));
+  });
   if (report) memberAction(report, () => reportInteraction('account', id));
   const refreshQuietly = () => refresh().catch(() => {});
   window.addEventListener('accountchange', refreshQuietly);
@@ -293,6 +294,7 @@ function setupVideoInteractions(id, author, player, duration, onDanmaku) {
 }
 
 function setupInteractionNavigation() {
+  memberAction(document.querySelector('[data-interaction=messages]'), () => location.assign('/messages'));
   const listVideo = (entry, label) => {
     const item = link('/video/' + entry.id, entry.title);
     const row = node('li');
@@ -302,27 +304,12 @@ function setupInteractionNavigation() {
   };
   const destinations = [
     ['favorites', '我的收藏', row => listVideo(row, row.folder)],
-    ['history', '观看历史', row => listVideo(row, row.position ? '观看至 ' + duration(row.position) : '')],
-    ['messages', '我的消息', row => {
-      const item = node('li');
-      item.append(link('/space/' + row.senderId, row.sender), node('small', '', row.sentAt?.replace('T', ' ')));
-      if (row.videoId) item.append(link('/video/' + row.videoId, '查看转发的视频'));
-      else item.append(node('p', '', row.content || '转发的视频已不可用'));
-      return item;
-    }]
+    ['history', '观看历史', row => listVideo(row, row.position ? '观看至 ' + duration(row.position) : '')]
   ];
   destinations.forEach(([kind, title, render]) => {
     memberAction(document.querySelector('[data-interaction=' + kind + ']'), () => interactionPanel(title, async (body) => {
       hideLoginPopup();
       appendInteractionList(body, await interaction('/' + kind), render);
-      if (kind === 'messages') {
-        body.append(node('h3', '', '系统通知'));
-        appendInteractionList(body, await interaction('/notifications'), row => {
-          const item = node('li');
-          item.append(node('small', '', row.sentAt?.replace('T', ' ')), node('p', '', row.content));
-          return item;
-        });
-      }
       if (kind === 'history') {
         body.append(node('h3', '', '搜索历史'));
         appendInteractionList(body, await interaction('/search-history'), keyword => {

@@ -23,11 +23,19 @@ class InteractionController {
     private final JdbcClient jdbc;
     private final AuthController auth;
     private final MysqlVideoCatalog catalog;
+    private final MessageStore inbox;
 
-    InteractionController(JdbcClient jdbc, AuthController auth, MysqlVideoCatalog catalog) {
+    InteractionController(JdbcClient jdbc, AuthController auth, MysqlVideoCatalog catalog, MessageStore inbox) {
         this.jdbc = jdbc;
         this.auth = auth;
         this.catalog = catalog;
+        this.inbox = inbox;
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    ResponseEntity<Map<String, String>> rejected(ResponseStatusException failure) {
+        return ResponseEntity.status(failure.getStatusCode())
+                .body(Map.of("message", failure.getReason() == null ? "操作失败" : failure.getReason()));
     }
 
     @ModelAttribute
@@ -179,6 +187,7 @@ class InteractionController {
         var member = write(request, block ? "拉黑" : "关注&粉丝", block ? "Lv1" : "Lv0");
         requireTarget(Target.ACCOUNT, id);
         if (member.uid().equals(id)) throw error(BAD_REQUEST, "不能对自己的账号执行此操作");
+        inbox.lockParticipants(member.uid(), id);
         boolean on = enabled(input);
         if (on && !block && exists("""
                 SELECT EXISTS(SELECT 1 FROM relationtable WHERE RelationType=1
@@ -208,24 +217,32 @@ class InteractionController {
     }
 
     @PostMapping("/videos/{id}/comments")
+    @Transactional
     ResponseEntity<Void> comment(@PathVariable String id, @RequestBody Text input, HttpServletRequest request) {
         var member = write(request, "评论", "Lv2");
         requireTarget(Target.VIDEO, id);
+        var keys = new org.springframework.jdbc.support.GeneratedKeyHolder();
+        String text = content(input.value(), 1000);
         jdbc.sql("INSERT INTO commenttable (UID,VideoID,Content) VALUES (:uid,:id,:text)")
-                .param("uid", member.uid()).param("id", id).param("text", content(input.value(), 1000)).update();
+                .param("uid", member.uid()).param("id", id).param("text", text).update(keys);
+        inbox.mentions(member.uid(), "comment", keys.getKey(), text);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/replies/{kind}/{id}")
+    @Transactional
     ResponseEntity<Void> reply(@PathVariable String kind, @PathVariable String id, @RequestBody Text input,
                                HttpServletRequest request) {
         var member = write(request, "回复", "Lv2");
         var target = target(kind);
         if (target != Target.COMMENT && target != Target.REPLY) throw error(BAD_REQUEST, "无效的回复对象");
         requireTarget(target, id);
+        var keys = new org.springframework.jdbc.support.GeneratedKeyHolder();
+        String text = content(input.value(), 1000);
         jdbc.sql("INSERT INTO replytable (UID,ReplyTargetID,ReplyTargetType,Content) VALUES (:uid,:id,:type,:text)")
                 .param("uid", member.uid()).param("id", id).param("type", target == Target.COMMENT ? 1 : 0)
-                .param("text", content(input.value(), 1000)).update();
+                .param("text", text).update(keys);
+        inbox.mentions(member.uid(), "reply", keys.getKey(), text);
         return ResponseEntity.noContent().build();
     }
 
@@ -384,22 +401,38 @@ class InteractionController {
     }
 
     @PostMapping("/authors/{id}/messages")
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     ResponseEntity<Void> message(@PathVariable String id, @RequestBody Text input, HttpServletRequest request) {
         var member = write(request, "私信", "Lv1");
-        requireRecipient(id, member);
-        jdbc.sql("INSERT INTO privatemessagetable (SenderUID,ReceiverUID,MessageType,MessageContent) VALUES (:uid,:id,0,:text)")
-                .param("uid", member.uid()).param("id", id).param("text", content(input.value(), 1000)).update();
+        sendPrivate(id, member, 0, content(input.value(), 500), null);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/authors/{id}/messages/image")
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    ResponseEntity<Void> image(@PathVariable String id,
+                               @RequestParam("image") org.springframework.web.multipart.MultipartFile file,
+                               HttpServletRequest request) {
+        var member = write(request, "私信", "Lv1");
+        sendPrivate(id, member, 1, "[图片]", inbox.imageUpload(file));
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/videos/{id}/forward")
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     Map<String, Long> forward(@PathVariable String id, @RequestBody Text input, HttpServletRequest request) {
         var member = write(request, "转发", "Lv1");
         requireTarget(Target.VIDEO, id);
-        requireRecipient(input.value(), member);
-        jdbc.sql("CALL sp_forward_video(:uid,:receiver,:id)").param("uid", member.uid())
-                .param("receiver", input.value()).param("id", id).update();
+        sendPrivate(input.value(), member, 2, id, null);
         return Map.of("count", catalog.engagement(id).share());
+    }
+
+    private void sendPrivate(String id, AuthController.Member member, int type, String value, MessageStore.Image image) {
+        requireId(id);
+        if (member.uid().equals(id)) throw error(BAD_REQUEST, "请选择其他账号");
+        inbox.lockParticipants(member.uid(), id);
+        requireRecipient(id, member);
+        inbox.send(member.uid(), id, type, value, image);
     }
 
     @GetMapping("/messages")
@@ -411,7 +444,7 @@ class InteractionController {
                   SELECT VideoID FROM videotable WHERE VideoContent=m.MessageContent AND VideoStatus='published'
                     AND VisibleStatus='public' ORDER BY VideoID LIMIT 1
                 ) v ON m.MessageType=2
-                WHERE m.ReceiverUID=CAST(:uid AS UNSIGNED) AND m.ReceiverDel=0 ORDER BY m.SendTime DESC,m.MessageID DESC LIMIT 50
+                WHERE m.ReceiverUID=CAST(:uid AS UNSIGNED) AND m.ReceiverDel=0 AND NOT EXISTS(SELECT 1 FROM message_filtered f WHERE f.message_id=m.MessageID) ORDER BY m.SendTime DESC,m.MessageID DESC LIMIT 50
                 """).param("uid", read(request).uid()).query((rs, row) -> new MessageRow(rs.getString(1),
                 rs.getString(2), rs.getInt(3), rs.getInt(3) == 0 ? rs.getString(4) : null,
                 rs.getObject(5, java.time.LocalDateTime.class), rs.getString(6))).list();
