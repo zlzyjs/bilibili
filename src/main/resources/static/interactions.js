@@ -1,15 +1,5 @@
 async function interaction(path, method = 'GET', body, keepalive = false, csrfToken) {
-  const options = { method, cache: 'no-store', keepalive };
-  if (body !== undefined) {
-    const token = csrfToken || (await authApi('csrf')).token;
-    options.headers = { 'Content-Type': 'application/json', 'X-CSRF-Token': token };
-    options.body = JSON.stringify(body);
-  }
-  const response = await fetch('/api/interactions' + path, options);
-  if (response.status === 204) return;
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.message || '互动操作失败，请稍后重试');
-  return result;
+  return apiRequest('/api/interactions', path, { method, body, keepalive, csrfToken, fallback: '互动操作失败，请稍后重试' });
 }
 
 function memberAction(button, action) {
@@ -293,12 +283,6 @@ function setupVideoInteractions(id, author, player, duration, onDanmaku) {
   refreshQuietly();
 }
 
-function formatViewTime(iso) {
-  if (!iso) return '';
-  const [date, time = ''] = String(iso).split('T');
-  return date.slice(5) + (time ? ' ' + time.slice(0, 5) : '');
-}
-
 function videoRow(v, note) {
   const row = node('li', 'dd-video');
   const videoUrl = '/video/' + encodeURIComponent(v.id);
@@ -329,54 +313,19 @@ function videoRow(v, note) {
   return row;
 }
 
-function messageRow(row) {
-  const item = node('li');
-  item.append(link('/space/' + row.senderId, row.sender), node('small', '', formatViewTime(row.sentAt)));
-  if (row.videoId) item.append(link('/video/' + row.videoId, '查看转发的视频'));
-  else item.append(node('p', '', row.content || '转发的视频已不可用'));
-  return item;
-}
+const NAV_DROPDOWN_LIMIT = 8;
+const historyVideoRow = v => videoRow(v, formatTime(v.viewedAt));
 
-const interactionViews = {
-  messages: {
-    title: '我的消息',
-    build: async body => {
-      appendInteractionList(body, await interaction('/messages'), messageRow);
-      body.append(node('h3', '', '系统通知'));
-      appendInteractionList(body, await interaction('/notifications'), row => {
-        const item = node('li');
-        item.append(node('small', '', formatViewTime(row.sentAt)), node('p', '', row.content));
-        return item;
-      });
-    }
-  },
-  history: {
-    title: '观看历史',
-    build: async body => {
-      appendInteractionList(body, await interaction('/history'),
-        v => videoRow(v, formatViewTime(v.viewedAt)), 'dd-video-list');
-      body.append(node('h3', '', '搜索历史'));
-      appendInteractionList(body, await interaction('/search-history'), keyword => {
-        const item = node('li');
-        item.append(link('/search?' + new URLSearchParams({ keyword }), keyword));
-        return item;
-      });
-    }
-  }
-};
-
-function openInteractionPanel(kind) {
-  hideLoginPopup();
-  interactionPanel(interactionViews[kind].title, interactionViews[kind].build);
-}
-
-function setupInteractionNavigation() {
-  const messages = document.querySelector('[data-interaction=messages]');
-  const history = document.querySelector('[data-interaction=history]');
-  const favorites = document.querySelector('[data-interaction=favorites]');
-  if (messages) memberAction(messages, () => location.assign('/messages'));
-  if (history) memberAction(history, () => openInteractionPanel('history'));
-  if (favorites) favorites.onclick = () => currentAccount ? location.assign('/me?tab=favorites') : openLogin(favorites);
+function openHistoryPanel() {
+  interactionPanel('观看历史', async body => {
+    appendInteractionList(body, await interaction('/history'), historyVideoRow, 'dd-video-list');
+    body.append(node('h3', '', '搜索历史'));
+    appendInteractionList(body, await interaction('/search-history'), keyword => {
+      const item = node('li');
+      item.append(link('/search?' + new URLSearchParams({ keyword }), keyword));
+      return item;
+    });
+  });
 }
 
 function appendInteractionList(body, rows, render, className = 'interaction-list') {
@@ -442,8 +391,12 @@ function navDropdown(button, className, build) {
   };
   button.addEventListener('mouseenter', show);
   button.addEventListener('mouseleave', hide);
+  button.addEventListener('focus', show);
+  button.addEventListener('blur', hide);
   panel.addEventListener('mouseenter', () => clearTimeout(hideTimer));
   panel.addEventListener('mouseleave', hide);
+  panel.addEventListener('focusin', () => clearTimeout(hideTimer));
+  panel.addEventListener('focusout', hide);
   window.addEventListener('accountchange', () => {
     request++;
     loaded = false;
@@ -456,12 +409,17 @@ function setupMessageDropdown(button) {
   navDropdown(button, 'dd-message', () => {
     const menu = node('div', 'dd-menu');
     [
-      ['/messages?tab=replies', '回复我的'],
-      ['/messages?tab=mentions', '@我的'],
-      ['/messages?tab=likes', '收到的赞'],
-      ['/messages?tab=system', '系统消息'],
-      ['/messages?tab=chat', '我的消息']
-    ].forEach(([href, label]) => menu.append(link(href, label, 'dd-menu-item')));
+      ['/messages?tab=replies', '回复我的', 'replies'],
+      ['/messages?tab=mentions', '@我的', 'mentions'],
+      ['/messages?tab=likes', '收到的赞', 'likes'],
+      ['/messages?tab=system', '系统消息', 'system'],
+      ['/messages?tab=chat', '我的消息', 'chat']
+    ].forEach(([href, label, key]) => {
+      const item = link(href, label, 'dd-menu-item');
+      item.dataset.messageTab = key;
+      menu.append(item);
+    });
+    if (window.refreshMessageBadges) window.refreshMessageBadges();
     return [menu];
   });
 }
@@ -475,7 +433,7 @@ function setupFavoriteDropdown(button) {
     let active = folders[0]?.id;
     const renderVideos = () => {
       const rows = active ? favorites.filter(v => v.folderId === active) : favorites;
-      if (rows.length) list.replaceChildren(...rows.slice(0, 8).map(v => videoRow(v)));
+      if (rows.length) list.replaceChildren(...rows.slice(0, NAV_DROPDOWN_LIMIT).map(v => videoRow(v)));
       else list.replaceChildren(node('li', 'nav-dropdown-empty', '暂无收藏'));
     };
     const buttons = folders.map(folder => {
@@ -501,21 +459,29 @@ function setupHistoryDropdown(button) {
   navDropdown(button, 'dd-history', async () => {
     const rows = await interaction('/history');
     const list = node('ul', 'dd-video-list');
-    if (rows.length) list.append(...rows.slice(0, 8).map(v => videoRow(v, formatViewTime(v.viewedAt))));
+    if (rows.length) list.append(...rows.slice(0, NAV_DROPDOWN_LIMIT).map(historyVideoRow));
     else list.append(node('li', 'nav-dropdown-empty', '暂无内容'));
-    return [list, panelFooter('查看全部历史', () => openInteractionPanel('history'))];
+    return [list, panelFooter('查看全部历史', () => openHistoryPanel())];
   });
 }
 
-function setupNavDropdowns() {
+function setupNav() {
   const messages = document.querySelector('[data-interaction=messages]');
   const favorites = document.querySelector('[data-interaction=favorites]');
   const history = document.querySelector('[data-interaction=history]');
-  if (messages) setupMessageDropdown(messages);
-  if (favorites) setupFavoriteDropdown(favorites);
-  if (history) setupHistoryDropdown(history);
+  if (messages) {
+    memberAction(messages, () => location.assign('/messages'));
+    setupMessageDropdown(messages);
+  }
+  if (favorites) {
+    memberAction(favorites, () => location.assign('/me?tab=favorites'));
+    setupFavoriteDropdown(favorites);
+  }
+  if (history) {
+    memberAction(history, () => openHistoryPanel());
+    setupHistoryDropdown(history);
+  }
 }
 
-setupInteractionNavigation();
-setupNavDropdowns();
+setupNav();
 recordSearchHistory();

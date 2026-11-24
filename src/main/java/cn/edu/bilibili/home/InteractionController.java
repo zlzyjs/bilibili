@@ -445,30 +445,6 @@ class InteractionController {
         inbox.send(member.uid(), id, type, value, image);
     }
 
-    @GetMapping("/messages")
-    List<MessageRow> messages(HttpServletRequest request) {
-        return jdbc.sql("""
-                SELECT m.SenderUID,u.Name,m.MessageType,m.MessageContent,m.SendTime,v.VideoID
-                FROM privatemessagetable m JOIN usertable u ON u.UID=m.SenderUID
-                LEFT JOIN LATERAL (
-                  SELECT VideoID FROM videotable WHERE VideoContent=m.MessageContent AND VideoStatus='published'
-                    AND VisibleStatus='public' ORDER BY VideoID LIMIT 1
-                ) v ON m.MessageType=2
-                WHERE m.ReceiverUID=CAST(:uid AS UNSIGNED) AND m.ReceiverDel=0 AND NOT EXISTS(SELECT 1 FROM message_filtered f WHERE f.message_id=m.MessageID) ORDER BY m.SendTime DESC,m.MessageID DESC LIMIT 50
-                """).param("uid", read(request).uid()).query((rs, row) -> new MessageRow(rs.getString(1),
-                rs.getString(2), rs.getInt(3), rs.getInt(3) == 0 ? rs.getString(4) : null,
-                rs.getObject(5, java.time.LocalDateTime.class), rs.getString(6))).list();
-    }
-
-    @GetMapping("/notifications")
-    List<Notification> notifications(HttpServletRequest request) {
-        return jdbc.sql("""
-                SELECT NotificationContent,NotificationTime FROM systemnotificationtable
-                WHERE ReceiverUID=CAST(:uid AS UNSIGNED) ORDER BY NotificationTime DESC,NotificationID DESC LIMIT 50
-                """).param("uid", read(request).uid()).query((rs, row) -> new Notification(rs.getString(1),
-                rs.getObject(2, java.time.LocalDateTime.class))).list();
-    }
-
     private void requireRecipient(String id, AuthController.Member member) {
         requireTarget(Target.ACCOUNT, id);
         if (member.uid().equals(id)) throw error(BAD_REQUEST, "请选择其他账号");
@@ -609,6 +585,4 @@ class InteractionController {
     record SpaceFolder(String id, String name, long count, String coverVideoId) {}
     record SpaceSummary(SpaceStats stats, List<SpaceFolder> folders) {}
     record Person(String id, String name) {}
-    record Notification(String content, java.time.LocalDateTime sentAt) {}
-    record MessageRow(String senderId, String sender, int type, String content, java.time.LocalDateTime sentAt, String videoId) {}
 }

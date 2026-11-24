@@ -79,6 +79,27 @@ function duration(seconds) {
   return parts.map((part) => String(part).padStart(2, '0')).join(':');
 }
 
+async function apiRequest(prefix, path, options = {}) {
+  const { method = 'GET', body, keepalive = false, csrfToken, fallback } = options;
+  const opt = { method, cache: 'no-store', keepalive };
+  if (body !== undefined) {
+    const token = csrfToken || (await authApi('csrf')).token;
+    opt.headers = { 'Content-Type': 'application/json', 'X-CSRF-Token': token };
+    opt.body = JSON.stringify(body);
+  }
+  const response = await fetch(prefix + path, opt);
+  if (response.status === 204) return;
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.message || fallback);
+  return result;
+}
+
+function formatTime(iso) {
+  if (!iso) return '';
+  const [date, time = ''] = String(iso).split('T');
+  return date + (time ? ' ' + time.slice(0, 5) : '');
+}
+
 function attachCover(img, url, category) {
   img.onerror = () => {
     img.removeAttribute('src');

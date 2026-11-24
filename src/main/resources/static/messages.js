@@ -15,16 +15,7 @@
   };
 
   async function inbox(resource, method = 'GET', data) {
-    const options = { method, cache: 'no-store' };
-    if (data !== undefined) {
-      options.headers = { 'X-CSRF-Token': (await authApi('csrf')).token, 'Content-Type': 'application/json' };
-      options.body = JSON.stringify(data);
-    }
-    const response = await fetch('/api/message-center' + resource, options);
-    if (response.status === 204) return;
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.message || '消息操作失败，请重试');
-    return payload;
+    return apiRequest('/api/message-center', resource, { method, body: data, fallback: '消息操作失败，请重试' });
   }
 
   function badge(host, count) {
@@ -42,7 +33,7 @@
       const counts = await inbox('/unread');
       if (currentAccount?.uid !== uid) return;
       badge(navButton, Object.values(counts).reduce((total, value) => total + value, 0));
-      root.querySelectorAll('[data-message-tab]').forEach(item => badge(item, counts[item.dataset.messageTab]));
+      document.querySelectorAll('[data-message-tab]').forEach(item => badge(item, counts[item.dataset.messageTab]));
     } catch {}
   }
 
@@ -58,10 +49,6 @@
     const state = node('div', 'mc-empty');
     state.append(icon('mail'), node('p', '', text));
     return state;
-  }
-
-  function showTime(value) {
-    return value?.replace('T', ' ').slice(0, 16) || '';
   }
 
   async function chat(section, status, stillCurrent) {
@@ -215,7 +202,7 @@
         body.append(row.videoId ? link('/video/' + row.videoId, '查看转发的视频') : node('span', '', '转发的视频已不可用'));
       } else body.textContent = row.text;
       const detail = node('div', 'mc-message-detail');
-      detail.append(node('time', '', showTime(row.sentAt)), body);
+      detail.append(node('time', '', formatTime(row.sentAt)), body);
       entry.append(avatar(row.sender), detail);
       return entry;
     }
@@ -339,7 +326,7 @@
       const item = node('article', tab === 'system' ? 'mc-system' : 'mc-event');
       const heading = node('div', 'mc-event-heading');
       if (tab === 'system') {
-        heading.append(node('strong', '', '系统通知'), node('time', '', showTime(event.sentAt)));
+        heading.append(node('strong', '', '系统通知'), node('time', '', formatTime(event.sentAt)));
         item.append(heading, node('p', 'mc-event-body', event.body));
         return item;
       }
@@ -355,7 +342,7 @@
       body.append(heading);
       if (event.body) body.append(node('p', 'mc-event-body', event.body));
       const actions = node('div', 'mc-event-actions');
-      actions.append(node('time', '', showTime(event.sentAt)));
+      actions.append(node('time', '', formatTime(event.sentAt)));
       body.append(actions);
       if (tab !== 'likes') {
         const reply = button('回复', () => { form.hidden = !form.hidden; if (!form.hidden) input.focus(); }, 'mc-text-button');
@@ -551,6 +538,7 @@
   }
 
   window.addEventListener('accountchange', () => { renderCenter(); refreshBadges(); });
+  window.refreshMessageBadges = refreshBadges;
   if (path === '/messages') renderCenter();
   setInterval(() => { if (!document.hidden) refreshBadges(); }, 25000);
 })();

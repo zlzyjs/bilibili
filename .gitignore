@@ -4,6 +4,7 @@
 /media/
 
 .local/
+.workbuddy/
 build-diagnostic.log
 __pycache__/
 /.local/data-backups/
