@@ -265,11 +265,16 @@ class InteractionController {
     @GetMapping("/history")
     List<VideoLink> history(HttpServletRequest request) {
         return jdbc.sql("""
-                SELECT v.VideoID,v.VideoTitle,h.LastViewingPosition FROM browsinghistorytable h JOIN videotable v USING(VideoID)
+                SELECT v.VideoID,v.VideoTitle,h.LastViewingPosition,v.CoverUrl,u.Name,v.UID,v.VideoDuration,h.LatestBrowseTime
+                FROM browsinghistorytable h JOIN videotable v USING(VideoID)
+                JOIN usertable u ON u.UID=v.UID
                 WHERE h.UID=CAST(:uid AS UNSIGNED) AND v.VideoStatus='published' AND v.VisibleStatus='public'
                 ORDER BY h.LatestBrowseTime DESC,v.VideoID DESC LIMIT 100
-                """).param("uid", read(request).uid()).query((rs, row) -> new VideoLink(rs.getString(1),
-                rs.getString(2), rs.getInt(3))).list();
+                """).param("uid", read(request).uid()).query((rs, row) -> {
+            java.time.LocalDateTime viewedAt = rs.getObject(8, java.time.LocalDateTime.class);
+            return new VideoLink(rs.getString(1), rs.getString(2), rs.getInt(3), rs.getString(4),
+                    rs.getString(5), rs.getString(6), rs.getInt(7), viewedAt == null ? null : viewedAt.toString());
+        }).list();
     }
 
     @PostMapping("/search-history")
@@ -305,11 +310,14 @@ class InteractionController {
     @GetMapping("/favorites")
     List<FavoriteLink> favorites(HttpServletRequest request) {
         return jdbc.sql("""
-                SELECT f.FavoriteName,v.VideoID,v.VideoTitle FROM favourittable f JOIN collectvideotable c USING(FavouritID)
-                JOIN videotable v USING(VideoID) WHERE f.UID=CAST(:uid AS UNSIGNED) AND v.VideoStatus='published' AND v.VisibleStatus='public'
+                SELECT f.FavouritID,f.FavoriteName,v.VideoID,v.VideoTitle,v.CoverUrl,u.Name,v.UID,v.VideoDuration
+                FROM favourittable f JOIN collectvideotable c USING(FavouritID)
+                JOIN videotable v USING(VideoID) JOIN usertable u ON u.UID=v.UID
+                WHERE f.UID=CAST(:uid AS UNSIGNED) AND v.VideoStatus='published' AND v.VisibleStatus='public'
                 ORDER BY c.CollectTime DESC,v.VideoID DESC LIMIT 100
                 """).param("uid", read(request).uid()).query((rs, row) -> new FavoriteLink(rs.getString(1),
-                rs.getString(2), rs.getString(3))).list();
+                rs.getString(2), rs.getString(3), rs.getString(4), rs.getString(5), rs.getString(6),
+                rs.getString(7), rs.getInt(8))).list();
     }
 
     @GetMapping("/me/space")
@@ -339,13 +347,15 @@ class InteractionController {
         String uid = read(request).uid();
         requireId(id);
         return jdbc.sql("""
-                SELECT v.VideoID, v.VideoTitle FROM favourittable f JOIN collectvideotable c USING(FavouritID)
-                JOIN videotable v USING(VideoID)
+                SELECT v.VideoID, v.VideoTitle, v.CoverUrl, u.Name, v.UID, v.VideoDuration FROM favourittable f
+                JOIN collectvideotable c USING(FavouritID)
+                JOIN videotable v USING(VideoID) JOIN usertable u ON u.UID=v.UID
                 WHERE f.UID=CAST(:uid AS UNSIGNED) AND f.FavouritID=CAST(:id AS UNSIGNED)
                   AND v.VideoStatus='published' AND v.VisibleStatus='public'
                 ORDER BY c.CollectTime DESC, v.VideoID DESC LIMIT 100
                 """).param("uid", uid).param("id", id)
-                .query((rs, row) -> new VideoLink(rs.getString(1), rs.getString(2), 0)).list();
+                .query((rs, row) -> new VideoLink(rs.getString(1), rs.getString(2), 0, rs.getString(3),
+                    rs.getString(4), rs.getString(5), rs.getInt(6), null)).list();
     }
 
     @GetMapping("/reports/{kind}/reasons")
@@ -559,8 +569,9 @@ class InteractionController {
     record VideoState(boolean liked, boolean favorited, boolean subscribed, int position) {}
     record Folder(String id, String name, boolean selected) {}
     record Relation(boolean following, boolean blocked, long followers) {}
-    record VideoLink(String id, String title, int position) {}
-    record FavoriteLink(String folder, String id, String title) {}
+    record VideoLink(String id, String title, int position, String cover, String author, String authorId, int duration, String viewedAt) {}
+    record FavoriteLink(String folderId, String folder, String id, String title, String cover, String author,
+                        String authorId, int duration) {}
     record SpaceStats(long plays, long likes) {}
     record SpaceFolder(String id, String name, long count, String coverVideoId) {}
     record SpaceSummary(SpaceStats stats, List<SpaceFolder> folders) {}

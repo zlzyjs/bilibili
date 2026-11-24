@@ -5,7 +5,7 @@
   <base target="_self">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>dilidili · 第二组课程项目</title>
-  <link rel="stylesheet" href="/home.css?v=39">
+  <link rel="stylesheet" href="/home.css?v=47">
   <link rel="stylesheet" href="/watch.css?v=23">
   <link rel="stylesheet" href="/watch-fullscreen.css?v=3">
   <link rel="stylesheet" href="/banner-leaves.css?v=1">
@@ -24,8 +24,8 @@
   <script src="/watch-comments.js?v=8" defer></script>
   <script src="/watch.js?v=25" defer></script>
   <script src="/home.js?v=37" defer></script>
-  <script src="/login.js?v=10" defer></script>
-  <script src="/interactions.js?v=1" defer></script>
+  <script src="/login.js?v=12" defer></script>
+  <script src="/interactions.js?v=9" defer></script>
 </head>
 <body>
   <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -73,18 +73,33 @@
           <a id="nav-account-space" class="nav-account-avatar" href="/me" target="_self" aria-label="进入我的空间">
             <img id="nav-account-image" alt="" width="38" height="38">
           </a>
-          <details id="nav-account-menu">
-            <summary aria-label="账号菜单"><svg><use href="#i-right"/></svg></summary>
-            <div class="nav-account-panel">
-              <strong id="nav-account-name"></strong>
-              <span id="nav-account-uid"></span>
-              <a href="/me" target="_self">我的空间</a>
-              <button id="nav-logout" type="button">退出登录</button>
+          <div id="nav-account-card" class="account-card">
+            <div class="account-card-head">
+              <img id="card-avatar" class="account-card-avatar" alt="头像">
+              <div class="account-card-id">
+                <strong id="card-name"></strong>
+                <p class="account-card-wallet">硬币 <b id="card-coins">0</b>　B币 <b id="card-bcoins">0</b></p>
+              </div>
             </div>
-          </details>
+            <div class="account-card-level">
+              <span id="card-level" class="level-badge">Lv0</span>
+              <div class="level-bar" aria-hidden="true"><i id="card-level-bar"></i></div>
+              <span id="card-level-next" class="level-next"></span>
+            </div>
+            <div class="account-card-stats">
+              <div><strong id="card-following">0</strong><span>关注</span></div>
+              <div><strong id="card-followers">0</strong><span>粉丝</span></div>
+              <div><strong id="card-videos">0</strong><span>稿件</span></div>
+            </div>
+            <nav class="account-card-menu" aria-label="账号菜单">
+              <a href="/me" target="_self"><svg><use href="#i-manage"/></svg>个人中心</a>
+              <a href="/studio" target="_self"><svg><use href="#i-video-upload"/></svg>投稿管理</a>
+              <button id="card-logout" type="button"><svg><use href="#i-right"/></svg>退出登录</button>
+            </nav>
+          </div>
         </div>
         <button type="button" class="nav-item" data-interaction="messages" data-login="消息" aria-haspopup="dialog"><svg><use href="#i-mail"/></svg>消息</button>
-        <button type="button" class="nav-item" data-interaction="favorites" data-login="收藏" aria-haspopup="dialog"><svg><use href="#i-star"/></svg>收藏</button>
+        <button type="button" class="nav-item" data-interaction="favorites" data-login="收藏"><svg><use href="#i-star"/></svg>收藏</button>
         <button type="button" class="nav-item" data-interaction="history" data-login="历史" aria-haspopup="dialog"><svg><use href="#i-clock"/></svg>历史</button>
         <a class="nav-item" href="/studio" target="_self"><svg><use href="#i-creator-bulb"/></svg>创作中心</a>
         <a class="upload" href="/studio/upload" target="_self"><svg><use href="#i-upload"/></svg>投稿</a>

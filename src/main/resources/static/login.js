@@ -22,16 +22,52 @@ function renderAccount(account) {
   currentAccount = account;
   el('nav-login').hidden = Boolean(account);
   el('nav-account').hidden = !account;
-  el('nav-account-menu').open = false;
   if (account) {
-    el('nav-account-name').textContent = account.name;
-    el('nav-account-uid').textContent = 'UID ' + account.uid + ' · ' + account.level;
+    el('card-name').textContent = account.name;
+    el('card-level').textContent = account.level;
     el('nav-account-space').title = account.name + '的个人空间';
     const avatar = el('nav-account-image');
     avatar.onerror = () => { avatar.onerror = null; avatar.src = '/assets/guest-avatar.gif'; };
     avatar.src = '/api/authors/' + encodeURIComponent(account.uid) + '/avatar';
+    loadAccountCard(account.uid);
   }
   window.dispatchEvent(new CustomEvent('accountchange', { detail: account }));
+}
+
+async function loadAccountCard(uid) {
+  try {
+    const summary = await authApi('me/summary');
+    if (!summary || String(summary.uid) !== String(uid)) return;
+    el('card-name').textContent = summary.name;
+    el('card-level').textContent = summary.level;
+    el('card-coins').textContent = Math.round(Number(summary.coins) || 0);
+    el('card-bcoins').textContent = Math.round(Number(summary.bcoins) || 0);
+    el('card-following').textContent = summary.following;
+    el('card-followers').textContent = summary.followers;
+    el('card-videos').textContent = summary.videos;
+    const avatar = el('card-avatar');
+    avatar.onerror = () => { avatar.onerror = null; avatar.src = '/assets/guest-avatar.gif'; };
+    avatar.src = '/api/authors/' + encodeURIComponent(uid) + '/avatar';
+    const exp = Number(summary.experience) || 0;
+    const next = summary.nextExp == null ? null : Number(summary.nextExp);
+    const bar = el('card-level-bar');
+    if (next == null) {
+      bar.style.width = '100%';
+      el('card-level-next').textContent = '已达最高等级';
+    } else if (next <= 0) {
+      bar.style.width = '100%';
+      el('card-level-next').textContent = '完成转正答题即可升级';
+    } else {
+      bar.style.width = Math.min(100, Math.round(exp / next * 100)) + '%';
+      el('card-level-next').textContent = `当前成长${exp}，距离升级还需${Math.max(0, next - exp)}`;
+    }
+  } catch {
+    if (String(currentAccount?.uid) !== String(uid)) return;
+    for (const id of ['card-coins', 'card-bcoins', 'card-following', 'card-followers', 'card-videos']) {
+      el(id).textContent = '—';
+    }
+    el('card-level-next').textContent = '数据加载失败';
+  }
 }
 
 async function authApi(action, data) {
@@ -152,7 +188,7 @@ loginDialog.addEventListener('close', () => {
   resetPasswordVisibility();
   resetRegistrationValidation();
   setMascots(false);
-  (currentAccount ? el('nav-account-name') : loginTrigger)?.focus({ preventScroll: true });
+  (currentAccount ? el('nav-account-space') : loginTrigger)?.focus({ preventScroll: true });
   hideLoginPopup();
 });
 document.addEventListener('keydown', (event) => {
@@ -275,8 +311,7 @@ el('copy-uid').onclick = async () => {
     el('copy-message').textContent = '已选中 UID，请手动复制';
   }
 };
-el('nav-logout').onclick = async (event) => {
-  const button = event.currentTarget;
+async function doLogout(button) {
   button.disabled = true;
   try {
     await authApi('logout', {});
@@ -288,7 +323,8 @@ el('nav-logout').onclick = async (event) => {
   } finally {
     button.disabled = false;
   }
-};
+}
+el('card-logout').onclick = (event) => doLogout(event.currentTarget);
 
 window.addEventListener('pageshow', (event) => { if (event.persisted) refreshAccount(); });
 const registrationPage = ['/service/注册', '/service/' + encodeURIComponent('注册')].includes(path);
