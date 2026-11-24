@@ -23,9 +23,11 @@
   <script src="/viewer-presence.js?v=1" defer></script>
   <script src="/watch-comments.js?v=8" defer></script>
   <script src="/watch.js?v=25" defer></script>
-  <script src="/home.js?v=37" defer></script>
+  <script src="/home.js?v=38" defer></script>
   <script src="/login.js?v=12" defer></script>
-  <script src="/interactions.js?v=9" defer></script>
+  <script src="/interactions.js?v=10" defer></script>
+  <link rel="stylesheet" href="/messages.css?v=1">
+  <script src="/messages.js?v=1" defer></script>
 </head>
 <body>
   <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -109,6 +111,7 @@
   </header>
 
   <main class="layout">
+    <section id="message-center" aria-label="消息中心" hidden></section>
     <section class="channels" aria-label="频道和分区">
       <div class="channel-icons">
         <a href="/popular"><span class="channel-circle orange"><svg><use href="#i-flame"/></svg></span>热门</a>
@@ -130,7 +133,7 @@
         </div>
         <div class="space-actions">
           <button class="follow" data-interaction="follow"><span data-follow-label>关注</span></button>
-          <button data-interaction="message" aria-haspopup="dialog">发消息</button>
+          <button data-interaction="message">发消息</button>
           <div class="space-more">
             <button class="space-more-trigger" aria-label="更多操作" aria-controls="space-more-menu">⋮</button>
             <div id="space-more-menu" class="space-more-menu">

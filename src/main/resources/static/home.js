@@ -481,6 +481,14 @@ async function init() {
   document.body.classList.toggle('popular-page', popularPage);
   const withBanner = home || category || popularPage || latestPage;
   document.body.classList.toggle('inner-page', !withBanner);
+  if (path === '/messages') {
+    document.body.classList.add('message-center-page');
+    document.querySelector('.channels').hidden = true;
+    document.querySelector('.feed').hidden = true;
+    el('message-center').hidden = false;
+    document.title = '消息中心 - dilidili';
+    return;
+  }
   document.body.classList.toggle('discovery-page', discoveryPage);
   document.body.classList.toggle('channel-page', Boolean(category));
   document.body.classList.toggle('search-page', search);

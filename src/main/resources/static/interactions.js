@@ -150,8 +150,9 @@ function setupAuthorInteractions(id, root, renderFollowers) {
     const state = await interaction(resource);
     apply(await interaction(resource + '/block', 'PUT', { enabled: !state.blocked }));
   });
-  if (message) memberAction(message, () => textInteraction('发私信', '消息', 1000,
-    value => interaction('/authors/' + id + '/messages', 'POST', { value })));
+  if (message) memberAction(message, () => {
+    location.assign('/messages?' + new URLSearchParams({ uid: id }));
+  });
   if (report) memberAction(report, () => reportInteraction('account', id));
   const refreshQuietly = () => refresh().catch(() => {});
   window.addEventListener('accountchange', refreshQuietly);
@@ -373,7 +374,7 @@ function setupInteractionNavigation() {
   const messages = document.querySelector('[data-interaction=messages]');
   const history = document.querySelector('[data-interaction=history]');
   const favorites = document.querySelector('[data-interaction=favorites]');
-  if (messages) memberAction(messages, () => openInteractionPanel('messages'));
+  if (messages) memberAction(messages, () => location.assign('/messages'));
   if (history) memberAction(history, () => openInteractionPanel('history'));
   if (favorites) favorites.onclick = () => currentAccount ? location.assign('/me?tab=favorites') : openLogin(favorites);
 }
@@ -455,11 +456,11 @@ function setupMessageDropdown(button) {
   navDropdown(button, 'dd-message', () => {
     const menu = node('div', 'dd-menu');
     [
-      ['/me?tab=replies', '回复我的'],
-      ['/me?tab=at', '@我的'],
-      ['/me?tab=likes', '收到的赞'],
-      ['/me?tab=system', '系统消息'],
-      ['/me?tab=messages', '我的消息']
+      ['/messages?tab=replies', '回复我的'],
+      ['/messages?tab=mentions', '@我的'],
+      ['/messages?tab=likes', '收到的赞'],
+      ['/messages?tab=system', '系统消息'],
+      ['/messages?tab=chat', '我的消息']
     ].forEach(([href, label]) => menu.append(link(href, label, 'dd-menu-item')));
     return [menu];
   });
