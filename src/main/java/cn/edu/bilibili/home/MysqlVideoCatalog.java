@@ -354,6 +354,7 @@ class MysqlVideoCatalog {
                 .param("id", videoId).query(Long.class).single();
         var comments = jdbc.sql("""
                 SELECT c.CommentID, c.UID, u.Name, l.LevelName, c.Content, c.CommentTime,
+                  EXISTS(SELECT 1 FROM comment_image i WHERE i.comment_id=c.CommentID) AS HasImage,
                   (SELECT COUNT(*) FROM liketable k WHERE k.LikeTargetType=2 AND k.LikeTargetID=c.CommentID) AS Likes
                 FROM commenttable c JOIN usertable u ON u.UID=c.UID
                 LEFT JOIN userleveltable l ON l.LevelID=u.LevelID
@@ -365,7 +366,7 @@ class MysqlVideoCatalog {
                     var replies = previewReplies(rs.getString("CommentID"));
                     return new CommentPreview(rs.getString("CommentID"), rs.getString("UID"), rs.getString("Name"),
                         rs.getString("LevelName"), rs.getString("Content"), rs.getObject("CommentTime", LocalDateTime.class),
-                        rs.getLong("Likes"), replies.isEmpty() ? 0 : replies.get(0).total(), replies);
+                        rs.getLong("Likes"), rs.getBoolean("HasImage"), replies.isEmpty() ? 0 : replies.get(0).total(), replies);
                 }).list();
         return new CommentPage(total, comments);
     }
@@ -396,7 +397,7 @@ class MysqlVideoCatalog {
 
     record CommentPage(long total, List<CommentPreview> items) {}
     record CommentPreview(String id, String userId, String author, String level, String content,
-                          LocalDateTime sentAt, long likes, long replyCount, List<ReplyPreview> replies) {}
+                          LocalDateTime sentAt, long likes, boolean hasImage, long replyCount, List<ReplyPreview> replies) {}
     record ReplyPreview(String id, String userId, String author, String level, String content,
                         LocalDateTime sentAt, long likes, long total) {}
 
@@ -413,15 +414,19 @@ class MysqlVideoCatalog {
 
     List<Danmaku> danmaku(String id) {
         return jdbc.sql("""
-                SELECT DanmakuID, UID, Content, VideoTimestamp, SendTime FROM danmakutable
-                WHERE VideoID = CAST(:id AS UNSIGNED) AND DanmakuStatus = 'active'
+                SELECT d.DanmakuID, d.UID, d.Content, d.VideoTimestamp, d.SendTime,
+                       COALESCE(s.display_mode, 'scroll'), COALESCE(s.font_size, 'standard'), COALESCE(s.color, '#FFFFFF')
+                FROM danmakutable d LEFT JOIN danmaku_style s ON s.danmaku_id = d.DanmakuID
+                WHERE d.VideoID = CAST(:id AS UNSIGNED) AND d.DanmakuStatus = 'active'
                 ORDER BY SendTime, DanmakuID
                 """).param("id", id).query((rs, row) -> new Danmaku(rs.getString("DanmakuID"), rs.getString("UID"),
-                        rs.getString("Content"), rs.getInt("VideoTimestamp"), rs.getObject("SendTime", LocalDateTime.class))).list();
+                        rs.getString("Content"), rs.getInt("VideoTimestamp"), rs.getObject("SendTime", LocalDateTime.class),
+                        rs.getString(6), rs.getString(7), rs.getString(8))).list();
     }
 
     record Engagement(long like, long coin, long favorite, long share) {}
-    record Danmaku(String id, String userId, String content, int timestamp, LocalDateTime sentAt) {}
+    record Danmaku(String id, String userId, String content, int timestamp, LocalDateTime sentAt,
+                   String mode, String size, String color) {}
 
     private static Video readVideo(java.sql.ResultSet rs, int row) throws java.sql.SQLException {
         return new Video(rs.getString("VideoID"), rs.getString("VideoTitle"), rs.getString("VideoDescription"),

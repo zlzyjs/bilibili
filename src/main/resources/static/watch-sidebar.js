@@ -1,7 +1,8 @@
 ﻿function setupWatchSidebar({read, save, notice, getUsers, setUsers, onChange}) {
   const settings = { enabled:true, disabledUsers:[], ...read('bili-shield-settings', {}) };
   let rules = read('bili-shield-rules', null) || (read('bili-danmaku-settings', {}).keywords || []).map(text => ({kind:'text',text,enabled:true}));
-  let tab = 'text', view = 'list';
+  const views = { list:'弹幕列表', block:'屏蔽设定' };
+  let tab = 'text';
   function persist() { save('bili-shield-settings', settings); save('bili-shield-rules', rules); onChange(); }
   function isBlocked(userId) { return settings.enabled && getUsers().has(userId) && !settings.disabledUsers.includes(userId); }
   function allowed(d) {
@@ -32,15 +33,14 @@
       row.append(node('span','',entry.text),state,remove);return row;
     }));
   }
-  function show(next) {
-    view = next;
-    el('danmaku-sidebar-title').textContent = {list:'弹幕列表',block:'屏蔽设定',advanced:'高级弹幕'}[view];
-    for (const value of ['list','block','advanced']) el('sidebar-' + value + '-view').hidden = value !== view;
+  function show(view) {
+    el('danmaku-sidebar-title').textContent = views[view];
+    for (const value of Object.keys(views)) el('sidebar-' + value + '-view').hidden = value !== view;
     el('danmaku-panel').open = true; el('danmaku-sidebar-menu-items').hidden = true; el('danmaku-sidebar-menu').setAttribute('aria-expanded','false');
-    if (next === 'block') render();
+    if (view === 'block') render();
   }
   el('danmaku-sidebar-menu').onclick = e => { e.preventDefault(); e.stopPropagation(); el('danmaku-sidebar-menu-items').hidden = !el('danmaku-sidebar-menu-items').hidden; el('danmaku-sidebar-menu').setAttribute('aria-expanded',String(!el('danmaku-sidebar-menu-items').hidden)); };
-  for (const value of ['list','block','advanced']) el('sidebar-view-' + value).onclick = e => { e.preventDefault(); e.stopPropagation(); show(value); };
+  for (const value of Object.keys(views)) el('sidebar-view-' + value).onclick = e => { e.preventDefault(); e.stopPropagation(); show(value); };
   for (const value of ['text','regex','user']) el('shield-tab-' + value).onclick = () => { tab = value; render(); };
   el('shield-enabled').onchange = e => { settings.enabled = e.target.checked; persist(); render(); };
   el('shield-add').onclick = () => {

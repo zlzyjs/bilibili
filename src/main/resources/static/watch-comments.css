@@ -5,10 +5,41 @@
 .comments-heading button { border:0;background:none;font-size:14px;color:#9499a0;padding:0;cursor:pointer; }
 .comments-heading button[aria-pressed=true] { color:#18191c; }
 .comments-divider { color:#9499a0; }
-.comment-compose { display:flex;gap:16px;align-items:center;margin-bottom:34px;width:100%;padding-left:16px;box-sizing:border-box; }
+.comment-compose { display:flex;gap:16px;align-items:flex-start;margin-bottom:34px;width:100%;max-width:820px;padding-left:16px;box-sizing:border-box; }
 .guest-avatar { display:block;object-fit:cover;width:48px;height:48px;flex-shrink:0;border-radius:50%;background:#e6e8f0;color:#b9bdc7;font-size:28px; }
-.comment-compose>button { flex:1;border:0;background:#f1f2f3;border-radius:6px;height:50px;font-size:13px;color:#9499a0;cursor:pointer; }
-.comment-compose b { display:inline-block;padding:6px 10px;background:#00aeec;color:white;border-radius:4px;font-weight:400;margin:0 3px; }
+.comment-compose > button, .comment-entry-form textarea {
+  width:100%;
+  min-width:0;
+  min-height:50px;
+  padding:12px 9px;
+  border:1px solid transparent;
+  border-radius:6px;
+  background:#f1f2f3;
+  font:inherit;
+  font-size:14px;
+  line-height:24px;
+  text-align:left;
+}
+.comment-compose > button, .comment-entry-form textarea::placeholder { color:#9499a0; }
+.comment-entry-form { flex:1;min-width:0; }
+.comment-entry-form textarea { display:block;height:50px;resize:vertical;color:var(--ink); }
+.comment-entry-form:is(:focus-within,[data-has-content="true"]) textarea {
+  border-color:#c9ccd0;
+  background:#fff;
+  outline:0;
+}
+.comment-compose-tools { display:none;align-items:center;justify-content:space-between;gap:12px;margin-top:10px; }
+.comment-entry-form:is(:focus-within,[data-has-content="true"]) .comment-compose-tools { display:flex; }
+#comment-image-select { display:grid;place-items:center;width:32px;height:26px;border:1px solid #e3e5e7;border-radius:4px;color:#61666d;padding:0; }
+#comment-image-select svg { width:16px;height:16px; }
+#comment-image-select:hover { color:var(--blue);border-color:var(--blue); }
+#comment-send { min-width:70px;height:32px;border-radius:4px;background:var(--blue);color:#fff;font-size:16px;padding:0 12px; }
+#comment-send:not(:disabled):hover { background:#21b8ef; }
+#comment-send:disabled { background:#80d3ef;cursor:default; }
+.comment-image-preview { display:flex;align-items:flex-start;gap:6px;margin-top:8px; }
+.comment-image-preview img { display:block;max-width:120px;max-height:100px;border-radius:5px; }
+.comment-image-preview button { padding:0 5px;color:#61666d;font-size:18px; }
+.comment-attachment { display:block;max-width:min(280px,100%);max-height:280px;object-fit:contain;border-radius:6px;margin:8px 0 12px; }
 .comment-entry { display:flex;gap:16px;padding:0 0 24px 16px;margin:0 0 24px; }
 .comment-avatar { width:48px;height:48px;flex:0 0 48px;border-radius:50%;overflow:hidden;background:#f1f2f3;display:grid;place-items:center;color:#9499a0;font-size:18px; }
 .comment-avatar img { width:100%;height:100%;object-fit:cover; }
@@ -51,7 +82,7 @@
 .watch-mini-toggle { position:fixed;right:12px;bottom:88px;z-index:90;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;width:42px;height:56px;padding:6px;border:1px solid #e3e5e7;border-radius:9px;background:#fff;color:#18191c;font-size:12px;cursor:pointer; }
 .watch-mini-toggle svg { width:25px;height:25px; }
 .watch-mini-toggle:hover { background:#f6fbfd; }
-#episodes-control .fullscreen-collection { bottom:calc(100% + 20px);left:50%;right:auto;max-height:min(55vh,400px);width:260px;font-size:12px; }
+#episodes-control .fullscreen-collection { bottom:100%;left:50%;right:auto;max-height:min(55vh,400px);width:260px;font-size:12px; }
 @media(max-width:800px){.watch-mini-toggle{display:none;}.comment-compose{padding-left:0;}}
 
 /* Keep the guest composer, top-level avatars and reply column on shared guides. */

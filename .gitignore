@@ -9,3 +9,5 @@ __pycache__/
 /.local/data-backups/
 *.sql
 !src/main/resources/message-schema.sql
+!src/main/resources/danmaku-schema.sql
+!src/main/resources/comment-schema.sql

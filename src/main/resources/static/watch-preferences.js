@@ -1,10 +1,9 @@
-﻿function setupWatchPreferences(player, { read, save, notice, onDanmakuChange }) {
-  const dmDefaults = { scroll:true, fixed:true, color:true, advanced:true, scale:false, subtitleSafe:false, smart:true, area:100, opacity:80, size:100, speed:3, density:'normal', keywords:[], syncRate:false, font:'heiti', bold:false, outline:'heavy' };
+﻿function setupWatchPreferences(player, { read, save, onDanmakuChange }) {
+  const dmDefaults = { scroll:true, fixed:true, color:true, scale:false, subtitleSafe:false, smart:true, area:100, opacity:80, size:100, speed:3, density:'normal', keywords:[], syncRate:false, font:'heiti', bold:false, outline:'heavy' };
   const dm = { ...dmDefaults, ...read('bili-danmaku-settings', {}) };
-  const playback = { next:true, ratio:'auto', audio:'off', hideBars:false, lights:false, nativePip:true, ...read('bili-more-playback', {}) };
-  let audioContext, compressor, source;
+  const playback = { next:true, ratio:'auto', hideBars:false, lights:false, nativePip:true, ...read('bili-more-playback', {}) };
   function applyDm() {
-    for (const key of ['scroll','fixed','color','advanced']) el('dm-filter-' + key).setAttribute('aria-pressed', String(dm[key]));
+    for (const key of ['scroll','fixed','color']) el('dm-filter-' + key).setAttribute('aria-pressed', String(dm[key]));
     for (const [key,id] of [['scale','dm-scale'],['subtitleSafe','dm-subtitle-safe'],['smart','dm-smart']]) el(id).checked = dm[key];
     for (const key of ['area','opacity','size','speed']) { el('dm-' + key).value = dm[key]; el('dm-' + key + '-value').textContent = key === 'speed' ? ['很慢','较慢','适中','较快','很快'][dm.speed - 1] : dm[key] + '%'; }
     for (const value of ['normal','more','overlap']) el('dm-density-' + value).setAttribute('aria-pressed', String(dm.density === value));
@@ -17,7 +16,7 @@
     onDanmakuChange();
     save('bili-danmaku-settings', dm);
   }
-  for (const key of ['scroll','fixed','color','advanced']) el('dm-filter-' + key).onclick = () => { dm[key] = !dm[key]; applyDm(); };
+  for (const key of ['scroll','fixed','color']) el('dm-filter-' + key).onclick = () => { dm[key] = !dm[key]; applyDm(); };
   for (const [key,id] of [['scale','dm-scale'],['subtitleSafe','dm-subtitle-safe'],['smart','dm-smart']]) el(id).onchange = e => { dm[key] = e.target.checked; applyDm(); };
   for (const key of ['area','opacity','size','speed']) el('dm-' + key).oninput = e => { dm[key] = Number(e.target.value); applyDm(); };
   for (const value of ['normal','more','overlap']) el('dm-density-' + value).onclick = () => { dm.density = value; applyDm(); };
@@ -36,7 +35,6 @@
   function applyPlayback() {
     el('mode-next').setAttribute('aria-pressed', String(playback.next)); el('mode-pause').setAttribute('aria-pressed', String(!playback.next)); el('autoplay-next').checked = playback.next;
     for (const ratio of ['auto','4','16']) el('ratio-' + ratio).setAttribute('aria-pressed', String(playback.ratio === ratio));
-    for (const audio of ['standard','dynamic','off']) el('audio-' + audio).setAttribute('aria-pressed', String(playback.audio === audio));
     for (const [key,id] of [['hideBars','hide-bars'],['lights','lights-off'],['nativePip','native-pip']]) el(id).checked = playback[key];
     player.dataset.ratio = playback.ratio; player.dataset.hideBars = String(playback.hideBars);
     document.body.classList.toggle('watch-lights-off', playback.lights);
@@ -46,22 +44,14 @@
   el('autoplay-next').onchange = e => { playback.next = e.target.checked; applyPlayback(); };
   for (const ratio of ['auto','4','16']) el('ratio-' + ratio).onclick = () => { playback.ratio = ratio; applyPlayback(); };
   for (const [key,id] of [['hideBars','hide-bars'],['lights','lights-off'],['nativePip','native-pip']]) el(id).onchange = e => { playback[key] = e.target.checked; applyPlayback(); };
-  for (const mode of ['standard','dynamic','off']) el('audio-' + mode).onclick = async () => {
-    try {
-      const Audio = window.AudioContext || window.webkitAudioContext;
-      if (!Audio) return notice('当前浏览器不支持音量均衡');
-      if (!audioContext) { audioContext = new Audio(); source = audioContext.createMediaElementSource(player); compressor = audioContext.createDynamicsCompressor(); }
-      await audioContext.resume(); source.disconnect(); compressor.disconnect();
-      if (mode === 'off') source.connect(audioContext.destination);
-      else { compressor.threshold.value = mode === 'standard' ? -24 : -12; compressor.ratio.value = mode === 'standard' ? 8 : 2; compressor.knee.value = 20; source.connect(compressor); compressor.connect(audioContext.destination); }
-      playback.audio = mode; applyPlayback();
-    } catch { notice('音量均衡暂时不可用'); }
-  };
-  // Audio processing needs a user gesture; do not claim a saved mode is active before activation.
-  playback.audio = 'off'; applyPlayback();
+  applyPlayback();
   return {
-    allows: mode => mode === 'scroll' ? dm.scroll : dm.fixed,
-    decorate: line => { line.style.fontSize = (dm.scale ? dm.size * .022 : dm.size * .22) + (dm.scale ? 'cqw' : 'px'); },
+    allows: (mode, color) => (mode === 'scroll' ? dm.scroll : dm.fixed)
+      && (dm.color || !color || color.toUpperCase() === '#FFFFFF'),
+    decorate: (line, size) => {
+      const fontSize = dm.size * (size === 'small' ? .8 : 1);
+      line.style.fontSize = (dm.scale ? fontSize * .022 : fontSize * .22) + (dm.scale ? 'cqw' : 'px');
+    },
     travelSeconds: () => (14 - dm.speed * 2) * 0.8 / (dm.syncRate ? player.playbackRate || 1 : 1),
     limit: () => dm.density === 'normal' ? 3 : dm.density === 'more' ? 6 : 12,
     nativePip: () => playback.nativePip,

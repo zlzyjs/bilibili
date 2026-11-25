@@ -4,15 +4,19 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import static org.springframework.http.HttpStatus.*;
@@ -221,12 +225,39 @@ class InteractionController {
     ResponseEntity<Void> comment(@PathVariable String id, @RequestBody Text input, HttpServletRequest request) {
         var member = write(request, "评论", "Lv2");
         requireTarget(Target.VIDEO, id);
+        createComment(id, member, content(input.value(), 1000), null);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping(path = "/videos/{id}/comments/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Transactional
+    ResponseEntity<Void> commentImage(@PathVariable String id, @RequestParam("image") MultipartFile file,
+                                      @RequestParam(defaultValue = "") String value, HttpServletRequest request) {
+        var member = write(request, "评论", "Lv2");
+        requireTarget(Target.VIDEO, id);
+        createComment(id, member, value.isBlank() ? "" : content(value, 1000), inbox.imageUpload(file));
+        return ResponseEntity.noContent().build();
+    }
+
+    private void createComment(String id, AuthController.Member member, String text, MessageStore.Image image) {
         var keys = new org.springframework.jdbc.support.GeneratedKeyHolder();
-        String text = content(input.value(), 1000);
         jdbc.sql("INSERT INTO commenttable (UID,VideoID,Content) VALUES (:uid,:id,:text)")
                 .param("uid", member.uid()).param("id", id).param("text", text).update(keys);
+        if (image != null) {
+            jdbc.sql("INSERT INTO comment_image (comment_id,mime,image_bytes) VALUES (:id,:mime,:image)")
+                    .param("id", keys.getKey()).param("mime", image.mime()).param("image", image.bytes()).update();
+        }
         inbox.mentions(member.uid(), "comment", keys.getKey(), text);
-        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/comments/{id}/image")
+    ResponseEntity<byte[]> commentImage(@PathVariable String id) {
+        requireTarget(Target.COMMENT, id);
+        var image = jdbc.sql("SELECT mime,image_bytes FROM comment_image WHERE comment_id=CAST(:id AS UNSIGNED)")
+                .param("id", id).query((rs, row) -> new MessageStore.Image(rs.getString(1), rs.getBytes(2)))
+                .optional().orElseThrow(() -> error(NOT_FOUND, "评论图片不存在"));
+        return ResponseEntity.ok().contentType(MediaType.parseMediaType(image.mime()))
+                .header("X-Content-Type-Options", "nosniff").body(image.bytes());
     }
 
     @PostMapping("/replies/{kind}/{id}")
@@ -254,20 +285,34 @@ class InteractionController {
     }
 
     @PostMapping("/videos/{id}/danmaku")
+    @Transactional
     MysqlVideoCatalog.Danmaku danmaku(@PathVariable String id, @RequestBody TimedText input, HttpServletRequest request) {
         var member = write(request, "弹幕", "Lv2");
         int duration = videoDuration(id);
         int timestamp = position(input.position(), duration);
+        String mode = input.mode() == null ? "scroll" : input.mode();
+        String size = input.size() == null ? "standard" : input.size();
+        String color = input.color() == null ? "#FFFFFF" : input.color();
+        if (!Set.of("scroll", "top", "bottom").contains(mode)
+                || !Set.of("small", "standard").contains(size) || !color.matches("#[0-9a-fA-F]{6}")) {
+            throw error(BAD_REQUEST, "无效的弹幕样式");
+        }
+        String normalizedColor = color.toUpperCase(Locale.ROOT);
         var keys = new org.springframework.jdbc.support.GeneratedKeyHolder();
         jdbc.sql("""
                 INSERT INTO danmakutable (UID,VideoID,Content,VideoTimestamp) VALUES (:uid,:id,:text,:position)
                 """).param("uid", member.uid()).param("id", id).param("text", content(input.value(), 100))
                 .param("position", timestamp).update(keys);
+        String danmakuId = keys.getKey().toString();
+        jdbc.sql("""
+                INSERT INTO danmaku_style (danmaku_id,display_mode,font_size,color)
+                VALUES (CAST(:id AS UNSIGNED),:mode,:size,:color)
+                """).param("id", danmakuId).param("mode", mode).param("size", size).param("color", normalizedColor).update();
         return jdbc.sql("""
                 SELECT DanmakuID,UID,Content,VideoTimestamp,SendTime FROM danmakutable WHERE DanmakuID=CAST(:id AS UNSIGNED)
-                """).param("id", keys.getKey().toString()).query((rs, row) -> new MysqlVideoCatalog.Danmaku(
+                """).param("id", danmakuId).query((rs, row) -> new MysqlVideoCatalog.Danmaku(
                     rs.getString(1), rs.getString(2), rs.getString(3), rs.getInt(4),
-                    rs.getObject(5, java.time.LocalDateTime.class))).single();
+                    rs.getObject(5, java.time.LocalDateTime.class), mode, size, normalizedColor)).single();
     }
 
     @PutMapping("/videos/{id}/progress")
@@ -585,7 +630,7 @@ class InteractionController {
     record Toggle(Boolean enabled) {}
     record Text(String value) {}
     record NumberInput(Integer value) {}
-    record TimedText(String value, Integer position) {}
+    record TimedText(String value, Integer position, String mode, String size, String color) {}
     record Report(String reason, String description) {}
     record Reason(String id, String name) {}
     record ToggleView(boolean enabled, long count) {}

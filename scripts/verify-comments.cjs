@@ -2,20 +2,64 @@
 class E {
   constructor(){this.children=[];this.hidden=false;this.attributes={};this.style={setProperty(){},removeProperty(){}};this.classList={add(){},remove(){},contains:()=>false};this.events={};}
   append(...items){this.children.push(...items);}prepend(...items){this.children.unshift(...items);}replaceChildren(...items){this.children=[...items];}setAttribute(k,v){this.attributes[k]=v;}
+  removeAttribute(key){delete this[key];}
   addEventListener(e,f){this.events[e]=f;}getBoundingClientRect(){return {top:-300,bottom:-50,height:200,left:100};}scrollIntoView(){this.scrolled=true;}setPointerCapture(){}
 }
 (async()=>{
   const els=new Map(),el=id=>{if(!els.has(id))els.set(id,new E());return els.get(id);};let prompts=0,sort='',observer,resize;
   const item={userId:'1',author:'A',level:'LV3',content:'Hello',sentAt:'2026-11-13T10:00:00',likes:2};
+  let comments = [{...item,replyCount:8,replies:[item,item,item]},{...item,replyCount:2,replies:[item,item]},item];
+  const accountEvents = {}, submissions = [];
   const context={el,node:(t,c,text)=>Object.assign(new E(),{className:c,textContent:text}),link:(href,text,c)=>Object.assign(new E(),{href,textContent:text,className:c}),shortCount:String,card:()=>new E(),
-    openLogin:()=>prompts++,api:async url=>{sort=url;return {total:20,items:[{...item,replyCount:8,replies:[item,item,item]},{...item,replyCount:0,replies:[]},item]};},
-    document:{body:new E(),fullscreenElement:null,createElementNS:()=>new E(),querySelector:()=>new E(),addEventListener(){}},window:{innerWidth:1200,innerHeight:800,addEventListener(){}},
+    openLogin:()=>prompts++,api:async url=>{sort=url;return {total:20,items:comments};},
+    interaction:async (...args)=>{submissions.push(args);},
+    FormData:class { constructor(){this.values={};} append(key,value){this.values[key]=value;} },
+    URL:{createObjectURL:()=> 'blob:preview',revokeObjectURL(){}},
+    document:{body:new E(),fullscreenElement:null,createElementNS:()=>new E(),querySelector:()=>new E(),addEventListener(){}},window:{innerWidth:1200,innerHeight:800,addEventListener(event,callback){accountEvents[event]=callback;}},
     ResizeObserver:class {constructor(fn){resize=fn;}observe(){}disconnect(){}},IntersectionObserver:class {constructor(fn){observer=fn;}observe(){}disconnect(){}}};
   vm.createContext(context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch-comments.js','utf8'),context);
   await context.setupWatchComments('123');assert.equal(el('comment-list').children.length,2);assert.equal(el('comment-total').textContent,'20');
   const body=el('comment-list').children[0].children[1],replies=body.children[3];assert.equal(replies.children.length,3,'two previews plus login-gated view link');
+  assert.deepEqual(el('comment-list').children[1].children[1].children[3].children.map(row=>row.className),['comment-reply','comment-reply']);
   replies.children[2].onclick();assert.equal(prompts,1);body.children[2].children[1].onclick();assert.equal(prompts,2);
   const beforeSort=sort;el('comments-latest').onclick();assert.equal(prompts,3);assert.equal(sort,beforeSort,'guest click must not request latest comments');
+  comments = [{...item,replyCount:1,replies:[item]},{...item,replyCount:0,replies:[]}];
+  await context.setupWatchComments('123');
+  assert.deepEqual(el('comment-list').children[0].children[1].children[3].children.map(row=>row.className),['comment-reply']);
+  assert.equal(el('comment-list').children[1].children[1].children[3].children.length,0);
+  context.currentAccount = {uid:'123'};
+  accountEvents.accountchange();
+  assert.equal(el('comment-current-avatar').src, '/api/authors/123/avatar');
+  assert.equal(el('comment-entry-form').hidden, false);
+  const commentText = el('comment-text'), publish = el('comment-send');
+  assert.equal(publish.disabled, true);
+  commentText.value = '  ';
+  commentText.oninput();
+  assert.equal(publish.disabled, true);
+  commentText.value = 'Comment';
+  commentText.oninput();
+  assert.equal(publish.disabled, false);
+  const submit = () => el('comment-entry-form').onsubmit({preventDefault(){}});
+  await submit();
+  assert.equal(submissions[0][0], '/videos/123/comments');
+  assert.equal(submissions[0][2].value, 'Comment');
+  assert.equal(publish.disabled, true);
+  const image = {size:123, type:'image/png'};
+  const imageFile = el('comment-image-file');
+  imageFile.files = [image];
+  imageFile.onchange();
+  assert.equal(el('comment-image-preview').hidden, false);
+  assert.equal(publish.disabled, false);
+  comments = [{...item,id:'5',content:'',hasImage:true,replyCount:0,replies:[]}];
+  await submit();
+  assert.equal(submissions[1][0], '/videos/123/comments/image');
+  assert.equal(submissions[1][2].values.image, image);
+  assert.equal(el('comment-image-preview').hidden, true);
+  assert.equal(el('comment-list').children[0].children[1].children[2].src, '/api/interactions/comments/5/image');
+  context.currentAccount = null;
+  accountEvents.accountchange();
+  assert.equal(el('comment-current-avatar').src, '/api/avatar/default');
+  assert.equal(el('comment-entry-form').hidden, true);
   context.setupRelatedExpansion(Array.from({length:40},(_,i)=>({id:i})));assert.equal(el('related-videos').children.length,20);assert.equal(el('related-extra').children.length,20);
   el('related-expand').onclick();assert.equal(el('related-extra').hidden,false);el('related-collapse').onclick();assert.equal(el('related-extra').hidden,true);
   const shell=new E();shell.offsetWidth=360;shell.offsetHeight=203;context.setupWatchScroll(new E(),shell);

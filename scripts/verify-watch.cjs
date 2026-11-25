@@ -23,12 +23,15 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   const elements = new Map(); const el = id => { if (!elements.has(id)) elements.set(id,new Element()); return elements.get(id); };
   const p = el('player'); Object.assign(p,{ currentTime:0, duration:100, readyState:4, paused:true, ended:false, seeking:false, pause(){this.paused=true;this.emit('pause');}, async play(){this.paused=false;this.emit('play');} });
   el('login-dialog').open = false;
-  let now = 0, tick, prompts = 0, copied = ''; const documentEvents={}, windowEvents={};
+  let now = 0, tick, prompts = 0, copied = '', postDanmaku, resizeDanmaku;
+  const documentEvents={}, windowEvents={};
   const context = { setupWatchComments(){},setupWatchScroll(){},setupRelatedExpansion(){},startViewerPresence(){}, el, path:'/video/10001', duration:n=>`${Math.floor(n/60)}`.padStart(2,'0')+':'+`${n%60}`.padStart(2,'0'), shortCount:String,
     localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)}, performance:{now:()=>now},
     setInterval:fn=>(tick=fn,1),clearInterval(){},setTimeout(){return 1;},clearTimeout(){},
+    ResizeObserver:class { constructor(callback) { resizeDanmaku = callback; } observe() {} },
     window:{addEventListener(event,fn){(windowEvents[event] ||= []).push(fn);}}, navigator:{clipboard:{writeText:async text=>{copied=text;}}}, document:{ documentElement:{clientWidth:1200}, body:new Element(), title:'', activeElement:{tagName:'BODY'}, addEventListener(event,fn){(documentEvents[event] ||= []).push(fn);},querySelector:()=>new Element() },
     openLogin:()=>{prompts++;el('login-dialog').open=true;},location:{assign(){}},
+    setupVideoInteractions:(_id,_author,_player,_duration,callback)=>{ postDanmaku=callback; },
     node:(tag,cls,text)=>Object.assign(new Element(),{className:cls,textContent:text}),
     link:(href,label,className)=>Object.assign(new Element(),{href,className,textContent:label}),
     icon:name=>Object.assign(new Element(),{name}),card:()=>new Element(),
@@ -37,7 +40,7 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
     ]:url.startsWith('/authors/')?{followers:10}:url.startsWith('/videos?')?{items:[]}: {video:{id:'10001',title:'Test',authorId:'1',streamUrl:'/test.mp4',plays:1,danmaku:3},tags:[],...accolades}
   };
   vm.createContext(context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch-sidebar.js','utf8'),context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch-preferences.js','utf8'),context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch.js','utf8'),context);await context.loadWatchPage();
-  return {el,p,storage,pageEvent:(name,event={})=>(windowEvents[name]||[]).forEach(fn=>fn(event)),copied:()=>copied,fullscreen:flag=>{context.document.fullscreenElement=flag?el('player-shell'):null;(documentEvents.fullscreenchange||[]).forEach(fn=>fn());}, advance(ms,move=true){now+=ms;if(move&&!p.paused)p.currentTime+=ms/1000;tick();},prompts:()=>prompts};
+  return {el,p,storage,postDanmaku,resizeDanmaku,pageEvent:(name,event={})=>(windowEvents[name]||[]).forEach(fn=>fn(event)),copied:()=>copied,fullscreen:flag=>{context.document.fullscreenElement=flag?el('player-shell'):null;(documentEvents.fullscreenchange||[]).forEach(fn=>fn());}, advance(ms,move=true){now+=ms;if(move&&!p.paused)p.currentTime+=ms/1000;tick();},prompts:()=>prompts};
 }
 (async()=>{
   const createTracks = vm.runInNewContext(fs.readFileSync('src/main/resources/static/watch.js', 'utf8') + '\nsetupDanmakuTracks;');
@@ -67,6 +70,50 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
     assert.equal(fixed[3].style.top, fixed[0].style.top);
   }
   console.log('PASS: rolling clearance, equal rolling speed, fixed lanes and release on animation end');
+
+  const styled = await setup();
+  styled.pageEvent('accountchange', { detail: { uid: '7' } });
+  const own = {id:'20', userId:'7', content:'Own', timestamp:25, mode:'bottom', size:'small', color:'#FF0000'};
+  styled.p.currentTime = own.timestamp;
+  styled.postDanmaku(own);
+  const overlayLines = styled.el('danmaku-overlay').children;
+  const ownLine = overlayLines.find(line => line.textContent === own.content);
+  assert.match(ownLine.className, /own-danmaku/);
+  assert.equal(ownLine.dataset.mode, 'bottom');
+  assert.equal(ownLine.style.color, '#FF0000');
+  assert.equal(ownLine.style.fontSize, '17.6px');
+  styled.postDanmaku({id:'21', userId:'8', content:'Scrolling', timestamp:25, mode:'scroll'});
+  const styledOverlay = styled.el('danmaku-overlay');
+  const rollingLine = styledOverlay.children.find(line => line.textContent === 'Scrolling');
+  const originalDuration = rollingLine.style.animationDuration;
+  for (const switchFullscreen of [styled.fullscreen, () => styled.el('web-fullscreen').onclick()]) {
+    switchFullscreen(true);
+    Object.assign(styledOverlay, {clientWidth:1000, clientHeight:500});
+    styled.resizeDanmaku();
+    assert.ok(styledOverlay.children.includes(ownLine));
+    assert.ok(styledOverlay.children.includes(rollingLine));
+    assert.equal(ownLine.style.top, '476px');
+    assert.equal(rollingLine.style['--danmaku-travel'], '1000px');
+    assert.equal(rollingLine.style.animationDuration, originalDuration);
+    switchFullscreen(false);
+    Object.assign(styledOverlay, {clientWidth:500, clientHeight:281});
+    styled.resizeDanmaku();
+    assert.ok(styledOverlay.children.includes(ownLine));
+    assert.ok(styledOverlay.children.includes(rollingLine));
+    assert.equal(ownLine.style.top, '257px');
+    assert.equal(rollingLine.style['--danmaku-travel'], '500px');
+  }
+  styled.p.currentTime = 29.9; styled.p.emit('timeupdate');
+  assert.ok(styled.el('danmaku-overlay').children.includes(ownLine));
+  styled.p.currentTime = 30; styled.p.emit('timeupdate');
+  assert.equal(styled.el('danmaku-overlay').children.includes(ownLine), false);
+  styled.p.emit('seeking'); styled.p.currentTime = 28; styled.p.emit('seeked');
+  const replayed = styled.el('danmaku-overlay').children.find(line => line.textContent === own.content);
+  replayed.emit('mouseenter');
+  assert.equal(styled.el('dm-action-report').hidden, true);
+  const ownRow = styled.el('danmaku-list').children.find(row => row.children[1].textContent === own.content);
+  assert.equal(ownRow.children.length, 3, 'own danmaku shows the timestamp, content and date');
+  console.log('PASS: styled own fixed danmaku, five-second timeline window and own list row');
   const t=await setup();
   const seek = t.el('seek'), seekBar = t.el('seek-bar');
   const previewFrame = Object.assign(t.el('seek-preview-frame'), {currentTime:0, duration:100, readyState:0, hidden:true});
@@ -113,7 +160,10 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   assert.equal(rankBadge.children[1], '全站排行榜最高第6名');
   assert.equal(rankBadge.target, '_self');
   t.p.pause();t.advance(5000);assert.equal(t.storage.has('bili-trial-v1:10001'),false,'pause does not count');
-  await t.p.play();t.p.seeking=true;t.p.currentTime=80;t.advance(100);t.p.seeking=false;assert.equal(t.storage.has('bili-trial-v1:10001'),false,'seek does not count');
+  await t.el('trial-start').onclick();
+  assert.equal(t.p.paused,false,'starting a trial resumes paused playback');
+  assert.equal(t.el('trial-tip').hidden,true,'starting a trial hides the tip');
+  t.p.seeking=true;t.p.currentTime=80;t.advance(100);t.p.seeking=false;assert.equal(t.storage.has('bili-trial-v1:10001'),false,'seek does not count');
   for(let i=0;i<100;i++)t.advance(100);assert.equal(t.p.paused,false,'ten seconds does not exhaust the trial');
   t.p.readyState=2;t.advance(2000,false);t.p.readyState=4;
   assert.equal(t.p.paused,false,'buffering does not exhaust the trial');
@@ -123,6 +173,9 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   assert.equal(t.storage.has('bili-trial-v1:10001'),false,'trial time is not persisted');
   const oldStorage = new Map(t.storage);oldStorage.set('bili-trial-v1:10001','30');
   const restored=await setup(oldStorage);assert.equal(restored.p.paused,false,'new visit ignores previously locked trial');
+  await restored.el('trial-start').onclick();
+  assert.equal(restored.p.paused,false,'starting a trial during playback keeps playing');
+  assert.equal(restored.el('trial-tip').hidden,true,'starting a trial during playback hides the tip');
   for(let i=0;i<301;i++)restored.advance(100);assert.equal(restored.p.paused,true,'new visit still locks after 30 seconds');
   restored.pageEvent('pagehide');restored.pageEvent('pageshow',{persisted:true});
   assert.equal(restored.el('trial-ended').hidden,true,'back navigation clears the lock');
@@ -134,9 +187,17 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   rows[1].children[3].onclick();assert.ok(!t.el('danmaku-list').children[0].className.includes('blocked'));
   assert.equal(t.el('coin-count').textContent,'4');
   t.p.playbackRate=2;t.p.emit('ratechange');assert.equal(t.p.playbackRate,1,'speed locked without login');
-  t.el('subtitle-settings-open').onclick();assert.equal(t.el('subtitle-settings').hidden,false,'subtitle settings available to guests');
-  t.el('subtitle-size').value='large';t.el('subtitle-size').onchange();assert.equal(t.p.dataset.subtitleSize,'large');
-  t.el('subtitle-reset').onclick();assert.equal(t.p.dataset.subtitleSize,'medium');
+  assert.equal(t.el('speed-options').hidden,true);
+  t.el('rate-1.25').onclick();assert.equal(t.p.playbackRate,1);
+  t.pageEvent('accountchange',{detail:{uid:'10001'}});
+  assert.equal(t.el('speed-options').hidden,false);
+  t.el('rate-1.25').onclick();t.p.emit('ratechange');
+  assert.equal(t.p.playbackRate,1.25);
+  assert.equal(t.el('rate-1.25').attributes['aria-pressed'],'true');
+  assert.equal(t.el('playback-rate').textContent,'1.25x');
+  t.el('rate-2').onclick();t.p.emit('ratechange');
+  assert.equal(t.el('playback-rate').textContent,'2.0x');
+  t.pageEvent('accountchange',{detail:null});assert.equal(t.p.playbackRate,1);
   t.el('auto-start').onchange({target:{checked:false}});const noAutoplay=await setup(t.storage);assert.equal(noAutoplay.el('auto-start').checked,false);
   t.el('mirror-toggle').onchange({target:{checked:true}});assert.ok(t.p.attributes.style.includes('scaleX(-1)'));
   t.el('loop-toggle').onchange({target:{checked:true}});assert.equal(t.p.loop,true);
@@ -167,15 +228,30 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   hover.el('shield-tab-regex').onclick();hover.el('shield-input').value='/First/';hover.el('shield-add').onclick();assert.equal(hover.el('shield-rows').children.length,1);
   hover.el('shield-enabled').onchange({target:{checked:false}});assert.equal(hover.el('shield-body').hidden,true);
   hover.el('shield-enabled').onchange({target:{checked:true}});assert.equal(hover.el('shield-body').hidden,false);
-  hover.el('sidebar-view-advanced').onclick(event);assert.equal(hover.el('sidebar-advanced-view').hidden,false);
   hover.el('dm-keywords-open').onclick();assert.equal(hover.el('sidebar-block-view').hidden,false);assert.equal(hover.el('danmaku-sidebar-title').textContent,'屏蔽设定');
   hover.el('sidebar-view-list').onclick(event);assert.equal(hover.el('sidebar-list-view').hidden,false);
+  assert.equal(hover.el('sidebar-block-view').hidden,true);
   assert.ok(hover.el('danmaku-overlay').attributes.style.includes('top:1%'));
   hover.fullscreen(true);assert.equal(hover.el('player-shell').classList.contains('fullscreen-layout'),true);
   assert.ok(hover.el('fullscreen-danmaku-slot').children.includes(hover.el('danmaku-compose')));
   hover.fullscreen(false);assert.equal(hover.el('player-shell').classList.contains('fullscreen-layout'),false);
   hover.el('web-fullscreen').onclick();assert.equal(hover.el('player-shell').classList.contains('fullscreen-layout'),true);
+  assert.equal(hover.el('web-fullscreen').attributes['aria-pressed'],'true');
+  assert.equal(hover.el('fullscreen-toggle').attributes['aria-pressed'],'false');
   hover.el('web-fullscreen').onclick();assert.equal(hover.el('player-shell').classList.contains('fullscreen-layout'),false);
+  hover.el('wide-toggle').onclick();assert.ok(hover.el('video-page').classList.contains('wide-mode'));
+  hover.el('wide-toggle').onclick();assert.ok(!hover.el('video-page').classList.contains('wide-mode'));
+  assert.equal(hover.el('heatmap-display').hidden,true);
+  hover.el('heatmap-toggle').checked=true;hover.el('heatmap-toggle').onchange();
+  assert.equal(hover.el('heatmap-display').hidden,false);
+  assert.match(hover.el('heatmap-path').attributes.d, /,2\b/, 'real danmaku counts form a peak');
+  hover.el('heatmap-pin').onclick();
+  const pinned=await setup(hover.storage);
+  assert.equal(pinned.el('heatmap-display').hidden,false,'pinned graph survives a new visit');
+  pinned.el('heatmap-pin').onclick();
+  assert.equal(pinned.el('heatmap-display').hidden,false,'unpinning keeps the graph on this visit');
+  const unpinned=await setup(pinned.storage);
+  assert.equal(unpinned.el('heatmap-display').hidden,true,'unpinned graph starts disabled next visit');
   hover.p.pause();await hover.el('mini-play-toggle').onclick();assert.equal(hover.p.paused,false);assert.equal(hover.el('player-shell').dataset.playing,'true');await hover.el('mini-play-toggle').onclick();assert.equal(hover.p.paused,true);assert.equal(hover.el('player-shell').dataset.playing,'false');
   const member = await setup();
   await member.p.play();
@@ -197,6 +273,6 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   console.log('PASS: sidebar modes, keyword routing, text/regex rules, filter switch, near-top danmaku');
   console.log('PASS: floating danmaku toolbar, guest like/report gate, clipboard copy, advanced typography/reset, sender tooltips');
   console.log('PASS: conditional collection, active episode, danmaku area/opacity, aspect ratio, pause-after-play');
-  console.log('PASS: guest speed restriction, subtitle preferences/reset, autoplay preference, mirror, loop');
+  console.log('PASS: member playback speed, guest restriction, wide layout, heat curve and pin persistence, autoplay, mirror, loop');
 console.log('PASS: cumulative trial, pause, buffering, seeking, cutoff, replay gate, fresh visit and back-navigation reset, sender blocking/unblocking, engagement binding');
 })().catch(e=>{console.error(e);process.exitCode=1;});
