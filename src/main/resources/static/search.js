@@ -29,10 +29,8 @@ function loadSearch() {
   el('feed-toolbar').hidden = true;
 
   const logo = link('/', null, 'search-brand');
-  const brand = node('img');
-  brand.src = document.querySelector('.home-logo').src;
-  brand.alt = 'dilidili';
-  logo.append(brand);
+  logo.setAttribute('aria-label', '返回首页');
+  logo.append(node('span', 'nav-brand-mark'));
   document.querySelector('.home-link').before(logo);
   document.title = (keyword || tag || '搜索') + ' - dilidili';
 

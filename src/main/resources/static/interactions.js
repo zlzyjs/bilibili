@@ -338,6 +338,112 @@ function appendInteractionList(body, rows, render, className = 'interaction-list
   body.append(list);
 }
 
+function setupHomeSearchHistory() {
+  if (!home) return;
+  const form = document.querySelector('.navbar > .search');
+  const input = el('keyword');
+  form.parentElement.classList.add('home-search-nav');
+  const panel = node('section', 'home-search-history');
+  panel.id = 'home-search-history';
+  panel.hidden = true;
+  panel.setAttribute('aria-labelledby', 'home-search-history-title');
+  input.setAttribute('aria-controls', panel.id);
+  const header = node('div', 'home-search-history-header');
+  const heading = node('h2', '', '搜索历史');
+  heading.id = 'home-search-history-title';
+  const clear = node('button', '', '清空');
+  clear.type = 'button';
+  clear.hidden = true;
+  clear.setAttribute('aria-label', '清空搜索历史');
+  clear.onclick = () => deleteHistory('/search-history/all', {}, clear, currentAccount?.uid, '清空失败，请重试');
+  header.append(heading, clear);
+  const status = node('p');
+  status.setAttribute('role', 'status');
+  const list = node('ul');
+  panel.append(header, status, list);
+  form.append(panel);
+
+  let request = 0;
+  function showStatus(message) {
+    status.textContent = message;
+    status.hidden = !message;
+  }
+
+  async function deleteHistory(path, data, button, uid, failure) {
+    if (!uid || uid !== currentAccount?.uid) return;
+    input.focus();
+    button.disabled = true;
+    try {
+      await interaction(path, 'DELETE', data);
+      if (!panel.hidden && uid === currentAccount?.uid) loadHistory();
+    } catch {
+      if (!panel.hidden && uid === currentAccount?.uid) showStatus(failure);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  function historyItem(value, uid) {
+    const item = node('li');
+    const repeat = link('/search?' + new URLSearchParams({ keyword: value }), value);
+    repeat.title = value;
+    const remove = node('button', '', '×');
+    remove.type = 'button';
+    remove.setAttribute('aria-label', '删除搜索记录：' + value);
+    remove.onclick = () => deleteHistory('/search-history', { value }, remove, uid, '删除失败，请重试');
+    item.append(repeat, remove);
+    return item;
+  }
+
+  async function loadHistory() {
+    const latest = ++request;
+    const uid = currentAccount?.uid;
+    list.replaceChildren();
+    clear.hidden = true;
+    showStatus(uid ? '正在加载…' : '登录后可查看搜索历史');
+    if (!uid) return;
+    try {
+      const rows = await interaction('/search-history');
+      if (latest !== request) return;
+      list.replaceChildren(...rows.map(value => historyItem(value, uid)));
+      clear.hidden = !rows.length;
+      showStatus(rows.length ? '' : '暂无搜索记录');
+    } catch {
+      if (latest === request) showStatus('暂时无法加载搜索历史');
+    }
+  }
+
+  function open() {
+    if (!panel.hidden) return;
+    panel.hidden = false;
+    loadHistory();
+  }
+
+  function close() {
+    panel.hidden = true;
+    request++;
+  }
+
+  input.addEventListener('focus', open);
+  input.addEventListener('click', open);
+  form.addEventListener('focusout', event => {
+    if (!form.contains(event.relatedTarget)) close();
+  });
+  form.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && !panel.hidden) {
+      event.preventDefault();
+      input.focus();
+      close();
+    }
+  });
+  document.addEventListener('pointerdown', event => {
+    if (!form.contains(event.target)) close();
+  });
+  window.addEventListener('accountchange', () => {
+    if (!panel.hidden) loadHistory();
+  });
+}
+
 function recordSearchHistory() {
   if (location.pathname !== '/search') return;
   const keyword = (new URLSearchParams(location.search).get('keyword') || '').trim();
@@ -484,4 +590,5 @@ function setupNav() {
 }
 
 setupNav();
+setupHomeSearchHistory();
 recordSearchHistory();

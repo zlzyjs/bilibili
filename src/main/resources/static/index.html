@@ -5,7 +5,8 @@
   <base target="_self">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>dilidili · 第二组课程项目</title>
-  <link rel="stylesheet" href="/home.css?v=53">
+  <link rel="stylesheet" href="/nav-brand.css?v=1">
+  <link rel="stylesheet" href="/home.css?v=60">
   <link rel="stylesheet" href="/watch.css?v=23">
   <link rel="stylesheet" href="/watch-fullscreen.css?v=3">
   <link rel="stylesheet" href="/banner-leaves.css?v=1">
@@ -16,16 +17,16 @@
   <script src="/space.js?v=7" defer></script>
   <link rel="stylesheet" href="/personal-space.css?v=4">
   <script src="/personal-space.js?v=7" defer></script>
-  <link rel="stylesheet" href="/search.css?v=7">
-  <script src="/search.js?v=7" defer></script>
+  <link rel="stylesheet" href="/search.css?v=8">
+  <script src="/search.js?v=8" defer></script>
   <script src="/watch-preferences.js?v=7" defer></script>
   <script src="/watch-sidebar.js?v=2" defer></script>
   <script src="/viewer-presence.js?v=1" defer></script>
   <script src="/watch-comments.js?v=8" defer></script>
   <script src="/watch.js?v=25" defer></script>
-  <script src="/home.js?v=41" defer></script>
+  <script src="/home.js?v=42" defer></script>
   <script src="/login.js?v=12" defer></script>
-  <script src="/interactions.js?v=14" defer></script>
+  <script src="/interactions.js?v=16" defer></script>
   <link rel="stylesheet" href="/messages.css?v=17">
   <script src="/messages.js?v=19" defer></script>
   <link rel="stylesheet" href="/account-center.css?v=1">
@@ -70,9 +71,13 @@
   </svg>
   <header class="masthead">
     <nav class="navbar" aria-label="主导航">
-      <a class="home-link" href="/" target="_self" aria-label="dilidili 首页"><img class="home-logo" src="/assets/dilidili.svg?v=4" alt="">首页</a>
-      <form class="search" role="search" action="/search" method="get">
-        <input name="keyword" id="keyword" aria-label="搜索视频、合集、UP主或标签" placeholder="搜索视频、合集、UP主或标签" maxlength="80">
+      <a class="home-link" href="/" target="_self" aria-label="返回首页">
+        <svg class="home-tv" aria-hidden="true"><use href="#i-tv"/></svg>
+        <span class="home-logo nav-brand-mark" aria-hidden="true"></span>
+        首页
+      </a>
+      <form class="search" role="search" action="/search" method="get" autocomplete="off">
+        <input name="keyword" id="keyword" aria-label="搜索视频、合集、UP主或标签" placeholder="搜索视频、合集、UP主或标签" autocomplete="off" maxlength="80">
         <button aria-label="搜索"><svg><use href="#i-search"/></svg></button>
       </form>
       <div class="nav-right">

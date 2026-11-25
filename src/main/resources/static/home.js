@@ -581,10 +581,15 @@ function setupChannelNavigation(alwaysPinned = false) {
   const homeLink = bar.querySelector('.home-link');
   const start = node('div', 'channel-nav-start');
   const logo = link('/', null, 'channel-nav-logo');
-  const image = node('img');
-  image.src = document.querySelector('.home-logo').src;
-  image.alt = 'dilidili 首页';
-  logo.append(image);
+  logo.setAttribute('aria-label', '返回首页');
+  if (home) {
+    const image = node('img');
+    image.src = banner.querySelector('.banner-logo img').src;
+    image.alt = '';
+    logo.append(image);
+  } else {
+    logo.append(node('span', 'nav-brand-mark'));
+  }
 
   const trigger = node('div', 'channel-nav-trigger');
   const toggle = node('button', 'channel-nav-toggle');

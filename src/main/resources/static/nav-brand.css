@@ -1,0 +1,9 @@
+.nav-brand-mark{
+  display:inline-block;
+  width:var(--nav-brand-width,82px);
+  flex:none;
+  aspect-ratio:1331 / 390;
+  vertical-align:middle;
+  /* Frame the visible mark inside the original transparent canvas. */
+  background:url('/assets/dilidili-nav.png') 33.6% 57.2% / 109% auto no-repeat;
+}

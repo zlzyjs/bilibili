@@ -133,8 +133,8 @@ class AuthController {
                   (SELECT COUNT(*) FROM relationtable r WHERE r.TargetUID = u.UID AND r.RelationType = 0) AS followers,
                   (SELECT COUNT(*) FROM videotable v WHERE v.UID = u.UID AND v.VideoStatus = 'published' AND v.VisibleStatus = 'public') AS videos,
                   (SELECT COALESCE(SUM(c.CoinChange), 0) FROM coinrecordtable c WHERE c.UID = u.UID) AS coins,
-                  (SELECT COALESCE(SUM(p.BCoinAmount), 0) FROM bcoinpurchasetable p WHERE p.UID = u.UID AND p.OrderStatus = 1)
-                    - (SELECT COALESCE(SUM(cc.BCoinAmount), 0) FROM bcoinconsumptiontable cc WHERE cc.UID = u.UID AND cc.OrderStatus = 1) AS bcoins,
+                  (SELECT COALESCE(SUM(p.BCoinAmount), 0) FROM bcoinpurchasetable p WHERE p.UID = u.UID AND p.OrderStatus = 0)
+                    - (SELECT COALESCE(SUM(cc.BCoinAmount), 0) FROM bcoinconsumptiontable cc WHERE cc.UID = u.UID AND cc.OrderStatus = 0) AS bcoins,
                   (SELECT MIN(l.RequiredExperience) FROM userleveltable l WHERE l.LevelID > u.LevelID) AS nextExp
                 FROM usertable u
                 WHERE u.UID = CAST(:uid AS UNSIGNED) AND u.AccountStatus = 'active'

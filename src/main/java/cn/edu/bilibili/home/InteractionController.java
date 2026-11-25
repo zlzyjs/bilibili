@@ -299,9 +299,28 @@ class InteractionController {
     @GetMapping("/search-history")
     List<String> searchHistory(HttpServletRequest request) {
         return jdbc.sql("""
-                SELECT SearchContent FROM searchhistorytable WHERE UID=CAST(:uid AS UNSIGNED)
-                GROUP BY SearchContent ORDER BY MAX(SearchTime) DESC, MAX(SearchID) DESC LIMIT 20
+                SELECT SearchContent FROM (
+                    SELECT SearchContent,SearchTime,SearchID,
+                           ROW_NUMBER() OVER(PARTITION BY SearchContent ORDER BY SearchTime DESC,SearchID DESC) AS entry_rank
+                    FROM searchhistorytable WHERE UID=CAST(:uid AS UNSIGNED)
+                ) recent WHERE entry_rank=1 ORDER BY SearchTime DESC,SearchID DESC LIMIT 20
                 """).param("uid", read(request).uid()).query(String.class).list();
+    }
+
+    @DeleteMapping("/search-history")
+    ResponseEntity<Void> removeSearchHistory(@RequestBody Text input, HttpServletRequest request) {
+        var member = write(request, "视频搜索", "Lv0");
+        jdbc.sql("DELETE FROM searchhistorytable WHERE UID=CAST(:uid AS UNSIGNED) AND SearchContent=:keyword")
+                .param("uid", member.uid()).param("keyword", content(input.value(), 100)).update();
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/search-history/all")
+    ResponseEntity<Void> clearSearchHistory(HttpServletRequest request) {
+        var member = write(request, "视频搜索", "Lv0");
+        jdbc.sql("DELETE FROM searchhistorytable WHERE UID=CAST(:uid AS UNSIGNED)")
+                .param("uid", member.uid()).update();
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/authors/{id}/relations/{list}")
