@@ -1,6 +1,13 @@
 package cn.edu.bilibili.home;
 
 import com.aliyun.oss.OSS;
+import com.aliyun.oss.OSSException;
+import com.aliyun.oss.ClientException;
+import com.aliyun.oss.model.ObjectMetadata;
+import java.io.ByteArrayInputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import com.aliyun.oss.OSSClientBuilder;
 import com.aliyun.oss.ClientBuilderConfiguration;
 import com.aliyun.oss.common.auth.DefaultCredentialProvider;
@@ -53,6 +60,31 @@ class OssMedia {
         if (client == null) throw new ResponseStatusException(SERVICE_UNAVAILABLE, "尚未配置 OSS");
         return URI.create(client.generatePresignedUrl(bucket, object,
                 Date.from(Instant.now().plusSeconds(3600))).toString());
+    }
+
+    String putAvatar(String uid, byte[] png) {
+        if (client == null) throw new ResponseStatusException(SERVICE_UNAVAILABLE, "尚未配置 OSS");
+        String hash;
+        try {
+            hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(png));
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException(ex);
+        }
+        String path = "media/avatars/uploads/" + uid + "/" + hash + ".png";
+        var metadata = new ObjectMetadata();
+        metadata.setContentLength(png.length);
+        metadata.setContentType("image/png");
+        try {
+            client.putObject(bucket, path, new ByteArrayInputStream(png), metadata);
+        } catch (OSSException ex) {
+            if ("AccessDenied".equals(ex.getErrorCode())) {
+                throw new ResponseStatusException(SERVICE_UNAVAILABLE, "OSS 尚未授予头像目录写权限");
+            }
+            throw new ResponseStatusException(SERVICE_UNAVAILABLE, "OSS 暂时无法保存头像，请稍后重试");
+        } catch (ClientException ex) {
+            throw new ResponseStatusException(SERVICE_UNAVAILABLE, "OSS 连接失败，请稍后重试");
+        }
+        return "oss://" + bucket + "/" + path;
     }
 
     @PreDestroy

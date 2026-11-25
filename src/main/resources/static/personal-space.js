@@ -207,7 +207,9 @@ function setupPersonalSpace() {
 
     function showSidebar() {
       const about = node('section', 'personal-about');
-      about.append(node('h2', '', '个人资料'), node('p', '', 'UID ' + account.uid));
+      const heading = node('div', 'profile-card-heading');
+      heading.append(node('h2', '', '个人资料'), link('/account/profile', '编辑', 'profile-card-edit'));
+      about.append(heading, node('p', '', 'UID ' + account.uid));
       if (author.birthday) about.append(node('p', '', '生日 ' + author.birthday));
       const creator = node('section', 'personal-creator');
       const creatorActions = node('div', 'personal-creator-actions');
