@@ -4,6 +4,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 class MessageEvents {
@@ -35,13 +37,13 @@ class MessageEvents {
                 WHERE COALESCE(c.UID,p.UID)=CAST(:uid AS UNSIGNED) AND r.UID<>CAST(:uid AS UNSIGNED)
                 """;
             case "mentions" -> """
-                SELECT CAST(m.id AS CHAR) AS id,COALESCE(c.UID,r.UID) AS actor,m.target_type AS kind,m.target_id AS target,
+                SELECT CAST(m.NotificationID AS CHAR) AS id,COALESCE(c.UID,r.UID) AS actor,m.MentionKind AS kind,m.MentionTarget AS target,
                        COALESCE(c.Content,r.Content) AS body,NULL AS context,
                        COALESCE(c.CommentTime,r.ReplyTime) AS sentAt,COALESCE(c.VideoID,r.VideoID) AS video
-                FROM message_mention m
-                LEFT JOIN commenttable c ON m.target_type='comment' AND m.target_id=c.CommentID AND c.CommentStatus='active'
-                LEFT JOIN reply_tree r ON m.target_type='reply' AND m.target_id=r.ReplyID
-                WHERE m.receiver=CAST(:uid AS UNSIGNED) AND COALESCE(c.UID,r.UID) IS NOT NULL
+                FROM systemnotificationtable m
+                LEFT JOIN commenttable c ON m.MentionKind='comment' AND m.MentionTarget=c.CommentID AND c.CommentStatus='active'
+                LEFT JOIN reply_tree r ON m.MentionKind='reply' AND m.MentionTarget=r.ReplyID
+                WHERE m.ReceiverUID=CAST(:uid AS UNSIGNED) AND COALESCE(c.UID,r.UID) IS NOT NULL
                 """;
             case "likes" -> """
                 SELECT CONCAT(l.UID,':',l.LikeTargetType,':',l.LikeTargetID,':',UNIX_TIMESTAMP(l.LikeTime)) AS id,
@@ -60,7 +62,7 @@ class MessageEvents {
             case "system" -> """
                 SELECT CAST(NotificationID AS CHAR) AS id,NULL AS actor,NULL AS kind,NULL AS target,
                        NotificationContent AS body,NULL AS context,NotificationTime AS sentAt,NULL AS video
-                FROM systemnotificationtable WHERE ReceiverUID=CAST(:uid AS UNSIGNED)
+                FROM systemnotificationtable WHERE ReceiverUID=CAST(:uid AS UNSIGNED) AND MentionKind IS NULL
                 """;
             default -> throw new IllegalArgumentException(category);
         };
@@ -69,14 +71,12 @@ class MessageEvents {
     private String events(String category) {
         return (category.equals("system") ? "WITH " : REPLY_TREE + ", ") + """
                 events AS (
-                  SELECT e.*,u.Name AS name,s.event_id IS NULL AS unread,
-                    EXISTS(SELECT 1 FROM relationtable WHERE UID=CAST(:uid AS UNSIGNED)
-                      AND TargetUID=e.actor AND RelationType=0) AS following
+                  SELECT e.*,u.Name AS name
                   FROM (%s) e
                   LEFT JOIN usertable u ON u.UID=e.actor
-                  LEFT JOIN message_event_state s ON s.uid=CAST(:uid AS UNSIGNED)
-                    AND s.category=:category AND s.event_id=e.id
-                  WHERE COALESCE(s.dismissed,0)=0 %s
+                  JOIN usertable owner ON owner.UID=CAST(:uid AS UNSIGNED)
+                  WHERE COALESCE(CAST(JSON_UNQUOTE(JSON_EXTRACT(owner.MessageNotificationState,
+                    CONCAT('$."',:category,'"."',e.id,'"'))) AS UNSIGNED),0)=0 %s
                 )
                 """.formatted(source(category), category.equals("system") ? "" : """
                   AND EXISTS(SELECT 1 FROM videotable v WHERE v.VideoID=e.video
@@ -92,27 +92,25 @@ class MessageEvents {
                 """).param("uid", uid).param("category", category).param("offset", offset)
                 .query((rs, row) -> new Event(rs.getString("id"), rs.getString("actor"), rs.getString("name"),
                         rs.getString("kind"), rs.getString("target"), rs.getString("body"), rs.getString("context"),
-                        rs.getObject("sentAt", LocalDateTime.class), rs.getString("video"), rs.getBoolean("liked"),
-                        rs.getBoolean("unread"))).list();
+                        rs.getObject("sentAt", LocalDateTime.class), rs.getString("video"), rs.getBoolean("liked"))).list();
     }
 
-    int unread(String uid, String category, String policy) {
-        if (policy.equals("none")) return 0;
-        return jdbc.sql(events(category) + "SELECT COUNT(*) FROM events WHERE unread AND (:policy='all' OR following)")
-                .param("uid", uid).param("category", category).param("policy", policy).query(Integer.class).single();
-    }
-
-    void updateState(String uid, String category, List<String> ids, boolean dismissed) {
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    void dismiss(String uid, String category, List<String> ids) {
         if (ids.isEmpty()) return;
-        jdbc.sql("""
-                INSERT INTO message_event_state (uid,category,event_id,dismissed)
-                """ + events(category) + """
-                SELECT :uid,:category,id,:dismissed FROM events WHERE id IN (:ids)
-                ON DUPLICATE KEY UPDATE dismissed=GREATEST(message_event_state.dismissed,:dismissed)
-                """).param("uid", uid).param("category", category).param("ids", ids).param("dismissed", dismissed).update();
+        jdbc.sql("SELECT UID FROM usertable WHERE UID=CAST(:uid AS UNSIGNED) FOR UPDATE")
+                .param("uid", uid).query(String.class).single();
+        jdbc.sql(events(category) + "SELECT JSON_OBJECTAGG(id,1) FROM events WHERE id IN (:ids)")
+                .param("uid", uid).param("category", category).param("ids", ids)
+                .query(String.class).optional().ifPresent(flags ->
+                    jdbc.sql("""
+                            UPDATE usertable SET MessageNotificationState=JSON_MERGE_PATCH(
+                                COALESCE(MessageNotificationState,JSON_OBJECT()),JSON_OBJECT(:category,CAST(:flags AS JSON)))
+                            WHERE UID=CAST(:uid AS UNSIGNED)
+                            """).param("uid", uid).param("category", category).param("flags", flags).update());
     }
 
     record Event(String id, String actor, String name, String kind, String target, String body, String context,
-                 LocalDateTime sentAt, String video, boolean liked, boolean unread) {}
+                 LocalDateTime sentAt, String video, boolean liked) {}
 }
 

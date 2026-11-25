@@ -19,7 +19,7 @@ class PageController {
     }
 
     @GetMapping({"/", "/index.html", "/recommend", "/search", "/channel/{id}", "/popular", "/popular/must-watch", "/popular/rank", "/latest",
-            "/messages", "/video/{id}", "/space/{id}", "/me", "/service/{name}", "/collections", "/creators"})
+            "/messages", "/account", "/account/{section}", "/account/{section}/{detail}", "/video/{id}", "/space/{id}", "/me", "/service/{name}", "/collections", "/creators"})
     ResponseEntity<Resource> page() {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())

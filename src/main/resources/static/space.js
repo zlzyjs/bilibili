@@ -147,6 +147,10 @@ async function loadSpace() {
     el('author-level').textContent = author.level;
     el('author-signature').textContent = author.signature || '这个人很神秘，什么都没有写';
     el('author-uid').replaceChildren(icon('uid'), author.id);
+    const edit = el('author-profile-edit');
+    const syncEdit = () => { edit.hidden = currentAccount?.uid !== author.id; };
+    window.addEventListener('accountchange', syncEdit);
+    syncEdit();
     el('author-following').textContent = shortCount(author.following);
     el('author-followers').textContent = shortCount(author.followers);
     setupAuthorInteractions(author.id, document.querySelector('.space-actions'), followers => {

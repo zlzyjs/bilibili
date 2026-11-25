@@ -13,9 +13,9 @@
   <link rel="stylesheet" href="/watch-comments.css?v=9">
   <link rel="stylesheet" href="/interactions.css?v=1">
   <link rel="stylesheet" href="/space.css?v=10">
-  <script src="/space.js?v=7" defer></script>
+  <script src="/space.js?v=8" defer></script>
   <link rel="stylesheet" href="/personal-space.css?v=4">
-  <script src="/personal-space.js?v=6" defer></script>
+  <script src="/personal-space.js?v=7" defer></script>
   <link rel="stylesheet" href="/search.css?v=6">
   <script src="/search.js?v=5" defer></script>
   <script src="/watch-preferences.js?v=7" defer></script>
@@ -23,11 +23,13 @@
   <script src="/viewer-presence.js?v=1" defer></script>
   <script src="/watch-comments.js?v=8" defer></script>
   <script src="/watch.js?v=25" defer></script>
-  <script src="/home.js?v=38" defer></script>
+  <script src="/home.js?v=39" defer></script>
   <script src="/login.js?v=10" defer></script>
   <script src="/interactions.js?v=2" defer></script>
-  <link rel="stylesheet" href="/messages.css?v=1">
-  <script src="/messages.js?v=1" defer></script>
+  <link rel="stylesheet" href="/messages.css?v=3">
+  <script src="/messages.js?v=3" defer></script>
+  <link rel="stylesheet" href="/account-center.css?v=1">
+  <script src="/account-center.js?v=1" defer></script>
 </head>
 <body>
   <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -81,6 +83,7 @@
               <strong id="nav-account-name"></strong>
               <span id="nav-account-uid"></span>
               <a href="/me" target="_self">我的空间</a>
+              <a href="/account" target="_self">个人中心</a>
               <button id="nav-logout" type="button">退出登录</button>
             </div>
           </details>
@@ -96,6 +99,7 @@
   </header>
 
   <main class="layout">
+    <section id="account-center" aria-labelledby="account-center-title" hidden><h1 id="account-center-title" class="ac-title">个人中心</h1><div class="ac-layout"></div></section>
     <section id="message-center" aria-label="消息中心" hidden></section>
     <section class="channels" aria-label="频道和分区">
       <div class="channel-icons">
@@ -148,7 +152,7 @@
             <span class="charge-label"><svg viewBox="0 0 16 24" aria-hidden="true"><path d="M5 1H15L9 10H15L3 23L6 13H1Z"/></svg>充电</span>
             <span class="charge-note">充电支持TA</span>
           </button>
-          <section><h2>个人资料</h2><p id="author-uid" class="profile-row" aria-label="UID"></p><p id="author-birthday" class="profile-row" aria-label="生日" hidden></p></section>
+          <section><div class="profile-card-heading"><h2>个人资料</h2><a id="author-profile-edit" class="profile-card-edit" href="/account/profile" hidden>编辑</a></div><p id="author-uid" class="profile-row" aria-label="UID"></p><p id="author-birthday" class="profile-row" aria-label="生日" hidden></p></section>
         </aside>
       </div>
     </section>

@@ -444,7 +444,7 @@ class InteractionController {
                   SELECT VideoID FROM videotable WHERE VideoContent=m.MessageContent AND VideoStatus='published'
                     AND VisibleStatus='public' ORDER BY VideoID LIMIT 1
                 ) v ON m.MessageType=2
-                WHERE m.ReceiverUID=CAST(:uid AS UNSIGNED) AND m.ReceiverDel=0 AND NOT EXISTS(SELECT 1 FROM message_filtered f WHERE f.message_id=m.MessageID) ORDER BY m.SendTime DESC,m.MessageID DESC LIMIT 50
+                WHERE m.ReceiverUID=CAST(:uid AS UNSIGNED) AND m.ReceiverDel=0 AND m.InboxFiltered=0 ORDER BY m.SendTime DESC,m.MessageID DESC LIMIT 50
                 """).param("uid", read(request).uid()).query((rs, row) -> new MessageRow(rs.getString(1),
                 rs.getString(2), rs.getInt(3), rs.getInt(3) == 0 ? rs.getString(4) : null,
                 rs.getObject(5, java.time.LocalDateTime.class), rs.getString(6))).list();
@@ -454,7 +454,7 @@ class InteractionController {
     List<Notification> notifications(HttpServletRequest request) {
         return jdbc.sql("""
                 SELECT NotificationContent,NotificationTime FROM systemnotificationtable
-                WHERE ReceiverUID=CAST(:uid AS UNSIGNED) ORDER BY NotificationTime DESC,NotificationID DESC LIMIT 50
+                WHERE ReceiverUID=CAST(:uid AS UNSIGNED) AND MentionKind IS NULL ORDER BY NotificationTime DESC,NotificationID DESC LIMIT 50
                 """).param("uid", read(request).uid()).query((rs, row) -> new Notification(rs.getString(1),
                 rs.getObject(2, java.time.LocalDateTime.class))).list();
     }

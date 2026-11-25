@@ -1,13 +1,7 @@
 package cn.edu.bilibili.home;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -16,7 +10,6 @@ import java.util.regex.Pattern;
 import javax.imageio.ImageIO;
 import javax.imageio.stream.MemoryCacheImageInputStream;
 import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
@@ -27,21 +20,17 @@ import static org.springframework.http.HttpStatus.*;
 class MessageStore {
     private static final Pattern MENTION = Pattern.compile(
             "(?<![\\p{L}\\p{N}_])[@＠](?:\\{([^{}\\r\\n]{1,80})\\}|([\\p{L}\\p{M}\\p{N}_-]+))");
-    private static final Pattern SPAM = Pattern.compile(
-            "(刷单|返利|兼职).*?(加群|微信|qq|联系)|稳赚不赔|点击领取.*(?:https?://|www\\.)", Pattern.DOTALL);
     private static final String VISIBLE = """
             ((m.SenderUID=CAST(:uid AS UNSIGNED) AND m.SenderDel=0) OR (m.ReceiverUID=CAST(:uid AS UNSIGNED) AND m.ReceiverDel=0
-              AND NOT EXISTS(SELECT 1 FROM message_filtered f WHERE f.message_id=m.MessageID)))
+              AND m.InboxFiltered=0))
             """;
     private static final String PAIR = """
             ((m.SenderUID=CAST(:uid AS UNSIGNED) AND m.ReceiverUID=CAST(:peer AS UNSIGNED)) OR (m.SenderUID=CAST(:peer AS UNSIGNED) AND m.ReceiverUID=CAST(:uid AS UNSIGNED)))
             """;
     private final JdbcClient jdbc;
-    private final ObjectMapper json;
 
-    MessageStore(JdbcClient jdbc, ObjectMapper json) {
+    MessageStore(JdbcClient jdbc) {
         this.jdbc = jdbc;
-        this.json = json;
     }
 
     void lockParticipants(String uid, String peer) {
@@ -61,7 +50,7 @@ class MessageStore {
         return !follows(peer, uid) && !jdbc.sql("""
                 SELECT EXISTS(SELECT 1 FROM privatemessagetable m
                   WHERE m.SenderUID=CAST(:peer AS UNSIGNED) AND m.ReceiverUID=CAST(:uid AS UNSIGNED)
-                    AND NOT EXISTS(SELECT 1 FROM message_filtered f WHERE f.message_id=m.MessageID))
+                    AND m.InboxFiltered=0)
                 """).param("uid", uid).param("peer", peer).query(Boolean.class).single();
     }
 
@@ -75,54 +64,37 @@ class MessageStore {
         if (restricted(uid, peer) && sentBefore(uid, peer)) {
             throw new ResponseStatusException(CONFLICT, "对方回复或关注你前，最多发送 1 条消息");
         }
-        String filterText = value;
         if (type == 2) {
-            var video = jdbc.sql("""
-                    SELECT VideoContent,VideoTitle FROM videotable WHERE VideoID=CAST(:id AS UNSIGNED)
+            value = jdbc.sql("""
+                    SELECT VideoContent FROM videotable WHERE VideoID=CAST(:id AS UNSIGNED)
                       AND VideoStatus='published' AND VisibleStatus='public' FOR SHARE
-                    """).param("id", value).query((rs, row) -> List.of(rs.getString(1), rs.getString(2)))
+                    """).param("id", value).query(String.class)
                     .optional().orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "视频不可用"));
-            value = video.get(0);
-            filterText = video.get(1);
         }
-        var keys = new GeneratedKeyHolder();
         jdbc.sql("""
-                INSERT INTO privatemessagetable(SenderUID,ReceiverUID,MessageType,MessageContent)
-                VALUES (CAST(:uid AS UNSIGNED),CAST(:peer AS UNSIGNED),:type,:value)
-                """).param("uid", uid).param("peer", peer).param("type", type).param("value", value).update(keys);
-        Number id = keys.getKey();
-        if (image != null) {
-            jdbc.sql("INSERT INTO message_image VALUES (CAST(:id AS UNSIGNED),:mime,:bytes)")
-                    .param("id", id).param("mime", image.mime()).param("bytes", image.bytes()).update();
-        }
-        Preferences preferences = preferences(peer);
-        String normalized = normalize(filterText);
-        if (preferences.keywords().stream().map(MessageStore::normalize).anyMatch(normalized::contains)
-                || (preferences.smartFilter() && !follows(peer, uid) && SPAM.matcher(normalized).find())) {
-            jdbc.sql("INSERT INTO message_filtered VALUES (CAST(:id AS UNSIGNED))").param("id", id).update();
-        }
+                INSERT INTO privatemessagetable(SenderUID,ReceiverUID,MessageType,MessageContent,
+                    InboxImageMime,InboxImageBytes)
+                VALUES (CAST(:uid AS UNSIGNED),CAST(:peer AS UNSIGNED),:type,:value,:mime,:bytes)
+                """).param("uid", uid).param("peer", peer).param("type", type).param("value", value)
+                .param("mime", image == null ? null : image.mime(), java.sql.Types.VARCHAR)
+                .param("bytes", image == null ? null : image.bytes(), java.sql.Types.LONGVARBINARY).update();
     }
 
     List<Conversation> conversations(String uid, int offset) {
         return jdbc.sql("""
                 WITH ranked AS (
-                  SELECT m.*, IF(m.SenderUID=CAST(:uid AS UNSIGNED),m.ReceiverUID,m.SenderUID) AS peer,
+                  SELECT m.MessageID,m.MessageType,IF(m.MessageType=0,m.MessageContent,NULL) AS preview, IF(m.SenderUID=CAST(:uid AS UNSIGNED),m.ReceiverUID,m.SenderUID) AS peer,
                     ROW_NUMBER() OVER(PARTITION BY IF(m.SenderUID=CAST(:uid AS UNSIGNED),m.ReceiverUID,m.SenderUID)
-                                      ORDER BY m.MessageID DESC) AS position,
-                    SUM(m.ReceiverUID=CAST(:uid AS UNSIGNED) AND seen.event_id IS NULL) OVER(
-                      PARTITION BY IF(m.SenderUID=CAST(:uid AS UNSIGNED),m.ReceiverUID,m.SenderUID)) AS unread
+                                      ORDER BY m.MessageID DESC) AS position
                   FROM privatemessagetable m
-                  LEFT JOIN message_event_state seen ON seen.uid=CAST(:uid AS UNSIGNED) AND seen.category='chat'
-                    AND seen.event_id=CAST(m.MessageID AS CHAR)
                   WHERE %s
                 )
-                SELECT m.peer,u.Name,m.MessageType,IF(m.MessageType=0,m.MessageContent,NULL),m.unread,
-                    EXISTS(SELECT 1 FROM relationtable WHERE UID=CAST(:uid AS UNSIGNED) AND TargetUID=m.peer AND RelationType=0)
+                SELECT m.peer,u.Name,m.MessageType,m.preview
                 FROM ranked m LEFT JOIN usertable u ON u.UID=m.peer
                 WHERE m.position=1 ORDER BY m.MessageID DESC LIMIT 50 OFFSET :offset
                 """.formatted(VISIBLE)).param("uid", uid).param("offset", offset)
                 .query((rs, row) -> new Conversation(rs.getString(1), rs.getString(2), rs.getInt(3),
-                        rs.getString(4), rs.getInt(5), rs.getBoolean(6))).list();
+                        rs.getString(4))).list();
     }
 
     ThreadView thread(String uid, String peer, String before) {
@@ -153,27 +125,9 @@ class MessageStore {
         return new ThreadView(name, restricted, issue, rows.stream().limit(40).toList(), rows.size() > 40);
     }
 
-    void readThread(String uid, String peer, String through) {
-        jdbc.sql("""
-                INSERT IGNORE INTO message_event_state (uid,category,event_id)
-                SELECT CAST(:uid AS UNSIGNED),'chat',m.MessageID FROM privatemessagetable m
-                WHERE m.ReceiverUID=CAST(:uid AS UNSIGNED) AND m.SenderUID=CAST(:peer AS UNSIGNED) AND m.MessageID<=CAST(:through AS UNSIGNED) AND %s
-                """.formatted(VISIBLE)).param("uid", uid).param("peer", peer).param("through", through).update();
-    }
-
-    int unreadChats(String uid) {
-        return jdbc.sql("""
-                SELECT COUNT(*) FROM privatemessagetable m
-                WHERE m.ReceiverUID=CAST(:uid AS UNSIGNED) AND %s AND NOT EXISTS(
-                  SELECT 1 FROM message_event_state s WHERE s.uid=CAST(:uid AS UNSIGNED) AND s.category='chat'
-                    AND s.event_id=CAST(m.MessageID AS CHAR))
-                """.formatted(VISIBLE)).param("uid", uid).query(Integer.class).single();
-    }
-
     Image privateImage(String uid, String id) {
         return jdbc.sql("""
-                SELECT a.mime,a.image_bytes,m.MessageContent FROM privatemessagetable m
-                LEFT JOIN message_image a ON a.message_id=m.MessageID
+                SELECT m.InboxImageMime,m.InboxImageBytes,m.MessageContent FROM privatemessagetable m
                 WHERE m.MessageID=CAST(:id AS UNSIGNED) AND m.MessageType=1 AND %s
                 """.formatted(VISIBLE)).param("uid", uid).param("id", id)
                 .query((rs, row) -> rs.getString(1) != null ? new Image(rs.getString(1), rs.getBytes(2))
@@ -207,70 +161,21 @@ class MessageStore {
         throw new ResponseStatusException(BAD_REQUEST, "请选择有效的 PNG、JPEG 或 GIF 图片");
     }
 
-    Preferences preferences(String uid) {
-        return jdbc.sql("SELECT * FROM message_preferences WHERE uid=CAST(:uid AS UNSIGNED)").param("uid", uid)
-                .query((rs, row) -> new Preferences(rs.getBoolean("reminders"), rs.getBoolean("smart_filter"),
-                        keywords(rs), rs.getString("reply_policy"), rs.getString("mention_policy"),
-                        rs.getBoolean("like_alert"), rs.getBoolean("fold_strangers")))
-                .optional().orElse(new Preferences(true, true, List.of(), "all", "all", true, false));
-    }
-
-    Preferences updatePreferences(String uid, Preferences p) {
-        if (p.reminders() == null || p.smartFilter() == null || p.likeAlert() == null || p.foldStrangers() == null
-                || !validPolicy(p.replyPolicy()) || !validPolicy(p.mentionPolicy()) || p.keywords() == null
-                || p.keywords().size() > 50 || p.keywords().stream().anyMatch(word -> word == null || word.isBlank()
-                        || word.codePointCount(0, word.length()) > 30)) {
-            throw new ResponseStatusException(BAD_REQUEST, "请检查消息设置，最多添加 50 个屏蔽词，每个最多 30 字");
-        }
-        var words = p.keywords().stream().map(String::strip).distinct().toList();
-        try {
-            jdbc.sql("""
-                    INSERT INTO message_preferences(uid,reminders,smart_filter,keywords,reply_policy,mention_policy,like_alert,fold_strangers)
-                    VALUES (CAST(:uid AS UNSIGNED),:reminders,:smart,:keywords,:reply,:mention,:likes,:fold) AS incoming
-                    ON DUPLICATE KEY UPDATE reminders=incoming.reminders,smart_filter=incoming.smart_filter,
-                      keywords=incoming.keywords,reply_policy=incoming.reply_policy,mention_policy=incoming.mention_policy,
-                      like_alert=incoming.like_alert,fold_strangers=incoming.fold_strangers
-                    """).param("uid", uid).param("reminders", p.reminders()).param("smart", p.smartFilter())
-                    .param("keywords", json.writeValueAsString(words)).param("reply", p.replyPolicy())
-                    .param("mention", p.mentionPolicy()).param("likes", p.likeAlert()).param("fold", p.foldStrangers()).update();
-        } catch (JsonProcessingException ex) {
-            throw new IllegalStateException(ex);
-        }
-        return preferences(uid);
-    }
-
-    private static boolean validPolicy(String policy) {
-        return policy != null && Set.of("all", "following", "none").contains(policy);
-    }
-
-    private List<String> keywords(ResultSet rs) throws SQLException {
-        try {
-            return json.readValue(rs.getString("keywords"), new TypeReference<List<String>>() {});
-        } catch (JsonProcessingException ex) {
-            throw new SQLException("Invalid message keywords", ex);
-        }
-    }
-
-    private static String normalize(String value) {
-        return Normalizer.normalize(value, Normalizer.Form.NFKC).toLowerCase(Locale.ROOT);
-    }
-
     void mentions(String author, String type, Number target, String content) {
         var matcher = MENTION.matcher(content);
         while (matcher.find()) {
             jdbc.sql("""
-                    INSERT IGNORE INTO message_mention(receiver,target_type,target_id)
-                    SELECT UID,:type,CAST(:id AS UNSIGNED) FROM usertable WHERE AccountStatus='active'
-                      AND UID<>:author AND BINARY Name=BINARY :name
+                    INSERT INTO systemnotificationtable(ReceiverUID,NotificationContent,MentionKind,MentionTarget)
+                    SELECT UID,'@',:type,CAST(:id AS UNSIGNED) FROM usertable WHERE AccountStatus='active'
+                      AND UID<>CAST(:author AS UNSIGNED) AND CAST(Name AS BINARY)=CAST(:name AS BINARY)
+                    ON DUPLICATE KEY UPDATE MentionTarget=systemnotificationtable.MentionTarget
                     """).param("type", type).param("id", target).param("author", author)
                     .param("name", matcher.group(1) == null ? matcher.group(2) : matcher.group(1)).update();
         }
     }
 
-    record Preferences(Boolean reminders, Boolean smartFilter, List<String> keywords,
-                       String replyPolicy, String mentionPolicy, Boolean likeAlert, Boolean foldStrangers) {}
     record Image(String mime, byte[] bytes) {}
-    record Conversation(String uid, String name, int type, String preview, int unread, boolean following) {}
+    record Conversation(String uid, String name, int type, String preview) {}
     record Chat(String id, String sender, int type, String text, LocalDateTime sentAt, String videoId) {}
     record ThreadView(String name, boolean restricted, String issue, List<Chat> messages, boolean hasMore) {}
 }

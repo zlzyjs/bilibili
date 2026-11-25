@@ -57,15 +57,6 @@ class MessageController {
         return store.thread(uid, peer, before);
     }
 
-    @PutMapping("/threads/{peer}/read")
-    @ResponseStatus(NO_CONTENT)
-    void read(@PathVariable String peer, @RequestBody ReadThread input, HttpServletRequest request) {
-        String uid = user(request, true);
-        checkId(peer);
-        checkId(input.through());
-        store.readThread(uid, peer, input.through());
-    }
-
     @GetMapping("/images/{id}")
     ResponseEntity<?> image(@PathVariable String id, HttpServletRequest request) {
         checkId(id);
@@ -79,27 +70,6 @@ class MessageController {
             return ResponseEntity.ok().contentType(type).body(source.getBody());
         }
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(image.mime())).body(image.bytes());
-    }
-
-    @GetMapping("/preferences")
-    MessageStore.Preferences preferences(HttpServletRequest request) {
-        return store.preferences(user(request, false));
-    }
-
-    @PutMapping("/preferences")
-    MessageStore.Preferences preferences(@RequestBody MessageStore.Preferences input, HttpServletRequest request) {
-        return store.updatePreferences(user(request, true), input);
-    }
-
-    @GetMapping("/unread")
-    Map<String, Integer> unread(HttpServletRequest request) {
-        String uid = user(request, false);
-        var p = store.preferences(uid);
-        if (!p.reminders()) return Map.of();
-        return Map.of("chat", store.unreadChats(uid), "replies", events.unread(uid, "replies", p.replyPolicy()),
-                "mentions", events.unread(uid, "mentions", p.mentionPolicy()),
-                "likes", events.unread(uid, "likes", p.likeAlert() ? "all" : "none"),
-                "system", events.unread(uid, "system", "all"));
     }
 
     @GetMapping("/events/{category}")
@@ -118,7 +88,7 @@ class MessageController {
                 id -> id == null || !id.matches("[0-9:]{1,80}"))) {
             throw new ResponseStatusException(BAD_REQUEST, "无效的通知编号");
         }
-        events.updateState(uid, category, input.ids(), input.dismissed());
+        if (input.dismissed()) events.dismiss(uid, category, input.ids());
     }
 
     private String user(HttpServletRequest request, boolean write) {
@@ -141,7 +111,6 @@ class MessageController {
         return offset;
     }
 
-    record ReadThread(String through) {}
     record EventState(List<String> ids, boolean dismissed) {}
 }
 

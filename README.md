@@ -30,6 +30,8 @@ Spring Boot、MySQL 和原生 HTML/CSS/JavaScript 实现首页、分区、搜索
 
 OSS 媒体路径使用 `oss://bilibili-media/media/videos/分区名视频/文件.mp4`、对应的 `media/covers/分区名视频封面/` 和 `media/avatars/`。后端生成一小时有效的 V4 签名链接，响应不缓存，Bucket 保持私有。`scripts/oss-read-policy.json` 中的 `media/*` 自动覆盖后续新增子目录。
 
+个人中心位于 `/account`。更换头像读取本地 JPG 或 PNG，后端居中裁成 180 × 180 的 PNG 后写入当前 OSS Bucket 的 `media/avatars/uploads/`，再更新 MySQL 的头像地址。项目的只读权限示例适用于浏览媒体。更换头像还需要为后端使用的 RAM 身份授予该前缀的 `oss:PutObject`，例如默认 Bucket 对应资源 `acs:oss:*:*:bilibili-media/media/avatars/uploads/*`。
+
 媒体接口也支持 `media/videos/...` 本地相对路径；`app.media-root` 默认指向项目上一层，可用 `BILI_MEDIA_ROOT` 调整。既有公开视频使用 OSS。
 
 Lv2 用户可以在 `/studio/upload` 提交 MP4 视频（最多 256 MB，时长不超过 10 小时）。封面可从视频画面生成，也可以上传不超过 5 MB 的 JPG 或 PNG。服务端将稿件文件保存到 `BILI_MEDIA_ROOT` 下的 `media/videos/studio/` 和 `media/covers/studio/`，因此运行服务的账号需要这两个目录的写权限。稿件走现有视频审核流程，提交后可在「稿件管理 → 进行中」查看。
@@ -37,6 +39,8 @@ Lv2 用户可以在 `/studio/upload` 提交 MP4 视频（最多 256 MB，时长�
 首页分区直接读取分区表；尚无视频的分区保留入口。用户搜索支持昵称关键词、粉丝与等级排序、分页；可用“小满”“星河”“晚风”展示多条匹配，用“的”展示分页。公开视频按数据库中的标签、合集、上传者与互动记录展示。
 
 可用唯一昵称和密码注册，系统会分配 UID、自动登录并显示 UID。再次登录时使用 UID 和密码。账号菜单提供个人空间和退出入口。注册复用数据库中的默认收藏夹触发器，密码登录调用 `sp_record_login_exp` 记录登录和奖励。游客可试看，登录后播放器可继续播放完整视频。弹幕偏好、屏蔽、全屏和小窗由前端控制，偏好保存在浏览器中。在线观看人数通过匿名心跳维护。
+
+消息中心复用现有 `usertable`、`privatemessagetable` 和 `systemnotificationtable`。首次使用新版启动时会补充缺失字段和索引，并将旧消息辅助表的记录迁入这三张表。启动账号需要具备所涉及表的 ALTER 和 INDEX 权限。旧辅助表中的原始记录保留作备份。
 
 ## 检查
 

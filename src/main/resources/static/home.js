@@ -481,6 +481,12 @@ async function init() {
   document.body.classList.toggle('popular-page', popularPage);
   const withBanner = home || category || popularPage || latestPage;
   document.body.classList.toggle('inner-page', !withBanner);
+  if (path === '/account' || path.startsWith('/account/')) {
+    document.body.classList.add('account-center-page');
+    document.querySelector('.channels').hidden = true;
+    document.querySelector('.feed').hidden = true;
+    return;
+  }
   if (path === '/messages') {
     document.body.classList.add('message-center-page');
     document.querySelector('.channels').hidden = true;
