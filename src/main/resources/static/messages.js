@@ -1,9 +1,11 @@
 (() => {
   const root = el('message-center');
+  const navButton = document.querySelector('[data-interaction=messages]');
   const tabs = { chat: '我的消息', replies: '回复我的', mentions: '@ 我的', likes: '收到的赞',
-    system: '系统通知' };
+    system: '系统通知', settings: '消息设置' };
   const tab = Object.hasOwn(tabs, params.get('tab')) ? params.get('tab') : 'chat';
   const peer = params.get('uid');
+  const folder = params.get('folder') === 'strangers';
   const url = (key, extra = {}) => '/messages?' + new URLSearchParams({ tab: key, ...extra });
   const button = (label, action, css = 'mc-button') => {
     const element = node('button', css, label);
@@ -12,17 +14,105 @@
     return element;
   };
 
+  function readChatPrefs(uid) {
+    try { return JSON.parse(localStorage.getItem('mc:chat:' + uid)) || {}; } catch { return {}; }
+  }
+  function writeChatPrefs(uid, prefs) {
+    localStorage.setItem('mc:chat:' + uid, JSON.stringify(prefs));
+  }
+
+  function mcDialog(title, build) {
+    const dialog = node('dialog', 'mc-dialog');
+    const heading = node('h2', '', title);
+    const close = button('×', () => dialog.close(), 'mc-dialog-close');
+    close.setAttribute('aria-label', '关闭');
+    const head = node('div', 'mc-dialog-head');
+    head.append(heading, close);
+    const content = node('div', 'mc-dialog-content');
+    const status = node('p', 'mc-dialog-status');
+    status.setAttribute('role', 'status');
+    const actions = node('div', 'mc-dialog-actions');
+    dialog.append(head, content, status, actions);
+    dialog.addEventListener('close', () => dialog.remove(), { once: true });
+    document.body.append(dialog);
+    dialog.showModal();
+    Promise.resolve().then(() => build(content, actions, status, () => dialog.close()))
+      .catch(error => { status.textContent = error.message; });
+  }
+
+  function mcConfirm(title, text, action) {
+    mcDialog(title, (content, actions, status, close) => {
+      content.append(node('p', 'mc-dialog-text', text));
+      const cancel = button('取消', close, 'mc-dialog-cancel');
+      const ok = button('确定', async () => {
+        ok.disabled = cancel.disabled = true;
+        try { await action(); close(); }
+        catch (error) { status.textContent = error.message; ok.disabled = cancel.disabled = false; }
+      }, 'mc-dialog-ok');
+      actions.append(cancel, ok);
+    });
+  }
+
+  function reportAccount(peer, name) {
+    mcDialog('举报该用户', async (content, actions, status, close) => {
+      const reasons = await interaction('/reports/account/reasons');
+      const intro = node('p', 'mc-dialog-text');
+      intro.append('请选择您举报 ', node('strong', '', name || '该用户'), ' 的理由，该对话近期内的消息将作为证据一并提交。');
+      const list = node('div', 'mc-report-reasons');
+      let chosen = '';
+      for (const reason of reasons) {
+        const input = node('input');
+        input.type = 'radio';
+        input.name = 'mc-report-reason';
+        input.value = reason.id;
+        input.onchange = () => { chosen = reason.id; };
+        const label = node('label');
+        label.append(input, node('span', '', reason.name));
+        list.append(label);
+      }
+      const detail = node('div', 'mc-report-detail');
+      const description = node('textarea');
+      description.maxLength = 60;
+      const counter = node('span', 'mc-report-count', '0/60');
+      description.oninput = () => { counter.textContent = description.value.length + '/60'; };
+      detail.append(description, counter);
+      content.append(intro, list,
+        node('p', 'mc-report-hint', '为帮助审核人员更快处理，请补充问题类型和出现位置等详细信息'), detail);
+      const cancel = button('取消', close, 'mc-dialog-cancel');
+      const ok = button('确认', async () => {
+        if (!chosen) { status.textContent = '请选择举报理由'; return; }
+        ok.disabled = cancel.disabled = true;
+        try {
+          await interaction('/reports/account/' + encodeURIComponent(peer), 'POST', { reason: chosen, description: description.value.trim() });
+          close();
+          accountNotice('举报已提交');
+        } catch (error) { status.textContent = error.message; ok.disabled = cancel.disabled = false; }
+      }, 'mc-dialog-ok');
+      actions.append(cancel, ok);
+    });
+  }
+
   async function inbox(resource, method = 'GET', data) {
-    const options = { method, cache: 'no-store' };
-    if (data !== undefined) {
-      options.headers = { 'X-CSRF-Token': (await authApi('csrf')).token, 'Content-Type': 'application/json' };
-      options.body = JSON.stringify(data);
+    return apiRequest('/api/message-center', resource, { method, body: data, fallback: '消息操作失败，请重试' });
+  }
+
+  function badge(host, count) {
+    host.querySelector('.mc-badge')?.remove();
+    if (count > 0) host.append(node('span', 'mc-badge', count > 99 ? '99+' : count));
+  }
+
+  async function refreshBadges() {
+    const uid = currentAccount?.uid;
+    if (!uid) {
+      badge(navButton, 0);
+      return;
     }
-    const response = await fetch('/api/message-center' + resource, options);
-    if (response.status === 204) return;
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(payload.message || '消息操作失败，请重试');
-    return payload;
+    try {
+      const counts = await inbox('/unread');
+      if (currentAccount?.uid !== uid) return;
+      badge(navButton, Object.values(counts).reduce((total, value) => total + value, 0));
+      document.querySelectorAll('[data-message-tab]').forEach(item => badge(item, counts[item.dataset.messageTab]));
+    } catch {}
   }
 
   function avatar(uid) {
@@ -39,10 +129,6 @@
     return state;
   }
 
-  function showTime(value) {
-    return value?.replace('T', ' ').slice(0, 16) || '';
-  }
-
   async function chat(section, status, stillCurrent) {
     const frame = node('div', 'mc-chat');
     const list = node('div', 'mc-threads');
@@ -50,36 +136,56 @@
     const main = node('section', 'mc-conversation');
     if (peer) frame.classList.add('mc-thread-open');
     const bar = node('div', 'mc-threads-title');
-    bar.textContent = '最近会话';
+    bar.append(folder ? link(url('chat'), '返回最近会话') : node('span', '', '最近会话'));
     list.append(bar, entries);
     frame.append(list, main);
     section.append(frame);
+    const preferences = await inbox('/preferences');
     const threads = [];
     let moreThreads = true;
     let offset = 0;
     let currentName;
     let loadingThreads = false;
     const threadPath = '/threads/' + encodeURIComponent(peer);
-    const threadLink = (uid, name) => link(url('chat', { uid }), name);
+    const threadLink = (uid, name) => link(url('chat', { ...(folder ? { folder: 'strangers' } : {}), uid }), name);
+
+    function threadItem(row) {
+      const prefs = readChatPrefs(row.uid);
+      const item = threadLink(row.uid);
+      item.className = 'mc-thread';
+      if (prefs.pin) item.classList.add('is-pinned');
+      if (row.uid === peer) item.setAttribute('aria-current', 'page');
+      const words = node('div', 'mc-thread-copy');
+      words.append(node('strong', '', row.name || '账号已注销'));
+      const preview = [row.preview || '', '[图片]', '[视频]'][row.type] || '';
+      if (preview) words.append(node('small', '', preview));
+      item.append(avatar(row.uid), words);
+      if (prefs.mute) {
+        const quiet = node('span', 'mc-quiet');
+        quiet.append(icon('bell-off'));
+        item.append(quiet);
+      } else if (preferences.reminders) badge(item, row.unread);
+      return item;
+    }
 
     function renderThreads() {
+      const unknown = threads.filter(row => !row.following);
       entries.replaceChildren();
-      const displayed = [...threads];
+      const displayed = threads.filter(row => folder ? !row.following : !preferences.foldStrangers || row.following);
       if (peer && currentName && !displayed.some(row => row.uid === peer)) {
         displayed.unshift({ uid: peer, name: currentName });
       }
-      displayed.forEach(row => {
-        const item = threadLink(row.uid);
-        item.className = 'mc-thread';
-        if (row.uid === peer) item.setAttribute('aria-current', 'page');
-        const words = node('div', 'mc-thread-copy');
-        words.append(node('strong', '', row.name || '账号已注销'));
-        const preview = [row.preview || '', '[图片]', '[视频]'][row.type] || '';
-        if (preview) words.append(node('small', '', preview));
-        item.append(avatar(row.uid), words);
-        entries.append(item);
-      });
-      if (!displayed.length) entries.append(empty('暂无最近会话'));
+      const pinnedRows = displayed.filter(row => readChatPrefs(row.uid).pin);
+      const restRows = displayed.filter(row => !readChatPrefs(row.uid).pin);
+      entries.append(...pinnedRows.map(threadItem));
+      if (preferences.foldStrangers && !folder && unknown.length) {
+        const group = link(url('chat', { folder: 'strangers' }), '', 'mc-strangers');
+        group.append(icon('mail'), node('span', '', '未关注的人'));
+        if (preferences.reminders) badge(group, unknown.reduce((total, row) => total + row.unread, 0));
+        entries.append(group);
+      }
+      entries.append(...restRows.map(threadItem));
+      if (!displayed.length) entries.append(empty(folder ? '暂无未关注人的会话' : '暂无最近会话'));
       if (moreThreads) entries.append(button('加载更多会话', async event => {
         event.currentTarget.disabled = true;
         try { await loadThreads(); }
@@ -115,14 +221,77 @@
     }
 
     const heading = node('div', 'mc-chat-title');
-    const back = link(url('chat'), '会话列表', 'mc-chat-back');
+    const back = link(url('chat', folder ? { folder: 'strangers' } : {}), '会话列表', 'mc-chat-back');
     const nameLink = link('/space/' + encodeURIComponent(peer), '');
     heading.append(back, nameLink);
+
+    const menuWrap = node('div', 'mc-chat-menu');
+    const menuBtn = node('button', 'mc-menu-btn');
+    menuBtn.type = 'button';
+    menuBtn.setAttribute('aria-label', '更多设置');
+    menuBtn.append(icon('dots'));
+    const dropdown = node('div', 'mc-menu-dropdown');
+    dropdown.hidden = true;
+    let prefs = readChatPrefs(peer);
+    let blocked = false;
+    const pinItem = node('button', 'mc-menu-item');
+    const muteItem = node('button', 'mc-menu-item');
+    const blockItem = node('button', 'mc-menu-item');
+    const reportItem = node('button', 'mc-menu-item', '举报该用户');
+    const pushItem = node('button', 'mc-menu-item');
+    function refreshMenuLabels() {
+      pinItem.textContent = prefs.pin ? '取消置顶' : '置顶聊天';
+      muteItem.textContent = prefs.mute ? '关闭免打扰' : '开启免打扰';
+      blockItem.textContent = blocked ? '移出黑名单' : '加入黑名单';
+      pushItem.textContent = prefs.noPush ? '接收推送' : '不接收推送';
+    }
+    const toggle = (key, value) => {
+      prefs = { ...prefs, [key]: value };
+      writeChatPrefs(peer, prefs);
+      refreshMenuLabels();
+      renderThreads();
+    };
+    pinItem.onclick = () => toggle('pin', !prefs.pin);
+    muteItem.onclick = () => toggle('mute', !prefs.mute);
+    pushItem.onclick = () => {
+      if (prefs.noPush) toggle('noPush', false);
+      else mcConfirm('确认关闭内容推送吗？', '关闭后，你将不再收到该账号的内容推送，但通知类消息不受影响', () => toggle('noPush', true));
+    };
+    const setBlock = async enabled => {
+      const result = await interaction('/authors/' + encodeURIComponent(peer) + '/relation/block', 'PUT', { enabled });
+      blocked = result.blocked;
+      refreshMenuLabels();
+      if (blocked) {
+        localStorage.removeItem('mc:chat:' + peer);
+        location.assign(url('chat'));
+      }
+    };
+    blockItem.onclick = () => {
+      if (blocked) setBlock(false).catch(error => { status.textContent = error.message; });
+      else mcConfirm('加入黑名单', '加入黑名单后，将自动解除关注关系和对该用户的合集订阅关系，禁止该用户与我互动或查看我的空间', () => setBlock(true));
+    };
+    reportItem.onclick = () => reportAccount(peer, currentName);
+    dropdown.append(pinItem, muteItem, blockItem, reportItem, pushItem);
+    dropdown.addEventListener('click', () => { dropdown.hidden = true; });
+    menuBtn.onclick = event => { event.stopPropagation(); dropdown.hidden = !dropdown.hidden; };
+    const closeMenu = event => {
+      if (!menuWrap.isConnected) { document.removeEventListener('click', closeMenu); return; }
+      if (!menuWrap.contains(event.target)) dropdown.hidden = true;
+    };
+    document.addEventListener('click', closeMenu);
+    addEventListener('pagehide', () => document.removeEventListener('click', closeMenu), { once: true });
+    menuWrap.append(menuBtn, dropdown);
+    heading.append(menuWrap);
+    refreshMenuLabels();
+    interaction('/authors/' + encodeURIComponent(peer) + '/relation')
+      .then(result => { blocked = result.blocked; refreshMenuLabels(); })
+      .catch(() => {});
     const history = node('div', 'mc-history');
-    const note = node('p', 'mc-chat-note');
     const older = button('加载更早消息', loadOlder, 'mc-load');
     const bubbles = node('div', 'mc-bubbles');
-    history.append(note, older, bubbles);
+    const note = node('p', 'mc-chat-note');
+    note.hidden = true;
+    history.append(older, bubbles, note);
     const form = node('form', 'mc-composer');
     const toolbar = node('div', 'mc-compose-tools');
     const text = node('textarea');
@@ -158,17 +327,39 @@
     form.append(toolbar, text, actions);
     main.append(heading, history, form);
     let issue = '';
+    let canSend = true;
     let busy = false;
     let newest;
     let oldest;
     let hasMore;
     let polling = false;
 
+    function updateNote() {
+      note.textContent = canSend ? '' : issue || (bubbles.querySelector('.mc-mine') ? '对方主动回复或关注你前，最多发送 1 条消息' : '');
+      note.hidden = !note.textContent;
+    }
+
     function updateComposer() {
       const length = [...text.value].length;
       count.textContent = length + '/500';
-      text.disabled = picture.disabled = emoji.disabled = Boolean(issue || busy);
-      send.disabled = Boolean(issue || busy || length > 500 || !text.value.trim());
+      text.disabled = picture.disabled = emoji.disabled = Boolean(!canSend || busy);
+      send.disabled = Boolean(!canSend || busy || length > 500 || !text.value.trim());
+    }
+
+    function videoCard(row) {
+      const id = encodeURIComponent(row.videoId);
+      const card = link('/video/' + id, '', 'mc-video');
+      const cover = node('img', 'mc-video-cover');
+      cover.alt = '';
+      cover.loading = 'lazy';
+      const play = node('span', 'mc-video-play');
+      play.append(icon('video-play'));
+      const author = node('div', 'mc-video-author');
+      if (row.authorId) author.append(avatar(row.authorId));
+      author.append(node('span', '', row.author || '未知UP主'));
+      card.append(cover, play, author);
+      attachCover(cover, '/api/videos/' + id + '/cover', '暂无封面');
+      return card;
     }
 
     function bubble(row) {
@@ -182,10 +373,11 @@
         image.onerror = () => image.replaceWith(node('span', '', '图片无法加载'));
         body.append(image);
       } else if (row.type === 2) {
-        body.append(row.videoId ? link('/video/' + row.videoId, '查看转发的视频') : node('span', '', '转发的视频已不可用'));
+        if (row.videoId) body.append(videoCard(row));
+        else body.textContent = '转发的视频已不可用';
       } else body.textContent = row.text;
       const detail = node('div', 'mc-message-detail');
-      detail.append(node('time', '', showTime(row.sentAt)), body);
+      detail.append(node('time', '', formatTime(row.sentAt)), body);
       entry.append(avatar(row.sender), detail);
       return entry;
     }
@@ -212,8 +404,7 @@
       currentName = result.name;
       nameLink.textContent = result.name;
       issue = result.issue;
-      note.textContent = issue || (result.restricted ? '对方主动回复或关注你前，最多发送 1 条消息' : '');
-      note.hidden = !note.textContent;
+      canSend = result.canSend;
       updateComposer();
       const latestId = result.messages[0]?.id;
       if (force || latestId !== newest || (result.messages.length === 0 && bubbles.children.length > 0)) {
@@ -228,13 +419,15 @@
         }
         older.hidden = !hasMore;
         newest = latestId;
+        updateNote();
         history.scrollTop = history.scrollHeight;
+        if (newest) await inbox(threadPath + '/read', 'PUT', { through: newest });
         await loadThreads(true);
-      }
+      } else updateNote();
     }
 
     async function sendMessage(action, sent) {
-      if (busy || issue || !stillCurrent()) return;
+      if (busy || !canSend || !stillCurrent()) return;
       busy = true;
       status.textContent = '';
       updateComposer();
@@ -307,7 +500,7 @@
       const item = node('article', tab === 'system' ? 'mc-system' : 'mc-event');
       const heading = node('div', 'mc-event-heading');
       if (tab === 'system') {
-        heading.append(node('strong', '', '系统通知'), node('time', '', showTime(event.sentAt)));
+        heading.append(node('strong', '', '系统通知'), node('time', '', formatTime(event.sentAt)));
         item.append(heading, node('p', 'mc-event-body', event.body));
         return item;
       }
@@ -323,7 +516,7 @@
       body.append(heading);
       if (event.body) body.append(node('p', 'mc-event-body', event.body));
       const actions = node('div', 'mc-event-actions');
-      actions.append(node('time', '', showTime(event.sentAt)));
+      actions.append(node('time', '', formatTime(event.sentAt)));
       body.append(actions);
       if (tab !== 'likes') {
         const reply = button('回复', () => { form.hidden = !form.hidden; if (!form.hidden) input.focus(); }, 'mc-text-button');
@@ -366,6 +559,7 @@
             item.remove();
             offset = Math.max(0, offset - 1);
             if (!list.children.length && next.hidden) list.append(empty('暂无' + tabs[tab]));
+            refreshBadges();
           } catch (error) { status.textContent = error.message; control.disabled = false; }
         }, 'mc-text-button'));
         body.append(form);
@@ -383,10 +577,100 @@
         list.append(...events.map(eventRow));
         if (!offset) list.append(empty('暂无' + tabs[tab]));
         next.hidden = events.length < 40;
+        const unread = events.filter(row => row.unread).map(row => row.id);
+        if (unread.length) await inbox('/events/' + tab + '/state', 'PUT', { ids: unread, dismissed: false });
+        refreshBadges();
       } catch (error) { status.textContent = error.message; }
       finally { next.disabled = false; }
     }
     await loadNext();
+  }
+
+  async function settings(section, status, stillCurrent) {
+    let preferences = await inbox('/preferences');
+    if (!stillCurrent()) return;
+    const form = node('form', 'mc-settings');
+    form.onsubmit = event => event.preventDefault();
+    section.append(form);
+    let saving = false;
+    async function update(key, value) {
+      if (saving) return;
+      saving = true;
+      form.querySelectorAll('button, input').forEach(control => { control.disabled = true; });
+      try {
+        preferences = await inbox('/preferences', 'PUT', { ...preferences, [key]: value });
+        status.textContent = '设置已保存';
+        refreshBadges();
+      } catch (error) { status.textContent = error.message; }
+      finally { saving = false; render(); }
+    }
+
+    const toggles = [[true, '开启'], [false, '关闭']];
+    const audiences = [['all', '所有人'], ['following', '关注的人'], ['none', '不接收任何消息提醒']];
+    function preference(key, title, description, choices = toggles) {
+      const row = node('fieldset', 'mc-setting');
+      row.append(node('legend', '', title));
+      if (description) row.append(node('p', '', description));
+      const options = node('div', 'mc-options');
+      for (const [value, label] of choices) {
+        const input = node('input');
+        input.type = 'radio';
+        input.name = key;
+        input.checked = preferences[key] === value;
+        input.onchange = () => update(key, value);
+        const choice = node('label');
+        choice.append(input, node('span', '', label));
+        options.append(choice);
+      }
+      row.append(options);
+      return row;
+    }
+
+    function keywords() {
+      const row = node('fieldset', 'mc-setting');
+      row.append(node('legend', '', '消息屏蔽词'), node('p', '', '包含屏蔽词的新消息将被自动拦截'));
+      const words = node('div', 'mc-keywords');
+      for (const word of preferences.keywords) {
+        const tag = button(word + ' ×', () => update('keywords', preferences.keywords.filter(existing => existing !== word)), 'mc-keyword');
+        tag.setAttribute('aria-label', '删除屏蔽词 ' + word);
+        words.append(tag);
+      }
+      const editor = node('div', 'mc-options');
+      const input = node('input', 'mc-keyword-input');
+      input.setAttribute('aria-label', '屏蔽词');
+      input.placeholder = '输入屏蔽词';
+      input.maxLength = 60;
+      const add = () => {
+        const word = input.value.trim();
+        if (word) update('keywords', [...new Set([...preferences.keywords, word])]);
+      };
+      input.onkeydown = event => {
+        if (event.key === 'Enter' && !event.isComposing) {
+          event.preventDefault();
+          add();
+        }
+      };
+      editor.append(input, button('添加屏蔽词', add));
+      row.append(words, editor);
+      return row;
+    }
+
+    function group(...rows) {
+      const card = node('section', 'mc-setting-group');
+      card.append(...rows);
+      return card;
+    }
+    function render() {
+      form.replaceChildren(
+        group(preference('reminders', '消息提醒', '控制消息入口和各分类的未读提醒')),
+        group(preference('smartFilter', '私信智能拦截', '自动拦截未关注账号发来的疑似骚扰或营销内容'), keywords()),
+        group(preference('replyPolicy', '回复我的消息提醒', '选择哪些人的回复会触发提醒', audiences),
+          preference('mentionPolicy', '@ 我的消息提醒', '选择哪些人的提及会触发提醒', audiences),
+          preference('likeAlert', '收到的赞消息提醒')),
+        group(preference('foldStrangers', '收起未关注人消息', '将未关注账号的会话放入单独列表'))
+      );
+    }
+    render();
   }
 
   let loginVersion = 0;
@@ -397,10 +681,11 @@
     const aside = node('nav', 'mc-sidebar');
     aside.setAttribute('aria-label', '消息类型');
     const brand = node('div', 'mc-brand');
-    brand.append(icon('mail'), node('span', '', '消息中心'));
+    brand.append(icon('plane'), node('span', '', '消息中心'));
     aside.append(brand);
     for (const [key, label] of Object.entries(tabs)) {
       const item = link(url(key), label);
+      item.dataset.messageTab = key;
       if (key === tab) item.setAttribute('aria-current', 'page');
       aside.append(item);
     }
@@ -420,11 +705,15 @@
     }
     try {
       if (tab === 'chat') await chat(section, status, stillCurrent);
+      else if (tab === 'settings') await settings(section, status, stillCurrent);
       else await notifications(section, status, stillCurrent);
     } catch (error) { status.textContent = error.message; }
+    refreshBadges();
   }
 
-  window.addEventListener('accountchange', renderCenter);
+  window.addEventListener('accountchange', () => renderCenter());
+  window.refreshMessageBadges = refreshBadges;
   if (path === '/messages') renderCenter();
+  setInterval(() => { if (!document.hidden) refreshBadges(); }, 25000);
 })();
 

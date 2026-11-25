@@ -1,15 +1,5 @@
 async function interaction(path, method = 'GET', body, keepalive = false, csrfToken) {
-  const options = { method, cache: 'no-store', keepalive };
-  if (body !== undefined) {
-    const token = csrfToken || (await authApi('csrf')).token;
-    options.headers = { 'Content-Type': 'application/json', 'X-CSRF-Token': token };
-    options.body = JSON.stringify(body);
-  }
-  const response = await fetch('/api/interactions' + path, options);
-  if (response.status === 204) return;
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.message || '互动操作失败，请稍后重试');
-  return result;
+  return apiRequest('/api/interactions', path, { method, body, keepalive, csrfToken, fallback: '互动操作失败，请稍后重试' });
 }
 
 function memberAction(button, action) {
@@ -293,41 +283,57 @@ function setupVideoInteractions(id, author, player, duration, onDanmaku) {
   refreshQuietly();
 }
 
-function setupInteractionNavigation() {
-  memberAction(document.querySelector('[data-interaction=messages]'), () => location.assign('/messages'));
-  const listVideo = (entry, label) => {
-    const item = link('/video/' + entry.id, entry.title);
-    const row = node('li');
-    row.append(item);
-    if (label) row.append(node('small', '', label));
-    return row;
-  };
-  const destinations = [
-    ['favorites', '我的收藏', row => listVideo(row, row.folder)],
-    ['history', '观看历史', row => listVideo(row, row.position ? '观看至 ' + duration(row.position) : '')]
-  ];
-  destinations.forEach(([kind, title, render]) => {
-    memberAction(document.querySelector('[data-interaction=' + kind + ']'), () => interactionPanel(title, async (body) => {
-      hideLoginPopup();
-      appendInteractionList(body, await interaction('/' + kind), render);
-      if (kind === 'history') {
-        body.append(node('h3', '', '搜索历史'));
-        appendInteractionList(body, await interaction('/search-history'), keyword => {
-          const item = node('li');
-          item.append(link('/search?' + new URLSearchParams({ keyword }), keyword));
-          return item;
-        });
-      }
-    }));
+function videoRow(v, note) {
+  const row = node('li', 'dd-video');
+  const videoUrl = '/video/' + encodeURIComponent(v.id);
+  const cover = link(videoUrl, null, 'dd-video-cover');
+  const img = node('img');
+  img.alt = '';
+  img.loading = 'lazy';
+  const dur = duration(v.duration);
+  const coverLabel = v.position > 0 ? duration(v.position) + '/' + dur : dur;
+  if (v.position > 0 && v.duration > 0) {
+    const bar = node('i', 'dd-video-progress');
+    bar.style.width = Math.min(100, Math.round(v.position / v.duration * 100)) + '%';
+    cover.append(bar);
+  }
+  cover.append(img, node('span', 'dd-video-dur', coverLabel));
+  attachCover(img, '/api/videos/' + encodeURIComponent(v.id) + '/cover', '暂无封面');
+  const info = node('div', 'dd-video-info');
+  info.append(link(videoUrl, v.title, 'dd-video-title'));
+  const meta = node('div', 'dd-video-meta');
+  if (note) meta.append(node('span', 'dd-video-time', note));
+  if (v.author) {
+    const up = link('/space/' + encodeURIComponent(v.authorId || ''), null, 'dd-video-up');
+    up.append(node('span', 'up', 'UP'), node('span', '', v.author));
+    meta.append(up);
+  }
+  info.append(meta);
+  row.append(cover, info);
+  return row;
+}
+
+const NAV_DROPDOWN_LIMIT = 8;
+const historyVideoRow = v => videoRow(v, formatTime(v.viewedAt));
+
+function openHistoryPanel() {
+  interactionPanel('观看历史', async body => {
+    appendInteractionList(body, await interaction('/history'), historyVideoRow, 'dd-video-list');
+    body.append(node('h3', '', '搜索历史'));
+    appendInteractionList(body, await interaction('/search-history'), keyword => {
+      const item = node('li');
+      item.append(link('/search?' + new URLSearchParams({ keyword }), keyword));
+      return item;
+    });
   });
 }
 
-function appendInteractionList(body, rows, render) {
+function appendInteractionList(body, rows, render, className = 'interaction-list') {
   if (!rows.length) {
     body.append(node('p', '', '暂无记录'));
     return;
   }
-  const list = node('ul', 'interaction-list');
+  const list = node('ul', className);
   list.append(...rows.map(render));
   body.append(list);
 }
@@ -349,5 +355,133 @@ function recordSearchHistory() {
   record();
 }
 
-setupInteractionNavigation();
+function panelFooter(label, action) {
+  const foot = node('div', 'dd-foot');
+  const button = node('button', 'dd-foot-link', label);
+  button.type = 'button';
+  button.onclick = action;
+  foot.append(button);
+  return foot;
+}
+
+function navDropdown(button, className, build) {
+  const wrap = node('div', 'nav-item-wrap');
+  const panel = node('div', 'nav-dropdown ' + className);
+  button.before(wrap);
+  wrap.append(button, panel);
+  let hideTimer, loaded = false, request = 0;
+  const hide = () => { clearTimeout(hideTimer); hideTimer = setTimeout(() => wrap.classList.remove('open'), 160); };
+  const show = async () => {
+    if (!currentAccount) return;
+    clearTimeout(hideTimer);
+    document.querySelectorAll('.nav-item-wrap.open').forEach(other => { if (other !== wrap) other.classList.remove('open'); });
+    wrap.classList.add('open');
+    if (loaded) return;
+    loaded = true;
+    panel.replaceChildren(node('p', 'nav-dropdown-empty', '加载中…'));
+    const ticket = ++request;
+    try {
+      const content = await build();
+      if (ticket === request) panel.replaceChildren(...content);
+    } catch {
+      if (ticket !== request) return;
+      loaded = false;
+      panel.replaceChildren(node('p', 'nav-dropdown-empty', '加载失败，请重试'));
+    }
+  };
+  button.addEventListener('mouseenter', show);
+  button.addEventListener('mouseleave', hide);
+  button.addEventListener('focus', show);
+  button.addEventListener('blur', hide);
+  panel.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+  panel.addEventListener('mouseleave', hide);
+  panel.addEventListener('focusin', () => clearTimeout(hideTimer));
+  panel.addEventListener('focusout', hide);
+  window.addEventListener('accountchange', () => {
+    request++;
+    loaded = false;
+    wrap.classList.remove('open');
+    panel.replaceChildren();
+  });
+}
+
+function setupMessageDropdown(button) {
+  navDropdown(button, 'dd-message', () => {
+    const menu = node('div', 'dd-menu');
+    [
+      ['/messages?tab=replies', '回复我的', 'replies'],
+      ['/messages?tab=mentions', '@我的', 'mentions'],
+      ['/messages?tab=likes', '收到的赞', 'likes'],
+      ['/messages?tab=system', '系统消息', 'system'],
+      ['/messages?tab=chat', '我的消息', 'chat']
+    ].forEach(([href, label, key]) => {
+      const item = link(href, label, 'dd-menu-item');
+      item.dataset.messageTab = key;
+      menu.append(item);
+    });
+    if (window.refreshMessageBadges) window.refreshMessageBadges();
+    return [menu];
+  });
+}
+
+function setupFavoriteDropdown(button) {
+  navDropdown(button, 'dd-fav', async () => {
+    const [space, favorites] = await Promise.all([interaction('/me/space'), interaction('/favorites')]);
+    const folders = space.folders || [];
+    const side = node('aside', 'dd-fav-folders');
+    const list = node('ul', 'dd-video-list');
+    let active = folders[0]?.id;
+    const renderVideos = () => {
+      const rows = active ? favorites.filter(v => v.folderId === active) : favorites;
+      if (rows.length) list.replaceChildren(...rows.slice(0, NAV_DROPDOWN_LIMIT).map(v => videoRow(v)));
+      else list.replaceChildren(node('li', 'nav-dropdown-empty', '暂无收藏'));
+    };
+    const buttons = folders.map(folder => {
+      const item = node('button', 'dd-fav-folder' + (folder.id === active ? ' active' : ''));
+      item.type = 'button';
+      item.append(node('span', '', folder.name), node('span', 'dd-fav-count', String(folder.count)));
+      item.addEventListener('mouseenter', () => {
+        active = folder.id;
+        buttons.forEach(other => other.classList.toggle('active', other === item));
+        renderVideos();
+      });
+      side.append(item);
+      return item;
+    });
+    renderVideos();
+    const main = node('div', 'dd-fav-main');
+    main.append(list, panelFooter('查看全部收藏', () => location.assign('/me?tab=favorites')));
+    return folders.length ? [side, main] : [main];
+  });
+}
+
+function setupHistoryDropdown(button) {
+  navDropdown(button, 'dd-history', async () => {
+    const rows = await interaction('/history');
+    const list = node('ul', 'dd-video-list');
+    if (rows.length) list.append(...rows.slice(0, NAV_DROPDOWN_LIMIT).map(historyVideoRow));
+    else list.append(node('li', 'nav-dropdown-empty', '暂无内容'));
+    return [list, panelFooter('查看全部历史', () => openHistoryPanel())];
+  });
+}
+
+function setupNav() {
+  const messages = document.querySelector('[data-interaction=messages]');
+  const favorites = document.querySelector('[data-interaction=favorites]');
+  const history = document.querySelector('[data-interaction=history]');
+  if (messages) {
+    memberAction(messages, () => location.assign('/messages'));
+    setupMessageDropdown(messages);
+  }
+  if (favorites) {
+    memberAction(favorites, () => location.assign('/me?tab=favorites'));
+    setupFavoriteDropdown(favorites);
+  }
+  if (history) {
+    memberAction(history, () => openHistoryPanel());
+    setupHistoryDropdown(history);
+  }
+}
+
+setupNav();
 recordSearchHistory();

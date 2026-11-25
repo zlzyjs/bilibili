@@ -123,6 +123,31 @@ class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/me/summary")
+    ResponseEntity<?> mySummary(HttpServletRequest request) {
+        Member member = currentMember(request);
+        if (member == null) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+        MemberSummary summary = jdbc.sql("""
+                SELECT u.Experience,
+                  (SELECT COUNT(*) FROM relationtable r WHERE r.UID = u.UID AND r.RelationType = 0) AS following,
+                  (SELECT COUNT(*) FROM relationtable r WHERE r.TargetUID = u.UID AND r.RelationType = 0) AS followers,
+                  (SELECT COUNT(*) FROM videotable v WHERE v.UID = u.UID AND v.VideoStatus = 'published' AND v.VisibleStatus = 'public') AS videos,
+                  (SELECT COALESCE(SUM(c.CoinChange), 0) FROM coinrecordtable c WHERE c.UID = u.UID) AS coins,
+                  (SELECT COALESCE(SUM(p.BCoinAmount), 0) FROM bcoinpurchasetable p WHERE p.UID = u.UID AND p.OrderStatus = 1)
+                    - (SELECT COALESCE(SUM(cc.BCoinAmount), 0) FROM bcoinconsumptiontable cc WHERE cc.UID = u.UID AND cc.OrderStatus = 1) AS bcoins,
+                  (SELECT MIN(l.RequiredExperience) FROM userleveltable l WHERE l.LevelID > u.LevelID) AS nextExp
+                FROM usertable u
+                WHERE u.UID = CAST(:uid AS UNSIGNED) AND u.AccountStatus = 'active'
+                """).param("uid", member.uid()).query((rs, row) -> new MemberSummary(
+                member.uid(), member.name(), member.level(),
+                rs.getLong("Experience"),
+                rs.getObject("nextExp") == null ? null : rs.getLong("nextExp"),
+                rs.getLong("following"), rs.getLong("followers"), rs.getLong("videos"),
+                rs.getDouble("coins"), rs.getDouble("bcoins"))).optional().orElse(null);
+        if (summary == null) return error(HttpStatus.UNAUTHORIZED, "请先登录");
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(summary);
+    }
+
     Member currentMember(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         if (session == null || !(session.getAttribute(USER_ID) instanceof String uid)) return null;
@@ -170,5 +195,7 @@ class AuthController {
     record Credentials(String uid, String password) {}
     record Signature(String value) {}
     record Member(String uid, String name, String level) {}
+    record MemberSummary(String uid, String name, String level, long experience, Long nextExp,
+                         long following, long followers, long videos, double coins, double bcoins) {}
     private record Account(Member member, String hash, String status) {}
 }
