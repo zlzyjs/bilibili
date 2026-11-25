@@ -576,7 +576,7 @@ function setupChannelNavigation(alwaysPinned = false) {
   const start = node('div', 'channel-nav-start');
   const logo = link('/', null, 'channel-nav-logo');
   const image = node('img');
-  image.src = '/assets/dilidili.svg?v=2';
+  image.src = document.querySelector('.home-logo').src;
   image.alt = 'dilidili 首页';
   logo.append(image);
 

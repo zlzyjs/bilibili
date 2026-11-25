@@ -24,8 +24,8 @@ svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke
 @media(max-width:700px){.navbar{--nav-search-width:calc(100vw - 180px)}}
 .nav-right{justify-self:end;display:flex;gap:24px;align-items:center;white-space:nowrap;flex-shrink:0}
 .navbar button{padding:0}
-.home-link{display:flex;gap:6px;align-items:center;min-height:36px;font-size:16px;font-weight:400;line-height:1;white-space:nowrap}
-.home-link svg{width:24px;height:24px}
+.home-link{display:flex;gap:10px;align-items:center;min-height:36px;font-size:18px;font-weight:400;line-height:1;white-space:nowrap}
+.home-logo{width:78px;height:auto;filter:brightness(0)}
 .home-link:hover,.nav-item:hover{opacity:.77}
 .search{justify-self:center;width:100%;max-width:480px;min-width:160px;height:42px;display:flex;align-items:center;gap:4px;padding:4px 6px 4px 13px;border:1px solid #ffffff70;border-radius:8px;background:#f1f2f3e8;color:#18191c}
 .search:focus-within{background:#fff}
@@ -195,6 +195,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:30px 0}
 .card-cover[data-fallback],.slide[data-fallback]{background:radial-gradient(ellipse at 75% 18%,#a8dbea,transparent 56%),linear-gradient(130deg,#4c8ba7,#4b638d);color:white}
 .card-cover[data-fallback]::before,.slide[data-fallback]::before{content:attr(data-fallback);position:absolute;left:8%;top:27%;font-weight:750;font-size:clamp(16px,2vw,30px)}
 .inner-page:not(.popular-page) .banner{display:none}
+body:not(.inner-page) .home-link{display:none}
 .inner-page:not(.popular-page) .navbar{position:relative;color:var(--ink);border-bottom:1px solid var(--line);background:#fff;min-height:64px}
 .inner-page .layout{padding-top:24px}
 @media(max-width:700px){.banner-logo{left:22px;bottom:18px}}
@@ -210,7 +211,7 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:30px 0}
 .navbar.channel-nav-stuck{position:fixed;z-index:8;color:var(--ink);background:#fff;box-shadow:0 2px 8px #00000012;animation:channel-nav-enter .22s ease-out}
 .channel-nav-stuck .channel-nav-logo{display:block}
 .channel-nav-stuck .channel-nav-toggle{display:grid;place-items:center}
-.channel-nav-stuck .home-link svg{display:none}
+.channel-nav-stuck .home-link :is(svg,img){display:none}
 .channel-nav-stuck .channel-nav-trigger{margin-inline-start:clamp(4px,.55vw,8px)}
 .channel-nav-stuck .search{background:var(--wash);border-color:var(--line)}
 .channel-nav-stuck .search:focus-within{background:#fff}

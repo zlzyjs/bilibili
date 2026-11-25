@@ -30,7 +30,7 @@ function loadSearch() {
 
   const logo = link('/', null, 'search-brand');
   const brand = node('img');
-  brand.src = '/assets/dilidili.svg?v=2';
+  brand.src = document.querySelector('.home-logo').src;
   brand.alt = 'dilidili';
   logo.append(brand);
   document.querySelector('.home-link').before(logo);
