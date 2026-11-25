@@ -156,7 +156,12 @@ function setupAccountCenter() {
         if (!active()) return;
         name.value = data.name;
         signature.value = data.signature || '';
-        el('nav-account-name').textContent = data.name;
+        if (user.name !== data.name) {
+          user.name = data.name;
+          el('card-name').textContent = data.name;
+          el('nav-account-space').title = data.name + '的个人空间';
+          loadAccountCard(user.uid);
+        }
         status.textContent = '资料已保存';
       } catch (error) { status.textContent = error.message; }
       finally { save.disabled = false; }

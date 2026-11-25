@@ -28,10 +28,6 @@ function loadSearch() {
   feed.before(header);
   el('feed-toolbar').hidden = true;
 
-  const logo = link('/', null, 'search-brand');
-  logo.setAttribute('aria-label', '返回首页');
-  logo.append(node('span', 'nav-brand-mark'));
-  document.querySelector('.home-link').before(logo);
   document.title = (keyword || tag || '搜索') + ' - dilidili';
 
   const users = node('section', 'search-users');

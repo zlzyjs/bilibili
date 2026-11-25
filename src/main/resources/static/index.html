@@ -6,19 +6,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>dilidili · 第二组课程项目</title>
   <link rel="stylesheet" href="/nav-brand.css?v=1">
-  <link rel="stylesheet" href="/home.css?v=60">
-  <link rel="stylesheet" href="/watch.css?v=23">
+  <link rel="stylesheet" href="/home.css?v=62">
+  <link rel="stylesheet" href="/watch.css?v=25">
   <link rel="stylesheet" href="/watch-fullscreen.css?v=3">
   <link rel="stylesheet" href="/banner-leaves.css?v=1">
   <script src="/banner-leaves.js?v=3" defer></script>
   <link rel="stylesheet" href="/watch-comments.css?v=9">
   <link rel="stylesheet" href="/interactions.css?v=1">
-  <link rel="stylesheet" href="/space.css?v=10">
+  <link rel="stylesheet" href="/space.css?v=12">
   <script src="/space.js?v=7" defer></script>
-  <link rel="stylesheet" href="/personal-space.css?v=4">
+  <link rel="stylesheet" href="/personal-space.css?v=5">
   <script src="/personal-space.js?v=7" defer></script>
-  <link rel="stylesheet" href="/search.css?v=8">
-  <script src="/search.js?v=8" defer></script>
+  <link rel="stylesheet" href="/search.css?v=10">
+  <script src="/search.js?v=9" defer></script>
   <script src="/watch-preferences.js?v=7" defer></script>
   <script src="/watch-sidebar.js?v=2" defer></script>
   <script src="/viewer-presence.js?v=1" defer></script>
@@ -27,10 +27,10 @@
   <script src="/home.js?v=42" defer></script>
   <script src="/login.js?v=12" defer></script>
   <script src="/interactions.js?v=16" defer></script>
-  <link rel="stylesheet" href="/messages.css?v=17">
+  <link rel="stylesheet" href="/messages.css?v=19">
   <script src="/messages.js?v=19" defer></script>
-  <link rel="stylesheet" href="/account-center.css?v=1">
-  <script src="/account-center.js?v=1" defer></script>
+  <link rel="stylesheet" href="/account-center.css?v=3">
+  <script src="/account-center.js?v=2" defer></script>
 </head>
 <body>
   <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -74,7 +74,7 @@
       <a class="home-link" href="/" target="_self" aria-label="返回首页">
         <svg class="home-tv" aria-hidden="true"><use href="#i-tv"/></svg>
         <span class="home-logo nav-brand-mark" aria-hidden="true"></span>
-        首页
+        <span class="home-label">首页</span>
       </a>
       <form class="search" role="search" action="/search" method="get" autocomplete="off">
         <input name="keyword" id="keyword" aria-label="搜索视频、合集、UP主或标签" placeholder="搜索视频、合集、UP主或标签" autocomplete="off" maxlength="80">
@@ -105,7 +105,7 @@
               <div><strong id="card-videos">0</strong><span>稿件</span></div>
             </div>
             <nav class="account-card-menu" aria-label="账号菜单">
-              <a href="/me" target="_self"><svg><use href="#i-manage"/></svg>个人中心</a>
+              <a href="/account" target="_self"><svg><use href="#i-manage"/></svg>个人中心</a>
               <a href="/studio" target="_self"><svg><use href="#i-video-upload"/></svg>投稿管理</a>
               <button id="card-logout" type="button"><svg><use href="#i-right"/></svg>退出登录</button>
             </nav>
@@ -122,6 +122,10 @@
   </header>
 
   <main class="layout">
+    <section id="account-center" aria-labelledby="account-center-title" hidden>
+      <h1 id="account-center-title" class="ac-title">个人中心</h1>
+      <div class="ac-layout"></div>
+    </section>
     <section id="message-center" aria-label="消息中心" hidden></section>
     <section class="channels" aria-label="频道和分区">
       <div class="channel-icons">
@@ -174,7 +178,7 @@
             <span class="charge-label"><svg viewBox="0 0 16 24" aria-hidden="true"><path d="M5 1H15L9 10H15L3 23L6 13H1Z"/></svg>充电</span>
             <span class="charge-note">充电支持TA</span>
           </button>
-          <section><h2>个人资料</h2><p id="author-uid" class="profile-row" aria-label="UID"></p><p id="author-birthday" class="profile-row" aria-label="生日" hidden></p></section>
+          <section><div class="profile-card-heading"><h2>个人资料</h2><a id="author-profile-edit" class="profile-card-edit" href="/account/profile" hidden>编辑</a></div><p id="author-uid" class="profile-row" aria-label="UID"></p><p id="author-birthday" class="profile-row" aria-label="生日" hidden></p></section>
         </aside>
       </div>
     </section>

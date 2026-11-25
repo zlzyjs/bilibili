@@ -1,6 +1,4 @@
-﻿.personal-space-page{--personal-gutter:max(5%,calc((100% - 1400px) / 2));--space-blue:#5fa9df}
-.personal-space-page .space-cover{min-height:clamp(200px,12vw,245px);padding-inline:var(--personal-gutter)}
-.personal-space-page .space-nav,.personal-space-page .space-body{padding-inline:var(--personal-gutter)}
+﻿.personal-space-page{--space-blue:#5fa9df}
 .personal-space-page .space-nav{gap:clamp(12px,2vw,32px)}
 .personal-space-page #space-tabs{position:relative;gap:clamp(12px,1.8vw,30px);min-width:0}
 .personal-space-page #space-tabs a.active{color:var(--blue)}
