@@ -32,12 +32,6 @@ class InteractionController {
         this.inbox = inbox;
     }
 
-    @ExceptionHandler(ResponseStatusException.class)
-    ResponseEntity<Map<String, String>> rejected(ResponseStatusException failure) {
-        return ResponseEntity.status(failure.getStatusCode())
-                .body(Map.of("message", failure.getReason() == null ? "操作失败" : failure.getReason()));
-    }
-
     @ModelAttribute
     void disableCaching(HttpServletResponse response) {
         response.setHeader("Cache-Control", "no-store");
@@ -559,7 +553,7 @@ class InteractionController {
     @ExceptionHandler(ResponseStatusException.class)
     ResponseEntity<Map<String, String>> problem(ResponseStatusException error) {
         return ResponseEntity.status(error.getStatusCode()).cacheControl(CacheControl.noStore())
-                .body(Map.of("message", error.getReason()));
+                .body(Map.of("message", error.getReason() == null ? "操作失败" : error.getReason()));
     }
 
     private enum Target {

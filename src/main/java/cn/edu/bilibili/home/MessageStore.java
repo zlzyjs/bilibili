@@ -32,6 +32,8 @@ class MessageStore {
     private static final String VISIBLE = """
             ((m.SenderUID=CAST(:uid AS UNSIGNED) AND m.SenderDel=0) OR (m.ReceiverUID=CAST(:uid AS UNSIGNED) AND m.ReceiverDel=0
               AND NOT EXISTS(SELECT 1 FROM message_filtered f WHERE f.message_id=m.MessageID)))
+            AND NOT EXISTS(SELECT 1 FROM relationtable b WHERE b.RelationType=1 AND b.UID=CAST(:uid AS UNSIGNED)
+              AND b.TargetUID=IF(m.SenderUID=CAST(:uid AS UNSIGNED),m.ReceiverUID,m.SenderUID))
             """;
     private static final String PAIR = """
             ((m.SenderUID=CAST(:uid AS UNSIGNED) AND m.ReceiverUID=CAST(:peer AS UNSIGNED)) OR (m.SenderUID=CAST(:peer AS UNSIGNED) AND m.ReceiverUID=CAST(:uid AS UNSIGNED)))
@@ -128,29 +130,26 @@ class MessageStore {
     ThreadView thread(String uid, String peer, String before) {
         String name = jdbc.sql("SELECT Name FROM usertable WHERE UID=CAST(:peer AS UNSIGNED)").param("peer", peer)
                 .query(String.class).optional().orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "该账号不存在"));
-        boolean restricted = restricted(uid, peer);
-        String issue = null;
-        if (jdbc.sql("""
+        boolean blocked = jdbc.sql("""
                 SELECT EXISTS(SELECT 1 FROM relationtable WHERE RelationType=1 AND
                   ((UID=CAST(:uid AS UNSIGNED) AND TargetUID=CAST(:peer AS UNSIGNED)) OR (UID=CAST(:peer AS UNSIGNED) AND TargetUID=CAST(:uid AS UNSIGNED))))
-                """).param("uid", uid).param("peer", peer).query(Boolean.class).single()) {
-            issue = "双方存在黑名单关系，无法发送";
-        } else if (restricted && sentBefore(uid, peer)) {
-            issue = "等待对方回复或关注你后，才可继续发送";
-        }
+                """).param("uid", uid).param("peer", peer).query(Boolean.class).single();
+        String issue = blocked ? "双方存在黑名单关系，无法发送" : null;
+        boolean canSend = !blocked && !(restricted(uid, peer) && sentBefore(uid, peer));
         List<Chat> rows = jdbc.sql("""
-                SELECT m.MessageID,m.SenderUID,m.MessageType,IF(m.MessageType=0,m.MessageContent,NULL),m.SendTime,v.VideoID
+                SELECT m.MessageID,m.SenderUID,m.MessageType,IF(m.MessageType=0,m.MessageContent,NULL),m.SendTime,v.VideoID,u.Name,v.UID
                 FROM privatemessagetable m
                 LEFT JOIN LATERAL (
-                    SELECT VideoID FROM videotable WHERE VideoContent=m.MessageContent
+                    SELECT VideoID,UID FROM videotable WHERE VideoContent=m.MessageContent
                       AND VideoStatus='published' AND VisibleStatus='public' ORDER BY VideoID LIMIT 1
                 ) v ON m.MessageType=2
+                LEFT JOIN usertable u ON u.UID=v.UID
                 WHERE %s AND %s AND (:before IS NULL OR m.MessageID<CAST(:before AS UNSIGNED))
                 ORDER BY m.MessageID DESC LIMIT 41
                 """.formatted(PAIR, VISIBLE)).param("uid", uid).param("peer", peer).param("before", before)
                 .query((rs, row) -> new Chat(rs.getString(1), rs.getString(2), rs.getInt(3), rs.getString(4),
-                        rs.getObject(5, LocalDateTime.class), rs.getString(6))).list();
-        return new ThreadView(name, restricted, issue, rows.stream().limit(40).toList(), rows.size() > 40);
+                        rs.getObject(5, LocalDateTime.class), rs.getString(6), rs.getString(7), rs.getString(8))).list();
+        return new ThreadView(name, canSend, issue, rows.stream().limit(40).toList(), rows.size() > 40);
     }
 
     void readThread(String uid, String peer, String through) {
@@ -271,7 +270,8 @@ class MessageStore {
                        String replyPolicy, String mentionPolicy, Boolean likeAlert, Boolean foldStrangers) {}
     record Image(String mime, byte[] bytes) {}
     record Conversation(String uid, String name, int type, String preview, int unread, boolean following) {}
-    record Chat(String id, String sender, int type, String text, LocalDateTime sentAt, String videoId) {}
-    record ThreadView(String name, boolean restricted, String issue, List<Chat> messages, boolean hasMore) {}
+    record Chat(String id, String sender, int type, String text, LocalDateTime sentAt, String videoId,
+                String author, String authorId) {}
+    record ThreadView(String name, boolean canSend, String issue, List<Chat> messages, boolean hasMore) {}
 }
 
