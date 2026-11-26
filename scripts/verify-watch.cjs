@@ -1,4 +1,4 @@
-﻿const assert = require('node:assert/strict');
+const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 class Element {
@@ -16,6 +16,7 @@ class Element {
   addEventListener(event, fn) { (this.listeners[event] ||= []).push(fn); }
   emit(event, details) { (this.listeners[event] || []).forEach(fn => fn(details)); }
   setAttribute(k,v) { this.attributes[k] = v; }
+  getAttribute(k) { return this.attributes[k] ?? null; }
   querySelectorAll() { return []; }
   getBoundingClientRect() { return {left:100,top:100,width:500,height:281,bottom:125}; }
 }
@@ -24,23 +25,24 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   const p = el('player'); Object.assign(p,{ currentTime:0, duration:100, readyState:4, paused:true, ended:false, seeking:false, pause(){this.paused=true;this.emit('pause');}, async play(){this.paused=false;this.emit('play');} });
   el('login-dialog').open = false;
   let now = 0, tick, prompts = 0, copied = '', postDanmaku, resizeDanmaku;
-  const documentEvents={}, windowEvents={};
+  const documentEvents={}, windowEvents={}, interactionCalls=[];
   const context = { setupWatchComments(){},setupWatchScroll(){},setupRelatedExpansion(){},startViewerPresence(){}, el, path:'/video/10001', duration:n=>`${Math.floor(n/60)}`.padStart(2,'0')+':'+`${n%60}`.padStart(2,'0'), shortCount:String,
     localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)}, performance:{now:()=>now},
     setInterval:fn=>(tick=fn,1),clearInterval(){},setTimeout(){return 1;},clearTimeout(){},
     ResizeObserver:class { constructor(callback) { resizeDanmaku = callback; } observe() {} },
     window:{addEventListener(event,fn){(windowEvents[event] ||= []).push(fn);}}, navigator:{clipboard:{writeText:async text=>{copied=text;}}}, document:{ documentElement:{clientWidth:1200}, body:new Element(), title:'', activeElement:{tagName:'BODY'}, addEventListener(event,fn){(documentEvents[event] ||= []).push(fn);},querySelector:()=>new Element() },
     openLogin:()=>{prompts++;el('login-dialog').open=true;},location:{assign(){}},
+    interaction:async (...args)=>{ interactionCalls.push(args); },
     setupVideoInteractions:(_id,_author,_player,_duration,callback)=>{ postDanmaku=callback; },
     node:(tag,cls,text)=>Object.assign(new Element(),{className:cls,textContent:text}),
     link:(href,label,className)=>Object.assign(new Element(),{href,className,textContent:label}),
-    icon:name=>Object.assign(new Element(),{name}),card:()=>new Element(),
+    icon:name=>Object.assign(new Element(),{name}),card:()=>new Element(),attachCover:(img,url)=>{img.src=url;},
     api:async url=> url.endsWith('/collection')?collection:url.endsWith('/engagement')?{like:3,coin:4,favorite:5,share:6}:url.endsWith('/danmaku')?[
       {id:'1',userId:'7',content:'A',timestamp:2,sentAt:'2026-11-12T12:00:00'}, {id:'2',userId:'7',content:'B',timestamp:3,sentAt:'2026-11-12T12:01:00'}, {id:'3',userId:'8',content:'C',timestamp:4,sentAt:'2026-11-12T12:02:00'}
     ]:url.startsWith('/authors/')?{followers:10}:url.startsWith('/videos?')?{items:[]}: {video:{id:'10001',title:'Test',authorId:'1',streamUrl:'/test.mp4',plays:1,danmaku:3},tags:[],...accolades}
   };
   vm.createContext(context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch-sidebar.js','utf8'),context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch-preferences.js','utf8'),context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch.js','utf8'),context);await context.loadWatchPage();
-  return {el,p,storage,postDanmaku,resizeDanmaku,keydown:event=>(documentEvents.keydown||[]).forEach(fn=>fn(event)),pageEvent:(name,event={})=>(windowEvents[name]||[]).forEach(fn=>fn(event)),copied:()=>copied,fullscreen:flag=>{context.document.fullscreenElement=flag?el('player-shell'):null;(documentEvents.fullscreenchange||[]).forEach(fn=>fn());}, advance(ms,move=true){now+=ms;if(move&&!p.paused)p.currentTime+=ms/1000;tick();},prompts:()=>prompts};
+  return {el,p,storage,postDanmaku,resizeDanmaku,interactionCalls,keydown:event=>(documentEvents.keydown||[]).forEach(fn=>fn(event)),pageEvent:(name,event={})=>(windowEvents[name]||[]).forEach(fn=>fn(event)),copied:()=>copied,fullscreen:flag=>{context.document.fullscreenElement=flag?el('player-shell'):null;(documentEvents.fullscreenchange||[]).forEach(fn=>fn());}, advance(ms,move=true){now+=ms;if(move&&!p.paused)p.currentTime+=ms/1000;tick();},prompts:()=>prompts};
 }
 (async()=>{
   const createTracks = vm.runInNewContext(fs.readFileSync('src/main/resources/static/watch.js', 'utf8') + '\nsetupDanmakuTracks;');
@@ -113,7 +115,23 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   assert.equal(styled.el('dm-action-report').hidden, true);
   const ownRow = styled.el('danmaku-list').children.find(row => row.children[1].textContent === own.content);
   assert.equal(ownRow.children.length, 3, 'own danmaku shows the timestamp, content and date');
-  console.log('PASS: styled own fixed danmaku, five-second timeline window and own list row');
+  const withdraw = styled.el('dm-action-withdraw');
+  assert.equal(withdraw.hidden, false);
+  await withdraw.onclick();
+  assert.deepEqual(styled.interactionCalls, [['/danmaku/20', 'DELETE']]);
+  assert.equal(styled.el('danmaku-actions').hidden, true);
+  assert.equal(styled.el('control-notice').textContent, '撤回成功');
+  assert.ok(styled.el('control-notice').classList.contains('control-notice-compact'));
+  assert.ok(!styledOverlay.children.some(line => line.textContent === own.content));
+  assert.ok(!styled.el('danmaku-list').children.some(row => row.children[1].textContent === own.content));
+  styled.p.emit('seeking'); styled.p.currentTime = 25; styled.p.emit('seeked');
+  assert.ok(!styledOverlay.children.some(line => line.textContent === own.content));
+  const otherLine = styledOverlay.children.find(line => line.textContent === 'Scrolling');
+  otherLine.emit('mouseenter');
+  assert.equal(withdraw.hidden, true);
+  await withdraw.onclick();
+  assert.equal(styled.interactionCalls.length, 1);
+  console.log('PASS: styled own fixed danmaku, own-only withdrawal and removal from list and timeline');
   const t=await setup();
   const seek = t.el('seek'), seekBar = t.el('seek-bar');
   const previewFrame = Object.assign(t.el('seek-preview-frame'), {currentTime:0, duration:100, readyState:0, hidden:true});
@@ -201,9 +219,32 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   t.el('auto-start').onchange({target:{checked:false}});const noAutoplay=await setup(t.storage);assert.equal(noAutoplay.el('auto-start').checked,false);
   t.el('mirror-toggle').onchange({target:{checked:true}});assert.ok(t.p.attributes.style.includes('scaleX(-1)'));
   t.el('loop-toggle').onchange({target:{checked:true}});assert.equal(t.p.loop,true);
-  const collectionPage = await setup(new Map(), {title:'Test collection',plays:30,items:[{id:'10001',title:'First',duration:60},{id:'10002',title:'Second',duration:90}]});
+  const collectionPage = await setup(new Map(), {title:'Test collection',plays:30,items:[{id:'10001',title:'First',duration:60,plays:20,danmaku:3,coverUrl:'/first.jpg'},{id:'10002',title:'Second',duration:90,plays:10,danmaku:2,coverUrl:'/second.jpg'}]});
   assert.equal(collectionPage.el('video-collection').hidden,false);assert.equal(collectionPage.el('collection-position').textContent,'(1/2)');
-  assert.equal(collectionPage.el('collection-list').children.length,2);assert.equal(t.el('video-collection').hidden,true);
+  const collectionList = collectionPage.el('collection-list');
+  const [activeEpisode, otherEpisode] = collectionList.children;
+  assert.equal(collectionList.children.length, 2);
+  assert.equal(activeEpisode.getAttribute('aria-current'), 'true');
+  assert.equal(activeEpisode.children[0].children[0].src, '/first.jpg');
+  assert.equal(otherEpisode.href, '/video/10002');
+  assert.equal(otherEpisode.children[2].textContent, '01:30');
+  const collectionExpand = collectionPage.el('collection-expand');
+  collectionList.scrollTop = 32;
+  activeEpisode.offsetTop = 72;
+  collectionExpand.onclick();
+  assert.equal(collectionExpand.getAttribute('aria-expanded'), 'true');
+  assert.equal(collectionList.dataset.expanded, 'true');
+  assert.equal(collectionPage.el('danmaku-panel').inert, true);
+  assert.equal(collectionList.scrollTop, 72);
+  assert.equal(collectionExpand.getAttribute('aria-label'), '收起合集列表');
+  collectionExpand.onclick();
+  assert.equal(collectionExpand.getAttribute('aria-expanded'), 'false');
+  assert.equal(collectionList.dataset.expanded, 'false');
+  assert.equal(collectionPage.el('danmaku-panel').inert, false);
+  assert.equal(collectionList.scrollTop, 32);
+  assert.equal(collectionExpand.getAttribute('aria-label'), '展开合集列表');
+  assert.equal(collectionList.children.length, 2);
+  assert.equal(t.el('video-collection').hidden, true);
   t.el('dm-area').oninput({target:{value:50}});assert.ok(t.el('danmaku-overlay').attributes.style.includes('height:42.5%'));
   t.el('dm-opacity').oninput({target:{value:40}});assert.ok(t.el('danmaku-overlay').attributes.style.includes('opacity:0.4'));
   t.el('ratio-4').onclick();assert.equal(t.p.dataset.ratio,'4');

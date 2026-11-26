@@ -115,11 +115,12 @@ async function setupWatchComments(videoId) {
   const guest = el('comment-guest'), form = el('comment-entry-form');
   const input = el('comment-text'), send = el('comment-send'), avatarImage = el('comment-current-avatar');
   const fileInput = el('comment-image-file'), preview = el('comment-image-preview'), previewImage = el('comment-preview-image');
-  let selectedImage = null, previewUrl, posting = false, composerUid;
+  const emptyNotice = el('comment-empty-notice');
+  let selectedImage = null, previewUrl, posting = false, composerUid, emptyNoticeTimer;
   function updateSend() {
     const hasContent = Boolean(input.value?.trim());
     form.setAttribute('data-has-content', String(hasContent));
-    send.disabled = posting || !hasContent;
+    send.disabled = posting;
   }
   function showImage(file) {
     if (previewUrl) {
@@ -150,7 +151,14 @@ async function setupWatchComments(videoId) {
     event.preventDefault();
     if (!signedIn()) return openLogin(guest);
     const value = input.value.trim(), image = selectedImage, uid = composerUid;
-    if (posting || !value) return;
+    if (posting) return;
+    clearTimeout(emptyNoticeTimer);
+    if (!value) {
+      emptyNotice.textContent = '你还没有评论！';
+      emptyNoticeTimer = setTimeout(() => { emptyNotice.textContent = ''; }, 1800);
+      return;
+    }
+    emptyNotice.textContent = '';
     posting = true;
     updateSend();
     try {
@@ -209,8 +217,19 @@ function setupWatchScroll(player,shell) {
   let floating=false, dismissed=false, revealed=false, pastPlayer=false, manualPosition=null, drag=null;
   const miniToggle=el('watch-mini-toggle');miniToggle.hidden=true;
   function syncMiniButton(){miniToggle.hidden=!revealed||!pastPlayer;miniToggle.setAttribute('aria-pressed',String(!dismissed));miniToggle.setAttribute('aria-label',!dismissed?'关闭小窗':'开启小窗');}
-  function measure(){main.style.setProperty('--watch-main-height',main.offsetHeight+'px');}
-  const resize=new ResizeObserver(measure);resize.observe(main);measure();
+  const author = document.querySelector('.watch-author');
+  function measure() {
+    const layout = el('video-page');
+    main.style.setProperty('--watch-main-height', main.offsetHeight + 'px');
+    if (layout.classList.contains('wide-mode')) return;
+    const playerTop = home.getBoundingClientRect().top - main.getBoundingClientRect().top;
+    const authorHeight = author.getBoundingClientRect().height;
+    author.style.setProperty('--watch-author-gap', (playerTop - authorHeight) + 'px');
+  }
+  const resize = new ResizeObserver(measure);
+  resize.observe(main);
+  resize.observe(author);
+  measure();
   function restore(){
     if(!floating)return;floating=false;shell.classList.remove('scroll-mini');home.append(shell);home.style.height='';shell.style.removeProperty('left');shell.style.removeProperty('top');shell.style.removeProperty('right');shell.style.removeProperty('bottom');syncMiniButton();
   }

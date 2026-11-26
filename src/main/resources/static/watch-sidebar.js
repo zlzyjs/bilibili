@@ -60,5 +60,13 @@
     const users = new Set(getUsers()); if (block) { users.add(id); settings.enabled = true; } else users.delete(id);
     settings.disabledUsers = settings.disabledUsers.filter(value=>value!==id); setUsers(users); persist(); render();
   }
-  return { allowed, isBlocked, setUserBlocked };
+  function shieldDanmaku(danmaku) {
+    const escaped = danmaku.content.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+    const text = '/^' + escaped + '$/';
+    const existing = rules.find(rule => rule.kind === 'regex' && rule.text === text);
+    if (existing) existing.enabled = true;
+    else rules.push({kind:'regex', text, enabled:true});
+    setUserBlocked(danmaku.userId, true);
+  }
+  return { allowed, isBlocked, setUserBlocked, shieldDanmaku };
 }
