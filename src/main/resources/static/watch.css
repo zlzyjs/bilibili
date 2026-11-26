@@ -321,6 +321,41 @@ body:has(.watch-layout:not([hidden])) .layout { max-width: 2440px; width: 84%; m
 .dm-density button { padding: 0; }
 .dm-density button[aria-pressed="true"] { color: #00aeec; }
 .video-actions button:hover svg,.video-actions button:focus-visible svg { animation: icon-nudge .38s ease-in-out; }
+#video-like { position: relative; }
+.video-like-celebration {
+  position: absolute;
+  z-index: 2;
+  left: clamp(12px, 1.4cqw, 22px);
+  bottom: calc(100% + 2px);
+  width: 82px;
+  height: 66px;
+  overflow: hidden;
+  transform: translateX(-50%);
+  pointer-events: none;
+  animation: video-like-rise .85s ease-out both;
+}
+/* Frame the supplied PNG around the artwork inside its transparent canvas. */
+.video-like-celebration img {
+  position: absolute;
+  left: -51px;
+  top: -32px;
+  width: 210px;
+  max-width: none;
+  height: auto;
+}
+@keyframes video-like-rise {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(.82); }
+  24% { opacity: 1; transform: translate(-50%, -4px) scale(1.04); }
+  69% { opacity: 1; transform: translate(-50%, -6px) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -14px) scale(.97); }
+}
+@keyframes video-like-fade {
+  0%, 65% { opacity: 1; }
+  100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .video-like-celebration { animation: video-like-fade .65s linear both; }
+}
 @keyframes icon-nudge { 0%,100% { transform: translateY(0) rotate(0); } 35% { transform: translateY(-3px) rotate(-7deg); } 65% { transform: translateY(-1px) rotate(5deg); } }
 @media(prefers-reduced-motion:reduce) { .video-actions button:hover svg,.video-actions button:focus-visible svg { animation: none; } }
 .watch-danmaku-slot {

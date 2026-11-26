@@ -332,7 +332,7 @@ function pressInteraction(button, enabled) {
 
 const likeBindings = new WeakMap();
 
-function bindLike(button, kind, id, render, load = true) {
+function bindLike(button, kind, id, render, load = true, onToggle) {
   const resource = '/likes/' + kind + '/' + id;
   const binding = { savingStarted: false };
   likeBindings.set(button, binding);
@@ -340,18 +340,35 @@ function bindLike(button, kind, id, render, load = true) {
     if (likeBindings.get(button) !== binding || currentAccount?.uid !== uid) return;
     pressInteraction(button, result.enabled);
     render(result.count);
+    return true;
   };
   memberAction(button, async () => {
     binding.savingStarted = true;
     const uid = currentAccount.uid;
     const existing = await interaction(resource);
     if (currentAccount?.uid !== uid) return;
-    apply(await interaction(resource, 'PUT', { enabled: !existing.enabled }), uid);
+    const result = await interaction(resource, 'PUT', { enabled: !existing.enabled });
+    if (apply(result, uid) && result.enabled !== existing.enabled) onToggle?.(result.enabled);
   });
   if (load && (currentAccount || kind === 'danmaku')) {
     const uid = currentAccount?.uid;
     interaction(resource).then(result => { if (!binding.savingStarted) apply(result, uid); }).catch(() => {});
   }
+}
+
+function showVideoLikeCelebration(button, enabled) {
+  button.querySelector('.video-like-celebration')?.remove();
+  if (!enabled) return;
+  const celebration = node('span', 'video-like-celebration');
+  celebration.setAttribute('aria-hidden', 'true');
+  const artwork = node('img');
+  artwork.alt = '';
+  artwork.src = '/assets/video-like-celebration.png';
+  celebration.hidden = true;
+  celebration.append(artwork);
+  celebration.addEventListener('animationend', () => celebration.remove(), { once: true });
+  button.append(celebration);
+  artwork.decode().then(() => { celebration.hidden = false; }).catch(() => celebration.remove());
 }
 
 function setupAuthorInteractions(id, root, renderFollowers) {
@@ -405,12 +422,96 @@ function setupPeopleList(button, id, kind, title) {
   }));
 }
 
+function videoCoinInteraction(id, applyLike) {
+  interactionPanel('为视频投币', (body, status, close) => {
+    const dialog = body.closest('dialog');
+    dialog.classList.add('video-coin-dialog');
+    const closeButton = dialog.querySelector('.interaction-close');
+    closeButton.textContent = '×';
+    closeButton.setAttribute('aria-label', '关闭投币弹窗');
+    const amountText = node('strong', 'video-coin-amount', '1');
+    dialog.querySelector('h2').replaceChildren('给 UP 主投上 ', amountText, ' 枚硬币');
+
+    const form = node('form', 'video-coin-form');
+    const choices = node('fieldset', 'video-coin-choices');
+    choices.setAttribute('aria-label', '投币数量');
+    let amount = 1, submitting = false;
+    for (const value of [1, 2]) {
+      const option = node('label', 'video-coin-choice');
+      const radio = node('input');
+      radio.type = 'radio';
+      radio.name = 'video-coin-amount';
+      radio.value = value;
+      radio.checked = value === amount;
+      radio.onchange = () => {
+        if (!radio.checked) return;
+        amount = value;
+        amountText.textContent = String(value);
+        status.textContent = '';
+      };
+      const artwork = node('span', 'video-coin-artwork');
+      artwork.setAttribute('aria-hidden', 'true');
+      const asset = value === 1 ? '/assets/coin-one' : '/assets/coin-two';
+      for (const selected of [false, true]) {
+        const image = node('img', selected ? 'video-coin-art-selected' : 'video-coin-art-default');
+        image.alt = '';
+        image.draggable = false;
+        image.src = asset + (selected ? '-selected.png' : '.png');
+        artwork.append(image);
+      }
+      option.append(radio, node('span', '', value + ' 硬币'), artwork);
+      choices.append(option);
+    }
+    const likeLabel = node('label', 'video-coin-like');
+    const alsoLike = node('input', 'report-check');
+    alsoLike.type = 'checkbox';
+    alsoLike.checked = true;
+    likeLabel.append(alsoLike, '同时点赞内容');
+    const submit = node('button', 'login-primary video-coin-submit', '确定');
+    submit.type = 'submit';
+    form.append(choices, likeLabel, submit);
+    body.append(form);
+
+    dialog.addEventListener('cancel', event => { if (submitting) event.preventDefault(); });
+    form.onsubmit = async event => {
+      event.preventDefault();
+      if (submitting) return;
+      const uid = currentAccount?.uid;
+      if (!uid) { status.textContent = '请先登录'; return; }
+      const shouldLike = alsoLike.checked;
+      submitting = choices.disabled = alsoLike.disabled = closeButton.disabled = submit.disabled = true;
+      status.textContent = '';
+      let result;
+      try {
+        result = await interaction('/videos/' + encodeURIComponent(id) + '/coins', 'POST', { value: amount });
+      } catch (error) {
+        status.textContent = error.message;
+        submitting = choices.disabled = alsoLike.disabled = closeButton.disabled = submit.disabled = false;
+        return;
+      }
+      el('coin-count').textContent = shortCount(result.count);
+      let feedback = '投币成功';
+      if (shouldLike && currentAccount?.uid === uid) {
+        try {
+          const like = await interaction('/likes/video/' + encodeURIComponent(id), 'PUT', { enabled: true });
+          if (currentAccount?.uid === uid) applyLike(like);
+        } catch {
+          feedback = '投币成功，点赞未成功';
+        }
+      }
+      close();
+      accountNotice(feedback);
+    };
+  });
+}
+
 function setupVideoInteractions(id, author, player, duration, onDanmaku, authorName) {
   const root = el('video-page');
   const resource = '/videos/' + id;
   const like = el('video-like'), favorite = el('video-favorite'), subscribe = el('video-subscribe');
   if (root) setupAuthorInteractions(author, root, followers => { el('watch-followers').textContent = shortCount(followers); });
-  bindLike(like, 'video', id, count => { el('like-count').textContent = shortCount(count); }, false);
+  const renderLikeCount = count => { el('like-count').textContent = shortCount(count); };
+  bindLike(like, 'video', id, renderLikeCount, false, enabled => showVideoLikeCelebration(like, enabled));
   memberAction(favorite, () => interactionPanel('收藏视频', async (body, status) => {
     const folders = await interaction(resource + '/folders');
     if (!folders.length) { status.textContent = '当前账号没有可用的收藏夹'; return; }
@@ -435,15 +536,11 @@ function setupVideoInteractions(id, author, player, duration, onDanmaku, authorN
       body.append(row);
     });
   }));
-  memberAction(el('video-coin'), () => interactionPanel('为视频投币', (body, status, close) => {
-    const amount = node('select');
-    [1, 2].forEach(value => { const option = node('option', '', value + ' 枚'); option.value = value; amount.append(option); });
-    interactionForm(body, status, [{ label: '投币数量', input: amount }], '确认投币', async () => {
-      const result = await interaction(resource + '/coins', 'POST', { value: Number(amount.value) });
-      el('coin-count').textContent = shortCount(result.count);
-      close();
-      accountNotice('投币成功');
-    });
+  memberAction(el('video-coin'), () => videoCoinInteraction(id, result => {
+    const wasLiked = like.getAttribute('aria-pressed') === 'true';
+    pressInteraction(like, result.enabled);
+    renderLikeCount(result.count);
+    if (result.enabled && !wasLiked) showVideoLikeCelebration(like, true);
   }));
   memberAction(el('video-share'), () => textInteraction('转发视频', '接收方 UID', 20, async value => {
     const result = await interaction(resource + '/forward', 'POST', { value });
