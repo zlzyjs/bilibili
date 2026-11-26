@@ -23,7 +23,7 @@ function setupPersonalSpace() {
       tabIndicator.style.transform = 'translateX(' + active.offsetLeft + 'px)';
       tabIndicator.style.width = active.offsetWidth + 'px';
       tabIndicator.hidden = false;
-    }
+    } else tabIndicator.hidden = true;
   }
 
   function showStatus(message, action, label) {
@@ -144,7 +144,8 @@ function setupPersonalSpace() {
       setupPeopleList(el('author-followers').parentElement, account.uid, 'followers', '粉丝列表');
       tabLinks.clear();
       for (const [key, label, symbol] of [
-        ['home', '主页', 'home-outline'], ['uploads', '投稿 ' + author.videos, 'tv'],
+        ['home', '主页', 'home-outline'], ['dynamic', '动态', 'play'],
+        ['uploads', '投稿 ' + author.videos, 'tv'],
         ['lists', '合集和系列', 'archive-box'], ['favorites', '收藏', 'star'],
         ['settings', '设置', 'settings-outline'],
       ]) {
@@ -174,9 +175,10 @@ function setupPersonalSpace() {
     const keyword = (params.get('keyword') || '').trim();
     const page = Math.min(10000, Math.max(0, Number.parseInt(params.get('page'), 10) || 0));
     const selectedTab = params.get('tab') || (keyword ? 'uploads' : 'home');
-    const mode = selectedTab === 'collection' || tabLinks.has(selectedTab) ? selectedTab : 'home';
+    const relationView = ['following', 'followers'].includes(selectedTab);
+    const mode = selectedTab === 'collection' || tabLinks.has(selectedTab) || relationView ? selectedTab : 'home';
     const collectionView = mode === 'lists' || mode === 'collection';
-    const activeTab = collectionView ? 'lists' : mode;
+    const activeTab = collectionView ? 'lists' : tabLinks.has(mode) ? mode : '';
     profile.classList.toggle('space-lists', collectionView);
     const sort = ['popular', 'favorites'].includes(params.get('sort')) ? params.get('sort') : 'latest';
     const url = (changes = {}) => {
@@ -254,7 +256,7 @@ function setupPersonalSpace() {
     }));
     const folderId = params.get('folder') || '';
     try {
-      const [summary, collectionContent, result, folderVideos, featured] = await Promise.all([
+      const [summary, collectionContent, result, folderVideos, featured, people] = await Promise.all([
         currentSpace.summary ||= interaction('/me/space').catch(error => {
           currentSpace.summary = null;
           throw error;
@@ -263,13 +265,14 @@ function setupPersonalSpace() {
           view: mode, params, page, url, collections, navigate,
           videos: options => videos({ size: 20, ...options }),
         })) : null,
-        ['home', 'uploads'].includes(mode) ? videos({
+        ['home', 'uploads', 'dynamic'].includes(mode) ? videos({
           q: mode === 'uploads' ? keyword : '', page: mode === 'uploads' ? page : 0,
           size: mode === 'home' ? 5 : 20,
         }) : null,
         mode === 'favorites' && /^\d+$/.test(folderId) ? interaction('/me/folders/' + folderId) : null,
         mode === 'home' && /^\d+$/.test(preferences.featured || '')
           ? api('/videos/' + preferences.featured).then(detail => detail.video).catch(() => null) : null,
+        relationView ? interaction('/authors/' + uid + '/relations/' + mode) : null,
       ]);
       if (request !== revision) return;
       if (summary && !counts.querySelector('.personal-stat')) {
@@ -381,6 +384,22 @@ function setupPersonalSpace() {
         content.append(section);
       }
 
+      function showPeople() {
+        const section = block(mode === 'following' ? '全部关注' : '我的粉丝');
+        const list = node('div', 'space-people');
+        for (const person of people) {
+          const entry = link('/space/' + encodeURIComponent(person.id), null, 'space-person');
+          const avatar = node('img');
+          avatar.alt = '';
+          avatar.src = '/api/authors/' + encodeURIComponent(person.id) + '/avatar';
+          avatar.onerror = () => { avatar.onerror = null; avatar.src = '/assets/guest-avatar.gif'; };
+          entry.append(avatar, node('span', '', person.name));
+          list.append(entry);
+        }
+        section.append(people.length ? list : node('p', 'space-empty', mode === 'following' ? '暂无关注' : '暂无粉丝'));
+        content.append(section);
+      }
+
       if (mode === 'home') {
         showFeatured();
         showVideos();
@@ -391,6 +410,12 @@ function setupPersonalSpace() {
         content.append(...collectionContent);
       } else if (mode === 'favorites') {
         showFolders();
+      } else if (mode === 'dynamic') {
+        const section = block('动态');
+        section.append(grid(result.items, videoCard, '暂无动态'));
+        content.append(section);
+      } else if (relationView) {
+        showPeople();
       } else if (mode === 'settings') {
         const section = block('空间设置');
         section.append(node('div', 'personal-settings'));

@@ -1,7 +1,7 @@
 function setupAccountCenter() {
   const root = el('account-center');
   const tabs = [
-    ['/account', '首页', 'home-outline'],
+    ['/account', '个人中心', 'home-outline'],
     ['/account/profile', '我的信息', 'uid'],
     ['/account/blocked', '黑名单管理', 'flag'],
     ['/account/coins', '我的硬币', 'star'],
@@ -393,7 +393,7 @@ function setupAccountCenter() {
     const card = node('section', 'ac-card');
     card.append(header, section);
     root.querySelector('.ac-layout').replaceChildren(sidebar, card);
-    document.title = (avatarPage ? '更换头像' : selected[1]) + ' · 个人中心 - dilidili';
+    document.title = (avatarPage ? '更换头像' : selected[0] === '/account' ? '个人中心' : selected[1] + ' · 个人中心') + ' - dilidili';
     if (!user) {
       const enter = action('登录', 'ac-button ac-primary');
       enter.onclick = () => openLogin(enter);
