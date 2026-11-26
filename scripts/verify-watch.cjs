@@ -40,7 +40,7 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
     ]:url.startsWith('/authors/')?{followers:10}:url.startsWith('/videos?')?{items:[]}: {video:{id:'10001',title:'Test',authorId:'1',streamUrl:'/test.mp4',plays:1,danmaku:3},tags:[],...accolades}
   };
   vm.createContext(context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch-sidebar.js','utf8'),context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch-preferences.js','utf8'),context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch.js','utf8'),context);await context.loadWatchPage();
-  return {el,p,storage,postDanmaku,resizeDanmaku,pageEvent:(name,event={})=>(windowEvents[name]||[]).forEach(fn=>fn(event)),copied:()=>copied,fullscreen:flag=>{context.document.fullscreenElement=flag?el('player-shell'):null;(documentEvents.fullscreenchange||[]).forEach(fn=>fn());}, advance(ms,move=true){now+=ms;if(move&&!p.paused)p.currentTime+=ms/1000;tick();},prompts:()=>prompts};
+  return {el,p,storage,postDanmaku,resizeDanmaku,keydown:event=>(documentEvents.keydown||[]).forEach(fn=>fn(event)),pageEvent:(name,event={})=>(windowEvents[name]||[]).forEach(fn=>fn(event)),copied:()=>copied,fullscreen:flag=>{context.document.fullscreenElement=flag?el('player-shell'):null;(documentEvents.fullscreenchange||[]).forEach(fn=>fn());}, advance(ms,move=true){now+=ms;if(move&&!p.paused)p.currentTime+=ms/1000;tick();},prompts:()=>prompts};
 }
 (async()=>{
   const createTracks = vm.runInNewContext(fs.readFileSync('src/main/resources/static/watch.js', 'utf8') + '\nsetupDanmakuTracks;');
@@ -215,11 +215,29 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   hover.el('dm-action-like').onclick();assert.equal(hover.prompts(),1);hover.el('login-dialog').open=false;
   hover.el('dm-action-report').onclick();assert.equal(hover.prompts(),2);
   await hover.el('dm-action-copy').onclick();assert.equal(hover.copied(),'A');
-  hover.el('dm-advanced-open').onclick();assert.equal(hover.el('dm-settings-advanced').hidden,false);
-  hover.el('dm-bold').onchange({target:{checked:true}});assert.equal(hover.el('danmaku-overlay').dataset.bold,'true');
-  hover.el('dm-font').onchange({target:{value:'songti'}});assert.equal(hover.el('danmaku-overlay').dataset.font,'songti');
-  hover.el('dm-outline-shadow').onclick();assert.equal(hover.el('danmaku-overlay').dataset.outline,'shadow');
-  hover.el('dm-reset').onclick();assert.equal(hover.el('danmaku-overlay').dataset.bold,'false');assert.equal(hover.el('danmaku-overlay').dataset.font,'heiti');
+  const legacy = await setup(new Map([['bili-danmaku-settings', JSON.stringify({ font:'songti', bold:true, outline:'shadow' })]]));
+  assert.equal(legacy.el('danmaku-overlay').dataset.font, 'songti');
+  assert.equal(legacy.el('danmaku-overlay').dataset.bold, 'true');
+  assert.equal(legacy.el('danmaku-overlay').dataset.outline, 'shadow');
+
+  hover.el('login-dialog').open = false;
+  const toggle = hover.el('danmaku-toggle');
+  toggle.onclick();
+  assert.equal(toggle.attributes['aria-pressed'], 'false');
+  assert.equal(toggle.dataset.tooltip, '开启弹幕 (d)');
+  assert.equal(hover.el('danmaku-overlay').hidden, true);
+  assert.equal(hover.el('danmaku-settings').disabled, true);
+  assert.equal(hover.el('danmaku-guest').disabled, true);
+  assert.equal(hover.el('danmaku-entry').inert, true);
+  hover.keydown({ key:'d', repeat:true });
+  assert.equal(toggle.attributes['aria-pressed'], 'false');
+  hover.keydown({ key:'d', preventDefault() {} });
+  assert.equal(toggle.attributes['aria-pressed'], 'true');
+  assert.equal(toggle.dataset.tooltip, '关闭弹幕 (d)');
+  assert.equal(hover.el('danmaku-overlay').hidden, false);
+  assert.equal(hover.el('danmaku-settings').disabled, false);
+  assert.equal(hover.el('danmaku-guest').disabled, false);
+  assert.equal(hover.el('danmaku-entry').inert, false);
   const sender=hover.el('danmaku-list').children[0].children[3];sender.emit('mouseenter');assert.equal(hover.el('sender-tooltip').textContent,'屏蔽该弹幕的发送者');sender.onclick();
   const unblock=hover.el('danmaku-list').children[0].children[3];unblock.emit('mouseenter');assert.equal(hover.el('sender-tooltip').textContent,'取消屏蔽该弹幕的发送者');
   const event={preventDefault(){},stopPropagation(){}};
@@ -271,7 +289,7 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   console.log('PASS: mini player uses shared play/pause state');
   console.log('PASS: native/web fullscreen state and preserved composer');
   console.log('PASS: sidebar modes, keyword routing, text/regex rules, filter switch, near-top danmaku');
-  console.log('PASS: floating danmaku toolbar, guest like/report gate, clipboard copy, advanced typography/reset, sender tooltips');
+  console.log('PASS: floating danmaku toolbar, guest like/report gate, clipboard copy, saved typography, danmaku toggle and keyboard shortcut, sender tooltips');
   console.log('PASS: conditional collection, active episode, danmaku area/opacity, aspect ratio, pause-after-play');
   console.log('PASS: member playback speed, guest restriction, wide layout, heat curve and pin persistence, autoplay, mirror, loop');
 console.log('PASS: cumulative trial, pause, buffering, seeking, cutoff, replay gate, fresh visit and back-navigation reset, sender blocking/unblocking, engagement binding');
