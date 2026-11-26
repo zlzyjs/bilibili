@@ -496,6 +496,18 @@ body:has(.watch-layout:not([hidden])) .layout { max-width: 2440px; width: 84%; m
 .player-shell .danmaku-actions button { padding: 0; color: white; }
 .player-shell .danmaku-actions .watch-icon { width: clamp(20px, 2.2cqw, 35px); height: clamp(20px, 2.2cqw, 35px); }
 .player-shell .danmaku-actions button:hover { color: #00aeec; }
+.player-shell .control-notice-compact {
+  z-index: 8;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  padding: 6px 8px;
+  border-radius: 2px;
+  background: #000;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  pointer-events: none;
+}
 .player-shell #dm-action-like { gap: 2px; }
 .player-shell #dm-action-like:hover { color: #fff; }
 #dm-action-like .dm-like-filled,
@@ -508,6 +520,9 @@ body:has(.watch-layout:not([hidden])) .layout { max-width: 2440px; width: 84%; m
 
 /* Sidebar modes share the original list's exact outer edges. */
 .watch-author { width:96%; margin:0 auto 18px; box-sizing:border-box; display:grid; grid-template-columns:48px minmax(0,1fr) auto; grid-template-rows:24px 22px 32px; gap:0 12px; padding:0; min-height:90px; }
+@media (min-width: 801px) {
+  .watch-layout:not(.wide-mode) .watch-author { inset-block-start: -10px; margin-bottom: var(--watch-author-gap, 18px); }
+}
 .watch-author > a { grid-column:2; grid-row:1; min-width:0; }
 .watch-author img { left:0; top:12px; width:48px; height:48px; }
 .watch-author strong { color:#fb7299; max-width:100%; font-size:14px; font-weight:400; }
@@ -515,6 +530,9 @@ body:has(.watch-layout:not([hidden])) .layout { max-width: 2440px; width: 84%; m
 .watch-author > p { grid-column:2/4; grid-row:2; margin:2px 0 6px; font-size:12px; line-height:16px; }
 .watch-author > div { grid-column:2/4; grid-row:3; display:grid; grid-template-columns:1fr 1.55fr; gap:12px; min-width:0; }
 .watch-author > div button { padding:4px 6px; min-width:0; white-space:nowrap; font-size:14px; height:30px; }
+.watch-author-actions :is(.watch-charge-label, .watch-follow-label) { line-height: 1; }
+.watch-author-actions .watch-charge-label { transform: translateY(-.5px); }
+.watch-author-actions .watch-icon { flex-shrink: 0; }
 .danmaku-panel summary { position:relative; }
 .danmaku-panel summary > #danmaku-sidebar-title { margin:0; color:#18191c; }
 .danmaku-panel summary > .sidebar-menu-wrap { margin-left:12px; display:inline-flex; position:relative; }

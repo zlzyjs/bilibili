@@ -12,7 +12,8 @@
   const trialExpired = () => !signedIn && watched >= 30;
   let blocked = new Set(read('bili-blocked-users', []));
   let danmaku = [], enabled = true, lastTick = performance.now(), lastVideoTime = 0, nextVideo = null, noticeTimer;
-  const shown = new Set();
+  const shown = new Set(), withdrawn = new Set();
+  let danmakuCountLabel;
   const seek = el('seek'), seekBar = el('seek-bar');
   const seekPreview = el('seek-preview'), seekPreviewTime = el('seek-preview-time');
   const seekPreviewFrame = el('seek-preview-frame');
@@ -83,8 +84,9 @@
   window.addEventListener('pointercancel', finishSeek);
   seek.addEventListener('keyup', finishSeek);
   seek.addEventListener('blur', finishSeek);
-  const notice = (message) => {
+  const notice = (message, compact = false) => {
     const status = el('control-notice');
+    status.classList.toggle('control-notice-compact', compact);
     status.textContent = message;
     status.hidden = false;
     clearTimeout(noticeTimer);
@@ -101,7 +103,9 @@
     clearTimeout(actionTimer);
     if (activeLine && activeLine !== line) activeLine.style.animationPlayState = '';
     activeDanmaku = d; activeLine = line; line.style.animationPlayState = 'paused';
-    el('dm-action-report').hidden = ownsDanmaku(d);
+    const own = ownsDanmaku(d);
+    el('dm-action-report').hidden = own;
+    el('dm-action-withdraw').hidden = !own;
     shell.classList.add('inspecting-danmaku');
     const rect = line.getBoundingClientRect(), frame = shell.getBoundingClientRect();
     const toolbar = el('danmaku-actions'); toolbar.hidden = false;
@@ -145,6 +149,30 @@
     const target = activeDanmaku;
     hideDanmakuActions();
     danmakuReportInteraction(shell, target, () => watchSidebar.shieldDanmaku(target));
+  };
+  const withdrawButton = el('dm-action-withdraw');
+  withdrawButton.onclick = async () => {
+    if (withdrawButton.disabled || !activeDanmaku || !ownsDanmaku(activeDanmaku)) return;
+    const target = activeDanmaku.id;
+    withdrawButton.disabled = true;
+    try {
+      await interaction('/danmaku/' + encodeURIComponent(target), 'DELETE');
+      withdrawn.add(target);
+      danmaku = danmaku.filter(row => row.id !== target);
+      shown.delete(target);
+      if (activeDanmaku?.id === target) hideDanmakuActions();
+      for (const line of Array.from(overlay.children)) {
+        if (line.dataset.danmakuId === String(target)) tracks.remove(line);
+      }
+      if (danmakuCountLabel) danmakuCountLabel.textContent = shortCount(danmaku.length);
+      updateHeatmap();
+      renderDanmaku();
+      notice('撤回成功', true);
+    } catch (error) {
+      notice(error.message);
+    } finally {
+      withdrawButton.disabled = false;
+    }
   };
   el('dm-action-copy').onclick = async () => {
     if (!activeDanmaku) return;
@@ -243,6 +271,7 @@
   function displayDanmaku(d, mode) {
     const line = node('span', 'flying-danmaku' + (ownsDanmaku(d) ? ' own-danmaku' : ''), d.content);
     line.dataset.userId = d.userId;
+    line.dataset.danmakuId = d.id;
     if (/^#[\da-f]{6}$/i.test(d.color)) line.style.color = d.color;
     watchPreferences.decorate(line, d.size);
     if (!tracks.add(line, mode, watchPreferences.travelSeconds(), mode === 'scroll' ? undefined : d.timestamp + fixedDanmakuSeconds)) return false;
@@ -406,7 +435,9 @@
     const metaStat = (name, count) => {
       const stat = node('span', 'video-meta-stat');
       stat.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="/assets/watch-icons.svg?v=2#meta-' + name + '"></use></svg>';
-      stat.append(node('span', '', shortCount(count)));
+      const label = node('span', '', shortCount(count));
+      if (name === 'danmaku') danmakuCountLabel = label;
+      stat.append(label);
       return stat;
     };
     const accolades = [];
@@ -434,7 +465,7 @@
     else if (video.streamUrl && preferences.autoStart) { player.muted = preferences.muted; player.play().catch(() => {}); }
     api('/videos/' + id + '/engagement').then(stats => { for (const key of ['like','coin','favorite','share']) el(key + '-count').textContent = shortCount(stats[key]); }).catch(() => { document.querySelector('.video-actions').title = '互动数据暂时加载失败'; });
     api('/videos/' + id + '/danmaku').then(rows => {
-      danmaku = [...new Map([...rows, ...danmaku].map(row => [row.id, row])).values()];
+      danmaku = [...new Map([...rows, ...danmaku].filter(row => !withdrawn.has(row.id)).map(row => [row.id, row])).values()];
       updateHeatmap();
       renderDanmaku();
       showTimedDanmaku();
@@ -647,5 +678,5 @@ function setupDanmakuTracks(overlay) {
     }
   }
 
-  return { add, clear, expireFixed, resize };
+  return { add, clear, expireFixed, remove, resize };
 }

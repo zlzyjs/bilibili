@@ -315,6 +315,22 @@ class InteractionController {
                     rs.getObject(5, java.time.LocalDateTime.class), mode, size, normalizedColor)).single();
     }
 
+    @DeleteMapping("/danmaku/{id}")
+    @Transactional
+    ResponseEntity<Void> withdrawDanmaku(@PathVariable String id, HttpServletRequest request) {
+        var member = write(request, "弹幕", "Lv2");
+        requireId(id);
+        int updated = jdbc.sql("""
+                UPDATE danmakutable SET DanmakuStatus='removed'
+                WHERE DanmakuID=CAST(:id AS UNSIGNED) AND UID=CAST(:uid AS UNSIGNED) AND DanmakuStatus='active'
+                """).param("id", id).param("uid", member.uid()).update();
+        if (updated == 0 && !exists("""
+                SELECT EXISTS(SELECT 1 FROM danmakutable
+                WHERE DanmakuID=CAST(:id AS UNSIGNED) AND UID=CAST(:uid AS UNSIGNED))
+                """, id, member.uid())) throw error(NOT_FOUND, "弹幕不存在或不可撤回");
+        return ResponseEntity.noContent().build();
+    }
+
     @PutMapping("/videos/{id}/progress")
     ResponseEntity<Void> progress(@PathVariable String id, @RequestBody NumberInput input, HttpServletRequest request) {
         var member = write(request, "历史记录", "Lv0");

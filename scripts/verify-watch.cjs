@@ -25,13 +25,14 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   const p = el('player'); Object.assign(p,{ currentTime:0, duration:100, readyState:4, paused:true, ended:false, seeking:false, pause(){this.paused=true;this.emit('pause');}, async play(){this.paused=false;this.emit('play');} });
   el('login-dialog').open = false;
   let now = 0, tick, prompts = 0, copied = '', postDanmaku, resizeDanmaku;
-  const documentEvents={}, windowEvents={};
+  const documentEvents={}, windowEvents={}, interactionCalls=[];
   const context = { setupWatchComments(){},setupWatchScroll(){},setupRelatedExpansion(){},startViewerPresence(){}, el, path:'/video/10001', duration:n=>`${Math.floor(n/60)}`.padStart(2,'0')+':'+`${n%60}`.padStart(2,'0'), shortCount:String,
     localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)}, performance:{now:()=>now},
     setInterval:fn=>(tick=fn,1),clearInterval(){},setTimeout(){return 1;},clearTimeout(){},
     ResizeObserver:class { constructor(callback) { resizeDanmaku = callback; } observe() {} },
     window:{addEventListener(event,fn){(windowEvents[event] ||= []).push(fn);}}, navigator:{clipboard:{writeText:async text=>{copied=text;}}}, document:{ documentElement:{clientWidth:1200}, body:new Element(), title:'', activeElement:{tagName:'BODY'}, addEventListener(event,fn){(documentEvents[event] ||= []).push(fn);},querySelector:()=>new Element() },
     openLogin:()=>{prompts++;el('login-dialog').open=true;},location:{assign(){}},
+    interaction:async (...args)=>{ interactionCalls.push(args); },
     setupVideoInteractions:(_id,_author,_player,_duration,callback)=>{ postDanmaku=callback; },
     node:(tag,cls,text)=>Object.assign(new Element(),{className:cls,textContent:text}),
     link:(href,label,className)=>Object.assign(new Element(),{href,className,textContent:label}),
@@ -41,7 +42,7 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
     ]:url.startsWith('/authors/')?{followers:10}:url.startsWith('/videos?')?{items:[]}: {video:{id:'10001',title:'Test',authorId:'1',streamUrl:'/test.mp4',plays:1,danmaku:3},tags:[],...accolades}
   };
   vm.createContext(context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch-sidebar.js','utf8'),context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch-preferences.js','utf8'),context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch.js','utf8'),context);await context.loadWatchPage();
-  return {el,p,storage,postDanmaku,resizeDanmaku,keydown:event=>(documentEvents.keydown||[]).forEach(fn=>fn(event)),pageEvent:(name,event={})=>(windowEvents[name]||[]).forEach(fn=>fn(event)),copied:()=>copied,fullscreen:flag=>{context.document.fullscreenElement=flag?el('player-shell'):null;(documentEvents.fullscreenchange||[]).forEach(fn=>fn());}, advance(ms,move=true){now+=ms;if(move&&!p.paused)p.currentTime+=ms/1000;tick();},prompts:()=>prompts};
+  return {el,p,storage,postDanmaku,resizeDanmaku,interactionCalls,keydown:event=>(documentEvents.keydown||[]).forEach(fn=>fn(event)),pageEvent:(name,event={})=>(windowEvents[name]||[]).forEach(fn=>fn(event)),copied:()=>copied,fullscreen:flag=>{context.document.fullscreenElement=flag?el('player-shell'):null;(documentEvents.fullscreenchange||[]).forEach(fn=>fn());}, advance(ms,move=true){now+=ms;if(move&&!p.paused)p.currentTime+=ms/1000;tick();},prompts:()=>prompts};
 }
 (async()=>{
   const createTracks = vm.runInNewContext(fs.readFileSync('src/main/resources/static/watch.js', 'utf8') + '\nsetupDanmakuTracks;');
@@ -114,7 +115,23 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   assert.equal(styled.el('dm-action-report').hidden, true);
   const ownRow = styled.el('danmaku-list').children.find(row => row.children[1].textContent === own.content);
   assert.equal(ownRow.children.length, 3, 'own danmaku shows the timestamp, content and date');
-  console.log('PASS: styled own fixed danmaku, five-second timeline window and own list row');
+  const withdraw = styled.el('dm-action-withdraw');
+  assert.equal(withdraw.hidden, false);
+  await withdraw.onclick();
+  assert.deepEqual(styled.interactionCalls, [['/danmaku/20', 'DELETE']]);
+  assert.equal(styled.el('danmaku-actions').hidden, true);
+  assert.equal(styled.el('control-notice').textContent, '撤回成功');
+  assert.ok(styled.el('control-notice').classList.contains('control-notice-compact'));
+  assert.ok(!styledOverlay.children.some(line => line.textContent === own.content));
+  assert.ok(!styled.el('danmaku-list').children.some(row => row.children[1].textContent === own.content));
+  styled.p.emit('seeking'); styled.p.currentTime = 25; styled.p.emit('seeked');
+  assert.ok(!styledOverlay.children.some(line => line.textContent === own.content));
+  const otherLine = styledOverlay.children.find(line => line.textContent === 'Scrolling');
+  otherLine.emit('mouseenter');
+  assert.equal(withdraw.hidden, true);
+  await withdraw.onclick();
+  assert.equal(styled.interactionCalls.length, 1);
+  console.log('PASS: styled own fixed danmaku, own-only withdrawal and removal from list and timeline');
   const t=await setup();
   const seek = t.el('seek'), seekBar = t.el('seek-bar');
   const previewFrame = Object.assign(t.el('seek-preview-frame'), {currentTime:0, duration:100, readyState:0, hidden:true});

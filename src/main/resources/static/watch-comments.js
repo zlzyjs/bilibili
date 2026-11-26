@@ -212,8 +212,19 @@ function setupWatchScroll(player,shell) {
   let floating=false, dismissed=false, revealed=false, pastPlayer=false, manualPosition=null, drag=null;
   const miniToggle=el('watch-mini-toggle');miniToggle.hidden=true;
   function syncMiniButton(){miniToggle.hidden=!revealed||!pastPlayer;miniToggle.setAttribute('aria-pressed',String(!dismissed));miniToggle.setAttribute('aria-label',!dismissed?'关闭小窗':'开启小窗');}
-  function measure(){main.style.setProperty('--watch-main-height',main.offsetHeight+'px');}
-  const resize=new ResizeObserver(measure);resize.observe(main);measure();
+  const author = document.querySelector('.watch-author');
+  function measure() {
+    const layout = el('video-page');
+    main.style.setProperty('--watch-main-height', main.offsetHeight + 'px');
+    if (layout.classList.contains('wide-mode')) return;
+    const playerTop = home.getBoundingClientRect().top - main.getBoundingClientRect().top;
+    const authorHeight = author.getBoundingClientRect().height;
+    author.style.setProperty('--watch-author-gap', (playerTop - authorHeight) + 'px');
+  }
+  const resize = new ResizeObserver(measure);
+  resize.observe(main);
+  resize.observe(author);
+  measure();
   function restore(){
     if(!floating)return;floating=false;shell.classList.remove('scroll-mini');home.append(shell);home.style.height='';shell.style.removeProperty('left');shell.style.removeProperty('top');shell.style.removeProperty('right');shell.style.removeProperty('bottom');syncMiniButton();
   }
