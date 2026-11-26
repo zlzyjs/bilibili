@@ -3,6 +3,7 @@ package cn.edu.bilibili.home;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.sql.SQLException;
+import java.sql.Types;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -241,19 +242,23 @@ class InteractionController {
 
     private void createComment(String id, AuthController.Member member, String text, MessageStore.Image image) {
         var keys = new org.springframework.jdbc.support.GeneratedKeyHolder();
-        jdbc.sql("INSERT INTO commenttable (UID,VideoID,Content) VALUES (:uid,:id,:text)")
-                .param("uid", member.uid()).param("id", id).param("text", text).update(keys);
-        if (image != null) {
-            jdbc.sql("INSERT INTO comment_image (comment_id,mime,image_bytes) VALUES (:id,:mime,:image)")
-                    .param("id", keys.getKey()).param("mime", image.mime()).param("image", image.bytes()).update();
-        }
+        jdbc.sql("""
+                INSERT INTO commenttable (UID,VideoID,Content,ImageMime,ImageBytes)
+                VALUES (:uid,:id,:text,:mime,:image)
+                """).param("uid", member.uid()).param("id", id).param("text", text)
+                .param("mime", image == null ? null : image.mime(), Types.VARCHAR)
+                .param("image", image == null ? null : image.bytes(), Types.BLOB).update(keys);
         inbox.mentions(member.uid(), "comment", keys.getKey(), text);
     }
 
     @GetMapping("/comments/{id}/image")
     ResponseEntity<byte[]> commentImage(@PathVariable String id) {
         requireTarget(Target.COMMENT, id);
-        var image = jdbc.sql("SELECT mime,image_bytes FROM comment_image WHERE comment_id=CAST(:id AS UNSIGNED)")
+        var image = jdbc.sql("""
+                SELECT ImageMime,ImageBytes FROM commenttable
+                WHERE CommentID=CAST(:id AS UNSIGNED) AND CommentStatus='active'
+                  AND ImageMime IS NOT NULL AND ImageBytes IS NOT NULL
+                """)
                 .param("id", id).query((rs, row) -> new MessageStore.Image(rs.getString(1), rs.getBytes(2)))
                 .optional().orElseThrow(() -> error(NOT_FOUND, "评论图片不存在"));
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(image.mime()))
@@ -300,14 +305,12 @@ class InteractionController {
         String normalizedColor = color.toUpperCase(Locale.ROOT);
         var keys = new org.springframework.jdbc.support.GeneratedKeyHolder();
         jdbc.sql("""
-                INSERT INTO danmakutable (UID,VideoID,Content,VideoTimestamp) VALUES (:uid,:id,:text,:position)
+                INSERT INTO danmakutable (UID,VideoID,Content,VideoTimestamp,DisplayMode,FontSize,Color)
+                VALUES (:uid,:id,:text,:position,:mode,:size,:color)
                 """).param("uid", member.uid()).param("id", id).param("text", content(input.value(), 100))
-                .param("position", timestamp).update(keys);
+                .param("position", timestamp).param("mode", mode).param("size", size).param("color", normalizedColor)
+                .update(keys);
         String danmakuId = keys.getKey().toString();
-        jdbc.sql("""
-                INSERT INTO danmaku_style (danmaku_id,display_mode,font_size,color)
-                VALUES (CAST(:id AS UNSIGNED),:mode,:size,:color)
-                """).param("id", danmakuId).param("mode", mode).param("size", size).param("color", normalizedColor).update();
         return jdbc.sql("""
                 SELECT DanmakuID,UID,Content,VideoTimestamp,SendTime FROM danmakutable WHERE DanmakuID=CAST(:id AS UNSIGNED)
                 """).param("id", danmakuId).query((rs, row) -> new MysqlVideoCatalog.Danmaku(

@@ -354,7 +354,7 @@ class MysqlVideoCatalog {
                 .param("id", videoId).query(Long.class).single();
         var comments = jdbc.sql("""
                 SELECT c.CommentID, c.UID, u.Name, l.LevelName, c.Content, c.CommentTime,
-                  EXISTS(SELECT 1 FROM comment_image i WHERE i.comment_id=c.CommentID) AS HasImage,
+                  (c.ImageMime IS NOT NULL AND c.ImageBytes IS NOT NULL) AS HasImage,
                   (SELECT COUNT(*) FROM liketable k WHERE k.LikeTargetType=2 AND k.LikeTargetID=c.CommentID) AS Likes
                 FROM commenttable c JOIN usertable u ON u.UID=c.UID
                 LEFT JOIN userleveltable l ON l.LevelID=u.LevelID
@@ -414,14 +414,13 @@ class MysqlVideoCatalog {
 
     List<Danmaku> danmaku(String id) {
         return jdbc.sql("""
-                SELECT d.DanmakuID, d.UID, d.Content, d.VideoTimestamp, d.SendTime,
-                       COALESCE(s.display_mode, 'scroll'), COALESCE(s.font_size, 'standard'), COALESCE(s.color, '#FFFFFF')
-                FROM danmakutable d LEFT JOIN danmaku_style s ON s.danmaku_id = d.DanmakuID
-                WHERE d.VideoID = CAST(:id AS UNSIGNED) AND d.DanmakuStatus = 'active'
+                SELECT DanmakuID, UID, Content, VideoTimestamp, SendTime, DisplayMode, FontSize, Color
+                FROM danmakutable
+                WHERE VideoID = CAST(:id AS UNSIGNED) AND DanmakuStatus = 'active'
                 ORDER BY SendTime, DanmakuID
                 """).param("id", id).query((rs, row) -> new Danmaku(rs.getString("DanmakuID"), rs.getString("UID"),
                         rs.getString("Content"), rs.getInt("VideoTimestamp"), rs.getObject("SendTime", LocalDateTime.class),
-                        rs.getString(6), rs.getString(7), rs.getString(8))).list();
+                        rs.getString("DisplayMode"), rs.getString("FontSize"), rs.getString("Color"))).list();
     }
 
     record Engagement(long like, long coin, long favorite, long share) {}
