@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>创作中心 · dilidili</title>
   <link rel="stylesheet" href="/nav-brand.css?v=1">
-  <link rel="stylesheet" href="/studio.css?v=5">
+  <link rel="stylesheet" href="/studio.css?v=7">
   <script src="/studio-upload.js?v=1" defer></script>
-  <script src="/studio.js?v=2" defer></script>
+  <script src="/studio.js?v=3" defer></script>
 </head>
 <body>
   <svg class="studio-symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -17,11 +17,16 @@
     <symbol id="studio-icon-data" viewBox="0 0 24 24"><path d="M4 4v16h16M8 15l4-4 3 2 4-6"/></symbol>
     <symbol id="studio-icon-followers" viewBox="0 0 24 24"><circle cx="10" cy="8" r="3"/><path d="M4 20v-2a6 6 0 0 1 10-4.5m4-1v7m-3.5-3.5h7"/></symbol>
     <symbol id="studio-icon-income" viewBox="0 0 24 24"><rect x="4" y="6" width="16" height="13" rx="3"/><path d="M4 9h16m-5 5h2"/></symbol>
+    <symbol id="studio-icon-site" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="m9 3 3 3 3-3M9 10v3m6-3v3"/></symbol>
+    <symbol id="studio-icon-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></symbol>
   </svg>
   <header class="studio-header">
     <a class="studio-brand" href="/studio"><span class="nav-brand-mark" role="img" aria-label="dilidili"></span> 创作中心</a>
-    <a href="/" class="main-site">返回主站 ↗</a>
-    <a href="/me" id="studio-account" hidden><img alt="" width="32" height="32"><span></span></a>
+    <a href="/" class="main-site"><svg class="studio-icon" aria-hidden="true"><use href="#studio-icon-site"/></svg>主站</a>
+    <div class="studio-header-tools">
+      <a class="studio-inbox" href="/messages" aria-label="消息中心"><svg class="studio-icon" aria-hidden="true"><use href="#studio-icon-mail"/></svg></a>
+      <a href="/me" id="studio-account" hidden><span></span><img alt="" width="28" height="28"></a>
+    </div>
   </header>
   <div class="studio-shell">
     <nav class="studio-nav" aria-label="创作中心">

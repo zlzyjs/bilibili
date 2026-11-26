@@ -582,14 +582,7 @@ function setupChannelNavigation(alwaysPinned = false) {
   const start = node('div', 'channel-nav-start');
   const logo = link('/', null, 'channel-nav-logo');
   logo.setAttribute('aria-label', '返回首页');
-  if (home) {
-    const image = node('img');
-    image.src = banner.querySelector('.banner-logo img').src;
-    image.alt = '';
-    logo.append(image);
-  } else {
-    logo.append(node('span', 'nav-brand-mark'));
-  }
+  logo.append(node('span', 'nav-brand-mark'));
 
   const trigger = node('div', 'channel-nav-trigger');
   const toggle = node('button', 'channel-nav-toggle');

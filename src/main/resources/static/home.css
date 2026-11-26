@@ -228,7 +228,6 @@ body:not(.inner-page) .home-logo{display:none}
 .channel-nav-trigger{align-self:stretch;white-space:nowrap}
 .channel-nav-logo,.navbar .channel-nav-toggle{display:none}
 .channel-nav-logo{--nav-brand-width:80px}
-.channel-nav-logo img{display:block;width:var(--nav-brand-width);height:auto;filter:brightness(0) saturate(100%) invert(63%) sepia(62%) saturate(407%) hue-rotate(171deg)}
 .navbar.channel-nav-stuck{position:fixed;z-index:8;color:var(--ink);background:#fff;box-shadow:0 2px 8px #00000012;animation:channel-nav-enter .22s ease-out}
 .channel-nav-stuck .channel-nav-logo{display:block}
 .channel-nav-stuck .channel-nav-toggle{display:grid;place-items:center}

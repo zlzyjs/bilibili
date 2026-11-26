@@ -66,7 +66,8 @@ function subheading(text, ...tools) {
 }
 
 function setContent(...children) {
-  content.replaceChildren(node('h1', '', routes[location.pathname]?.[0] || '创作中心'), ...children);
+  if (children[0]?.classList.contains('studio-dashboard')) content.replaceChildren(...children);
+  else content.replaceChildren(node('h1', '', routes[location.pathname]?.[0] || '创作中心'), ...children);
 }
 
 async function api(path, options) {
@@ -110,16 +111,68 @@ function tile(label, value, handler) {
 }
 
 async function overview() {
-  const data = await api('/overview');
+  const [data, recent] = await Promise.all([
+    api('/overview'),
+    api('/videos').catch(() => null),
+  ]);
+  const welcome = group('studio-welcome', node('h1', '', '创作工作台'),
+    node('p', '', '管理稿件，查看创作表现'),
+    link('/studio/upload', '发布视频 ↗', 'studio-btn'));
+  const destinations = [
+    ['/studio/videos?state=draft', '继续编辑草稿'],
+    ['/studio/videos?state=pending', '查看审核进度'],
+    ['/studio/analytics', '分析视频表现'],
+    ['/studio/fans', '查看粉丝动态'],
+    ['/studio/charge', '查看充电记录'],
+  ];
+  const shortcuts = node('ul', 'studio-shortcuts');
+  for (const [href, label] of destinations) {
+    const item = node('li');
+    item.append(link(href, label));
+    shortcuts.append(item);
+  }
+  const quick = panel(node('h2', '', '常用入口'), shortcuts);
   const cards = group('studio-cards', ...Object.keys(data.metrics).sort((a, b) =>
     Object.keys(metrics).indexOf(a) - Object.keys(metrics).indexOf(b))
     .map(key => tile(metrics[key], number.format(data.metrics[key]))));
-  const video = panel(subheading('视频数据', link('/studio/analytics', '查看趋势 ›', 'studio-btn')), cards);
+  const video = panel(subheading('视频数据', link('/studio/analytics', '查看趋势 ›', 'studio-btn')),
+    node('p', 'studio-muted studio-metrics-note', '已发布稿件的累计数据'), cards);
+  video.classList.add('studio-metrics');
   const audience = panel(subheading('粉丝概览', link('/studio/fans', '查看 ›', 'studio-btn')),
     tile('粉丝总数', number.format(data.followers)), tile('今日新增粉丝', '+' + number.format(data.newFans)));
   const revenue = panel(subheading('收益概览', link('/studio/income', '查看 ›', 'studio-btn')),
     tile('累计收到充电', money.format(data.received)));
-  return [group('studio-overview', video, group('studio-aside', audience, revenue))];
+  const recentPanel = panel(subheading('近期稿件', link('/studio/videos', '全部稿件 ›', 'studio-btn')));
+  if (recent?.items.length) {
+    const list = node('ul', 'studio-recent-list');
+    for (const draft of recent.items.slice(0, 4)) {
+      const item = node('li');
+      const destination = draft.playable ? '/video/' + encodeURIComponent(draft.id) :
+        '/studio/videos?' + new URLSearchParams({ state: draft.state, q: draft.title });
+      const entry = link(destination);
+      entry.append(studioCover(draft), node('strong', '', draft.title),
+        node('span', 'studio-muted', states[draft.state] || draft.state));
+      item.append(entry);
+      list.append(item);
+    }
+    recentPanel.append(list);
+  } else {
+    recentPanel.append(node('p', 'studio-empty', recent ? '暂无稿件' : '暂时无法加载近期稿件'));
+  }
+  return [group('studio-dashboard', group('studio-dashboard-top', welcome, quick),
+    group('studio-overview', video, group('studio-aside', audience, revenue)), recentPanel)];
+}
+
+function studioCover(video) {
+  const cover = group('studio-video-image');
+  const image = node('img');
+  image.alt = '';
+  image.loading = 'lazy';
+  image.onerror = () => image.hidden = true;
+  image.src = '/api/studio/videos/' + encodeURIComponent(video.id) + '/cover';
+  const duration = [Math.floor(video.duration / 60), video.duration % 60].map(value => String(value).padStart(2, '0')).join(':');
+  cover.append(image, node('span', '', duration));
+  return cover;
 }
 
 function pager(total, page, change) {
@@ -132,8 +185,10 @@ function pager(total, page, change) {
   return group('studio-pager', prev, node('span', '', (page + 1) + ' / ' + pages), next);
 }
 
-const initialState = new URLSearchParams(location.search).get('state');
-const videoQuery = { state: Object.hasOwn(states, initialState) ? initialState : 'all', q: '', sort: 'latest', page: 0 };
+const videoParams = new URLSearchParams(location.search);
+const initialState = videoParams.get('state');
+const videoQuery = { state: Object.hasOwn(states, initialState) ? initialState : 'all',
+  q: (videoParams.get('q') || '').slice(0, 80), sort: 'latest', page: 0 };
 async function videos() {
   const { state, q, sort, page } = videoQuery;
   const data = await api('/videos?' + new URLSearchParams({ state, q, sort, page }));
@@ -163,14 +218,6 @@ async function videos() {
   const list = node('ul', 'studio-list');
   for (const video of data.items) {
     const row = node('li', 'studio-video');
-    const cover = group('studio-video-image');
-    const image = node('img');
-    image.alt = '';
-    image.loading = 'lazy';
-    image.onerror = () => image.hidden = true;
-    image.src = '/api/studio/videos/' + encodeURIComponent(video.id) + '/cover';
-    const duration = [Math.floor(video.duration / 60), video.duration % 60].map(value => String(value).padStart(2, '0')).join(':');
-    cover.append(image, node('span', '', duration));
     const heading = node('h3');
     heading.append(video.playable ? link('/video/' + encodeURIComponent(video.id), video.title) : video.title);
     const labels = [iso(video.uploadTime), states[video.state] || video.state];
@@ -183,7 +230,7 @@ async function videos() {
     if (video.playable || video.visibility === 'private') {
       tools.append(link('/studio/analytics?video=' + encodeURIComponent(video.id), '数据', 'studio-btn'));
     }
-    row.append(cover, details, tools);
+    row.append(studioCover(video), details, tools);
     list.append(row);
   }
   return [panel(subheading('视频管理', group('studio-tools', search, link('/studio/upload', '投稿', 'studio-btn studio-primary'))), group('studio-row', filters, order),
