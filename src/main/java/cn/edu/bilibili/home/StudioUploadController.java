@@ -7,6 +7,11 @@ import java.io.RandomAccessFile;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Locale;
+import java.text.Normalizer;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import javax.imageio.ImageIO;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.MediaType;
@@ -27,17 +32,19 @@ import static org.springframework.http.HttpStatus.*;
 @RestController
 @RequestMapping("/api/studio")
 class StudioUploadController {
-    private static final long VIDEO_LIMIT = 256L * 1024 * 1024;
+    private static final long VIDEO_LIMIT = 5L * 1024 * 1024 * 1024;
     private static final long COVER_LIMIT = 5L * 1024 * 1024;
     private static final int MAX_DURATION = 36000;
     private final AuthController auth;
     private final JdbcTemplate jdbc;
     private final OssMedia oss;
+    private final StudioController studio;
 
-    StudioUploadController(AuthController auth, JdbcTemplate jdbc, OssMedia oss) {
+    StudioUploadController(AuthController auth, JdbcTemplate jdbc, OssMedia oss, StudioController studio) {
         this.auth = auth;
         this.jdbc = jdbc;
         this.oss = oss;
+        this.studio = studio;
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -49,21 +56,24 @@ class StudioUploadController {
         }
         var body = WebUtils.getNativeRequest(request, MultipartHttpServletRequest.class);
         if (body == null) throw invalid("请选择视频和封面");
+        String editId = field(body, "editId");
+        var original = editId.isEmpty() ? null : studio.ownVideo(account.uid(), editId);
         String title = field(body, "title");
         String description = field(body, "description");
         String category = field(body, "category");
         String visibility = field(body, "visibility");
-        String statement = field(body, "statement");
+        String statement = original == null ? field(body, "statement") : String.valueOf(original.statement());
+        String tags = validatedTags(field(body, "tags"));
         String token = field(body, "submission");
         if (title.isEmpty() || title.codePointCount(0, title.length()) > 80 || description.length() > 5000
-                || !AuthController.validUid(category) || !statement.matches("[12]")
+                || !AuthController.validUid(category) || !statement.matches("[1-6]")
                 || !("public".equals(visibility) || "private".equals(visibility)) || !token.matches("[a-f0-9]{32}")) {
-            throw invalid("请检查标题、分区、投稿类型和可见范围");
+            throw invalid("请检查标题、分区、创作声明和可见范围");
         }
         var video = body.getFile("video");
         var cover = body.getFile("cover");
-        if (video == null || video.isEmpty() || cover == null || cover.isEmpty()) throw invalid("请提供视频和封面");
-        if (video.getSize() > VIDEO_LIMIT || cover.getSize() > COVER_LIMIT) {
+        if (original == null && (video == null || video.isEmpty() || cover == null || cover.isEmpty())) throw invalid("请提供视频和封面");
+        if ((video != null && video.getSize() > VIDEO_LIMIT) || (cover != null && cover.getSize() > COVER_LIMIT)) {
             throw new ResponseStatusException(PAYLOAD_TOO_LARGE, "视频或封面超过大小限制");
         }
         String name = account.uid() + "-" + token;
@@ -82,7 +92,7 @@ class StudioUploadController {
                 String existing = receipt(session, account.uid(), oss.reference(videoKey), videoKey);
                 if (existing != null) return Map.of("id", existing);
                 return uploadAndSubmit(session, account.uid(), video, cover, videoKey, coverKey,
-                        title, description, category, Integer.parseInt(statement), visibility);
+                        title, description, category, Integer.parseInt(statement), visibility, tags, editId, original);
             } finally {
                 session.sql("SELECT RELEASE_LOCK(:lock)").param("lock", lock).query(Integer.class).optional();
             }
@@ -91,7 +101,7 @@ class StudioUploadController {
 
     private Map<String, String> uploadAndSubmit(JdbcClient session, String uid, MultipartFile video,
             MultipartFile cover, String videoKey, String coverKey, String title, String description,
-            String category, int statement, String visibility) {
+            String category, int statement, String visibility, String tags, String editId, StudioController.OwnedVideo original) {
         Path directory = null;
         Path videoFile = null;
         Path coverFile = null;
@@ -99,17 +109,28 @@ class StudioUploadController {
             directory = Files.createTempDirectory("bili-studio-");
             videoFile = directory.resolve("video.mp4");
             coverFile = directory.resolve("cover.jpg");
-            video.transferTo(videoFile);
-            int duration = mp4Duration(videoFile);
-            writeCover(cover, coverFile);
-            String coverPath = oss.putFile(coverKey, "image/jpeg", coverFile);
-            String videoPath = oss.putFile(videoKey, "video/mp4", videoFile);
+            int duration = original == null ? 0 : original.duration();
+            String videoPath = original == null ? null : original.content();
+            String coverPath = original == null ? null : original.cover();
+            if (video != null && !video.isEmpty()) {
+                video.transferTo(videoFile);
+                duration = mp4Duration(videoFile);
+                videoPath = oss.putFile(videoKey, "video/mp4", videoFile);
+            }
+            if (cover != null && !cover.isEmpty()) {
+                writeCover(cover, coverFile);
+                coverPath = oss.putFile(coverKey, "image/jpeg", coverFile);
+            }
+            if (videoPath == null || coverPath == null) throw invalid("请提供视频和封面");
             String id = session.sql("""
-                CALL sp_submit_video_audit_with_tags(:uid,NULL,:title,:description,:cover,:video,
-                    :statement,:category,NULL,:duration,:visibility,NULL)
-                """).param("uid", uid).param("title", title).param("description", description)
+                CALL sp_submit_video_audit_with_tags(:uid,:editId,:title,:description,:cover,:video,
+                    :statement,:category,:collection,:duration,:visibility,:tags)
+                """).param("uid", uid).param("editId", editId.isEmpty() ? null : editId, java.sql.Types.VARCHAR)
+                    .param("collection", original == null ? null : original.collection(), java.sql.Types.VARCHAR)
+                    .param("title", title).param("description", description)
                     .param("cover", coverPath).param("video", videoPath).param("statement", statement)
                     .param("category", category).param("duration", duration).param("visibility", visibility)
+                    .param("tags", tags)
                     .query((rs, row) -> rs.getString("VideoID")).single();
             return Map.of("id", id);
         } catch (DataAccessException error) {
@@ -129,7 +150,7 @@ class StudioUploadController {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     @ResponseStatus(PAYLOAD_TOO_LARGE)
     Map<String, String> tooLarge() {
-        return Map.of("message", "视频最多 256 MB，封面最多 5 MB");
+        return Map.of("message", "视频最多 5 GB，封面最多 5 MB");
     }
 
     @ExceptionHandler(ResponseStatusException.class)
@@ -150,6 +171,29 @@ class StudioUploadController {
                     ORDER BY VideoID LIMIT 1
                     """).param("uid", uid).param("remote", remotePath).param("local", localPath)
                         .query(String.class).optional().orElse(null));
+    }
+
+    static String validatedTags(String json) {
+        try {
+            if (json.length() > 12000) throw invalid("标签内容过长");
+            var mapper = new ObjectMapper();
+            var input = mapper.readTree(json);
+            if (input == null || !input.isArray() || input.size() < 1 || input.size() > 10) {
+                throw invalid("请添加 1 到 10 个标签");
+            }
+            var tags = new ArrayList<String>();
+            var seen = new HashSet<String>();
+            for (var item : input) {
+                if (!item.isTextual()) throw invalid("标签必须为文字");
+                String tag = Normalizer.normalize(item.textValue().strip(), Normalizer.Form.NFC);
+                int length = tag.codePointCount(0, tag.length());
+                if (length < 1 || length > 50) throw invalid("每个标签须为 1 到 50 字");
+                if (seen.add(tag.toLowerCase(Locale.ROOT))) tags.add(tag);
+            }
+            return mapper.writeValueAsString(tags);
+        } catch (IOException error) {
+            throw invalid("标签格式有误");
+        }
     }
 
     private static String field(MultipartHttpServletRequest body, String name) {

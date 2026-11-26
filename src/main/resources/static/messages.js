@@ -1,6 +1,6 @@
 (() => {
   const root = el('message-center');
-  const tabs = { chat: '我的消息', replies: '回复我的', mentions: '@ 我的', likes: '收到的赞',
+  const tabs = { chat: '我的消息', replies: '回复我的', mentions: '@我的', likes: '收到的赞',
     system: '系统通知' };
   let tab = Object.hasOwn(tabs, params.get('tab')) ? params.get('tab') : 'chat';
   let peer = params.get('uid');
@@ -143,10 +143,27 @@
       const art = node('img', picture === 'chat' ? 'mc-empty-art' : 'mc-notice-empty-art');
       art.alt = '';
       art.src = picture === 'chat' ? '/assets/mc-placeholder.png' : '/assets/mc-notice-empty.png';
-      state.append(art);
+      if (picture === 'chat') state.append(art);
+      else {
+        const illustration = node('div', 'mc-notice-empty-illustration');
+        illustration.append(art);
+        state.append(illustration);
+      }
     } else state.append(icon('mail'));
     state.append(node('p', '', text));
     return state;
+  }
+
+  function chatTime(iso) {
+    if (!iso) return '';
+    const [date, time = ''] = String(iso).split('T');
+    const clock = time.slice(0, 5);
+    const [year, month, day] = date.split('-').map(Number);
+    const today = new Date();
+    const days = Math.round((new Date(today.getFullYear(), today.getMonth(), today.getDate()) - new Date(year, month - 1, day)) / 86400000);
+    if (days === 0) return '今天 ' + clock;
+    if (days === 1) return '昨天 ' + clock;
+    return date + ' ' + clock;
   }
 
   async function chat(section, status, stillCurrent) {
@@ -360,17 +377,6 @@
     let polling = false;
     const recalls = [];
 
-    function chatTime(iso) {
-      if (!iso) return '';
-      const [date, time = ''] = String(iso).split('T');
-      const clock = time.slice(0, 5);
-      const [year, month, day] = date.split('-').map(Number);
-      const today = new Date();
-      const days = Math.round((new Date(today.getFullYear(), today.getMonth(), today.getDate()) - new Date(year, month - 1, day)) / 86400000);
-      if (days === 0) return '今天 ' + clock;
-      if (days === 1) return '昨天 ' + clock;
-      return date + ' ' + clock;
-    }
 
     function recallRow(sentAt) {
       const entry = node('div', 'mc-recall');
@@ -597,16 +603,25 @@
   }
 
   async function notifications(section, status, stillCurrent) {
+    const category = tab;
     section.classList.add('mc-notification-content');
-    const list = node('div', tab === 'system' ? 'mc-system-list' : 'mc-event-list');
-    const next = button('加载更多', loadNext, 'mc-load');
+    const list = node('div', category === 'system' ? 'mc-system-list' : 'mc-event-list');
+    const loadingNote = node('p', 'mc-auto-load', '正在加载…');
+    loadingNote.setAttribute('role', 'status');
+    loadingNote.hidden = true;
     let offset = 0;
-    section.append(list, next);
+    let loading = false;
+    let hasMore = true;
+    section.append(list, loadingNote);
+    const loadNearBottom = () => {
+      if (section.isConnected && section.scrollHeight - section.scrollTop - section.clientHeight < 160) loadNext();
+    };
+    section.addEventListener('scroll', loadNearBottom, { passive: true });
 
     function eventRow(event) {
-      const item = node('article', tab === 'system' ? 'mc-system' : 'mc-event');
+      const item = node('article', category === 'system' ? 'mc-system' : 'mc-event');
       const heading = node('div', 'mc-event-heading');
-      if (tab === 'system') {
+      if (category === 'system') {
         heading.append(node('strong', '', '系统通知'), node('time', '', chatTime(event.sentAt)));
         item.append(heading, node('p', 'mc-event-body', event.body));
         return item;
@@ -617,15 +632,15 @@
       actor.append(avatar(event.actor));
       const body = node('div', 'mc-event-main');
       const kind = { video: '视频', danmaku: '弹幕', comment: '评论', reply: '回复' };
-      const desc = tab === 'likes' ? '赞了我的' + kind[event.kind] :
-        tab === 'mentions' ? '在' + kind[event.kind] + '中提到了我' : '回复了我的评论';
+      const desc = category === 'likes' ? '赞了我的' + kind[event.kind] :
+        category === 'mentions' ? '在' + kind[event.kind] + '中提到了我' : '回复了我的评论';
       heading.append(profile, node('span', '', desc));
       body.append(heading);
       if (event.body) body.append(node('p', 'mc-event-body', event.body));
       const actions = node('div', 'mc-event-actions');
       actions.append(node('time', '', chatTime(event.sentAt)));
       body.append(actions);
-      if (tab !== 'likes') {
+      if (category !== 'likes') {
         const reply = button('回复', () => { form.hidden = !form.hidden; if (!form.hidden) input.focus(); }, 'mc-text-button');
         const form = node('form', 'mc-inline-reply');
         form.hidden = true;
@@ -666,16 +681,21 @@
     }
 
     async function loadNext() {
-      next.disabled = true;
+      if (loading || !hasMore || !stillCurrent()) return;
+      loading = true;
+      loadingNote.hidden = false;
       try {
-        const events = await inbox('/events/' + tab + '?offset=' + offset);
+        const events = await inbox('/events/' + category + '?offset=' + offset);
         if (!stillCurrent()) return;
+        const rows = events.map(eventRow);
         offset += events.length;
-        list.append(...events.map(eventRow));
-        if (!offset) list.append(empty('暂无' + tabs[tab], 'notice'));
-        next.hidden = events.length < 40;
-      } catch (error) { status.textContent = error.message; }
-      finally { next.disabled = false; }
+        list.append(...rows);
+        if (!offset) list.append(empty('暂无' + tabs[category], 'notice'));
+        hasMore = events.length === 40;
+        status.textContent = '';
+        if (hasMore) requestAnimationFrame(loadNearBottom);
+      } catch (error) { if (stillCurrent()) status.textContent = error.message; }
+      finally { loading = false; loadingNote.hidden = true; }
     }
     await loadNext();
   }

@@ -5,12 +5,14 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import org.springframework.core.io.Resource;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -72,11 +74,14 @@ class StudioController {
     private final JdbcClient jdbc;
     private final AuthController auth;
     private final VideoController videoController;
+    private final InteractionController interactions;
 
-    StudioController(JdbcClient jdbc, AuthController auth, VideoController videoController) {
+    StudioController(JdbcClient jdbc, AuthController auth, VideoController videoController,
+                     InteractionController interactions) {
         this.jdbc = jdbc;
         this.auth = auth;
         this.videoController = videoController;
+        this.interactions = interactions;
     }
 
     @ModelAttribute
@@ -87,6 +92,8 @@ class StudioController {
     @GetMapping("/overview")
     Overview overview(HttpServletRequest request) {
         String uid = member(request).uid();
+        LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Shanghai"));
+        LocalDate statisticsDate = statisticsDate(now);
         Metrics metrics = jdbc.sql("SELECT COALESCE(SUM(plays),0), COALESCE(SUM(likes),0), COALESCE(SUM(comments),0), "
                 + "COALESCE(SUM(danmaku),0), COALESCE(SUM(favorites),0), COALESCE(SUM(shares),0), COALESCE(SUM(coins),0) "
                 + "FROM (SELECT " + METRICS + """
@@ -94,13 +101,17 @@ class StudioController {
                 WHERE v.UID=CAST(:uid AS UNSIGNED) AND v.VideoStatus='published') AS totals
                 """).param("uid", uid).query((rs, row) -> new Metrics(rs.getLong(1), rs.getLong(2), rs.getLong(3),
                         rs.getLong(4), rs.getLong(5), rs.getLong(6), rs.getLong(7))).single();
-        LocalDate today = MysqlVideoCatalog.today();
+        LocalDate fanStart = now.toLocalDate().minusDays(now.getHour() < 12 ? 1 : 0);
         long newFans = jdbc.sql("SELECT COUNT(*) " + FANS + " AND r.CreationTime>=:start AND r.CreationTime<:end")
-                .param("uid", uid).param("start", today.atStartOfDay()).param("end", today.plusDays(1).atStartOfDay())
+                .param("uid", uid).param("start", fanStart.atStartOfDay()).param("end", now)
                 .query(Long.class).single();
         BigDecimal received = jdbc.sql("SELECT COALESCE(SUM(ChargeAmount),0) FROM chargetable WHERE UPUID=CAST(:uid AS UNSIGNED)")
                 .param("uid", uid).query(BigDecimal.class).single();
-        return new Overview(metrics, fanCount(uid), newFans, received);
+        return new Overview(metrics, fanCount(uid), newFans, received, statisticsDate);
+    }
+
+    static LocalDate statisticsDate(LocalDateTime now) {
+        return now.toLocalDate().minusDays(now.getHour() < 12 ? 2 : 1);
     }
 
     @GetMapping("/analytics")
@@ -140,7 +151,7 @@ class StudioController {
                 SELECT v.VideoID,v.display_title,v.display_description,v.VideoDuration,v.VideoStatus,v.VisibleStatus,v.display_time,v.state,
                 """ + METRICS + """
                 FROM own v LEFT JOIN playcounttable p USING(VideoID)
-                WHERE (LOCATE(:q,v.display_title)>0 OR :q='') AND (:state='all' OR v.state=:state)
+                WHERE (LOCATE(:q,v.display_title)>0 OR :q='') AND ((:state='all' AND v.state<>'draft') OR v.state=:state)
                 ORDER BY
                 """ + " " + order + " LIMIT 12 OFFSET :offset").param("uid", uid).param("q", term)
                 .param("state", state).param("offset", offset).query((rs, row) -> new Draft(
@@ -150,7 +161,7 @@ class StudioController {
                         "published".equals(rs.getString("VideoStatus")) && "public".equals(rs.getString("VisibleStatus")),
                         new Metrics(rs.getLong("plays"),rs.getLong("likes"),rs.getLong("comments"),rs.getLong("danmaku"),
                                 rs.getLong("favorites"),rs.getLong("shares"),rs.getLong("coins")))).list();
-        return new VideoPage(items, counts, "all".equals(state) ? counts.values().stream().mapToLong(Long::longValue).sum()
+        return new VideoPage(items, counts, "all".equals(state) ? counts.entrySet().stream().filter(entry -> !entry.getKey().equals("draft")).mapToLong(Map.Entry::getValue).sum()
                                                                : counts.getOrDefault(state, 0L));
     }
 
@@ -163,6 +174,29 @@ class StudioController {
         headers.putAll(response.getHeaders());
         headers.setCacheControl("no-store");
         return new ResponseEntity<>(response.getBody(), headers, response.getStatusCode());
+    }
+
+    @GetMapping("/videos/{id}/edit")
+    Map<String, Object> editDetails(@PathVariable String id, HttpServletRequest request) {
+        String uid = member(request).uid();
+        var original = ownVideo(uid, id);
+        var result = new java.util.HashMap<String, Object>(jdbc.sql(VIDEOS +
+                "SELECT display_title AS title,display_description AS description,VisibleStatus AS visibility,state FROM own WHERE VideoID=CAST(:id AS UNSIGNED)")
+                .param("uid", uid).param("id", id).query((rs, row) -> {
+                    var data = new java.util.HashMap<String, Object>();
+                    data.put("title", rs.getString("title"));
+                    data.put("description", rs.getString("description"));
+                    data.put("visibility", rs.getString("visibility"));
+                    data.put("state", rs.getString("state"));
+                    return data;
+                }).single());
+        result.put("id", id);
+        result.put("statement", original.statement());
+        result.put("category", original.category());
+        result.put("duration", original.duration());
+        result.put("tags", jdbc.sql("SELECT t.TagName FROM videotagtable vt JOIN tagtable t ON t.TagID=vt.TagID WHERE vt.VideoID=CAST(:id AS UNSIGNED) ORDER BY t.TagID")
+                .param("id", id).query(String.class).list());
+        return result;
     }
 
     @PostMapping("/videos/{id}")
@@ -195,12 +229,31 @@ class StudioController {
     }
 
     @GetMapping("/fans")
-    FanPage fans(@RequestParam(defaultValue="0") int page, HttpServletRequest request) {
+    FanPage fans(@RequestParam(defaultValue="0") int page,
+                 @RequestParam(defaultValue="all") String filter, HttpServletRequest request) {
         String uid = member(request).uid();
-        var items = jdbc.sql("SELECT u.UID,u.Name,r.CreationTime " + FANS + " ORDER BY r.CreationTime DESC,u.UID LIMIT 12 OFFSET :offset")
+        if (!List.of("all", "mutual").contains(filter)) throw new ResponseStatusException(BAD_REQUEST);
+        String following = "EXISTS(SELECT 1 FROM relationtable back WHERE back.UID=CAST(:uid AS UNSIGNED) AND back.TargetUID=r.UID AND back.RelationType=0)";
+        String condition = FANS + (filter.equals("mutual") ? " AND " + following : "");
+        long total = jdbc.sql("SELECT COUNT(*) " + condition).param("uid", uid).query(Long.class).single();
+        var items = jdbc.sql("SELECT u.UID,u.Name,r.CreationTime," + following + " " + condition + " ORDER BY r.CreationTime DESC,u.UID LIMIT 12 OFFSET :offset")
                 .param("uid", uid).param("offset", offset(page)).query((rs, row) -> new Fan(rs.getString(1),
-                        rs.getString(2), rs.getObject(3, LocalDateTime.class))).list();
-        return new FanPage(items, fanCount(uid));
+                        rs.getString(2), rs.getObject(3, LocalDateTime.class), rs.getBoolean(4))).list();
+        return new FanPage(items, total, fanCount(uid));
+    }
+
+    @DeleteMapping("/fans/{id}")
+    @Transactional
+    ResponseEntity<Void> removeFan(@PathVariable String id,
+                                   @RequestParam(defaultValue="false") boolean block,
+                                   HttpServletRequest request) {
+        String uid = member(request).uid();
+        if (!auth.validCsrf(request)) throw new ResponseStatusException(FORBIDDEN);
+        if (!AuthController.validUid(id) || uid.equals(id)) throw new ResponseStatusException(BAD_REQUEST);
+        if (block) interactions.relation(id, "block", new InteractionController.Toggle(true), request);
+        jdbc.sql("DELETE FROM relationtable WHERE UID=CAST(:id AS UNSIGNED) AND TargetUID=CAST(:uid AS UNSIGNED) AND RelationType=0")
+                .param("id", id).param("uid", uid).update();
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/income")
@@ -241,7 +294,7 @@ class StudioController {
         return jdbc.sql("SELECT COUNT(*) " + FANS).param("uid", uid).query(Long.class).single();
     }
 
-    private OwnedVideo ownVideo(String uid, String id) {
+    OwnedVideo ownVideo(String uid, String id) {
         if (!AuthController.validUid(id)) throw new ResponseStatusException(NOT_FOUND);
         return jdbc.sql("""
             SELECT CASE WHEN v.VideoStatus='draft' THEN COALESCE(p.CoverUrl,v.CoverUrl) ELSE v.CoverUrl END,
@@ -264,17 +317,17 @@ class StudioController {
     }
 
     record Metrics(long plays,long likes,long comments,long danmaku,long favorites,long shares,long coins) {}
-    record Overview(Metrics metrics,long followers,long newFans,BigDecimal received) {}
+    record Overview(Metrics metrics,long followers,long newFans,BigDecimal received,LocalDate statisticsDate) {}
     record Point(String metric,LocalDate date,BigDecimal value) {}
     record Trend(LocalDate start,LocalDate end,List<Point> points) {}
     record Draft(String id,String title,String description,int duration,String state,String visibility,
                  LocalDateTime uploadTime,boolean playable,Metrics metrics) {}
     record VideoPage(List<Draft> items,Map<String,Long> counts,long total) {}
-    record Fan(String id,String name,LocalDateTime since) {}
-    record FanPage(List<Fan> items,long total) {}
+    record Fan(String id,String name,LocalDateTime since,boolean following) {}
+    record FanPage(List<Fan> items,long total,long followers) {}
     record Charge(LocalDateTime date,String name,BigDecimal amount,int type,String message) {}
     record ChargePage(List<Charge> items,long total) {}
     record Edit(String title,String description) {}
-    private record OwnedVideo(String cover,String content,int statement,String category,String collection,int duration) {}
+    record OwnedVideo(String cover,String content,int statement,String category,String collection,int duration) {}
 }
 

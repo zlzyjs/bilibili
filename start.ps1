@@ -24,6 +24,25 @@ if ($jdk) {
 }
 $java = if ($env:JAVA_HOME) { Join-Path $env:JAVA_HOME 'bin/java.exe' } else { 'java.exe' }
 
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+function Test-ExecutableJar([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return $false }
+    $archive = $null
+    $reader = $null
+    try {
+        $archive = [IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $Path).Path)
+        $manifest = $archive.GetEntry('META-INF/MANIFEST.MF')
+        if ($null -eq $manifest) { return $false }
+        $reader = [IO.StreamReader]::new($manifest.Open())
+        return $reader.ReadToEnd() -match '(?m)^Main-Class:\s*\S+'
+    } catch {
+        return $false
+    } finally {
+        if ($null -ne $reader) { $reader.Dispose() }
+        if ($null -ne $archive) { $archive.Dispose() }
+    }
+}
+
 $env:BILI_DB_USER = $DbUser
 $env:BILI_PORT = "$Port"
 $hasLocalConfig = (Test-Path -LiteralPath '.local/application.properties') -or
@@ -36,7 +55,7 @@ if ($askedForPassword) {
 
 try {
     $jar = 'target/bilibili-home-1.0.0.jar'
-    $needsBuild = $Rebuild -or -not (Test-Path -LiteralPath $jar)
+    $needsBuild = $Rebuild -or -not (Test-ExecutableJar $jar)
     if (-not $needsBuild) {
         $jarTime = (Get-Item -LiteralPath $jar).LastWriteTimeUtc
         $needsBuild = (Get-Item -LiteralPath 'pom.xml').LastWriteTimeUtc -gt $jarTime -or
@@ -62,6 +81,7 @@ try {
         $buildStartedAt = [DateTime]::UtcNow
         & $maven "-Dmaven.repo.local=$repo" --batch-mode clean package
         if ($LASTEXITCODE -ne 0) { throw "Maven 构建失败（退出码 $LASTEXITCODE）。具体原因见上方首条 [ERROR]。" }
+        if (-not (Test-ExecutableJar $jar)) { throw 'JAR 未生成有效启动入口，请检查 Maven 打包结果。' }
         (Get-Item -LiteralPath $jar).LastWriteTimeUtc = $buildStartedAt
     }
     Write-Host "首页地址 http://127.0.0.1:$Port/"
