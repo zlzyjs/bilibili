@@ -2,10 +2,11 @@
   --accent:#00a1d7; --ink:#18191c; --sub:#61666d; --muted:#9499a0; --line:#e3e5e7;
   background:#fff;
 }
-.ac-hero { position:relative; aspect-ratio:1892/144; background:#00a0d8 url('/assets/account-banner.png') center/100% 100% no-repeat }
-.ac-hero-logo { position:absolute; z-index:1; top:7%; left:max(16px,calc(50% - 480px)); display:block }
+html:has(.account-center-page)::-webkit-scrollbar{width:0;height:0}
+.ac-hero { position:relative; aspect-ratio:1892/145; background:#00a0d8 url('/assets/account-banner.png?v=5') center/100% 100% no-repeat }
+.ac-hero-logo { position:absolute; z-index:1; top:37.25%; left:max(16px,calc(50% - 480px)); display:block; transform:translateY(-50%) }
 .ac-hero-logo img { display:block; width:13.5vw; height:auto }
-.account-center-page main.layout { width:min(980px,calc(100% - 64px)); padding:10px 0 100px }
+.account-center-page main.layout { width:min(980px,calc(100% - 64px)); padding:5px 0 100px }
 .account-center-page .ac-title { display:none }
 .security_content { display:flex; width:100%; background:#fafafa; border:1px solid #e1e2e5; border-radius:4px; box-shadow:0 2px 4px #00000024; overflow:hidden }
 .security-left { flex:none; width:150px; overflow:hidden }
@@ -76,7 +77,7 @@
 .curren-b { background-position:-150px -534px }
 .coin-link { background-position:-150px -470px }
 .curren-b-num { display:inline-block; vertical-align:top; height:20px; margin-right:12px; color:#222; font-size:14px; line-height:20px }
-.home-daily-task-wrap { position:relative; padding:36px 0; border-bottom:1px solid #e5e9ef }
+.home-daily-task-wrap { position:relative; padding:36px 0 }
 .home-daily-task-icon { display:inline-block; vertical-align:top; width:30px; height:30px; margin-left:10px; margin-right:6px; background:url('/assets/account-icons.png') -145px -18px no-repeat }
 .home-daily-task-title { display:inline-block; vertical-align:top; margin-right:6px; color:#222; font-size:20px; line-height:30px }
 .home-daily-task-more { position:absolute; top:44px; right:0; color:var(--accent); font-size:12px }
@@ -92,10 +93,6 @@
 .re-exp-getexp { display:inline-block; min-width:80px; height:20px; margin:15px auto 0; padding:0 6px; border-radius:4px; background:#8a95a8; color:#fff; font-size:12px; line-height:20px }
 .re-exp-none { margin-top:16px; color:#99a2aa; font-size:12px }
 .h-line { position:absolute; top:54px; right:0; width:1px; height:74px; border-left:1px solid #e5e9ef }
-.home-mp { position:relative; padding:36px 0 30px; border-bottom:1px solid #e5e9ef }
-.home-mp-icon { display:inline-block; vertical-align:top; width:30px; height:30px; margin-left:10px; margin-right:6px; background:url('/assets/account-icons.png') -145px -82px no-repeat }
-.h-reward-info { display:inline-block; vertical-align:top; margin-right:6px; color:#222; font-size:20px; line-height:30px }
-.h-none-msg { margin:16px 0 0 10px; color:#99a2aa; font-size:14px }
 .ac-avatar { display:block; width:72px; height:72px; object-fit:cover; border-radius:50%; background:#f1f2f3; box-shadow:0 0 0 3px #fff,0 0 0 4px var(--line) }
 .ac-muted { color:var(--muted); font-size:13px }
 .ac-button { display:inline-flex; align-items:center; justify-content:center; min-height:36px; padding:6px 14px; border:1px solid #e3e5e7; border-radius:6px; background:#fff; color:var(--sub); font:inherit; font-size:14px; cursor:pointer; transition:border-color .18s,color .18s,background .18s }
@@ -184,7 +181,7 @@
   .home-top-level-up{width:calc(100% - 300px)}
 }
 @media(max-width:760px){
-  .ac-hero-logo{left:16px;top:8%}
+  .ac-hero-logo{left:16px}
   .account-center-page main.layout{width:calc(100% - 24px);padding:16px 0 28px}
   .security_content{flex-direction:column}
   .security-left{display:flex;flex-wrap:wrap;width:100%;border-bottom:1px solid #e1e2e5}
