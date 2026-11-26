@@ -117,7 +117,7 @@ function setupAccountCenter() {
     space.append(spaceArrow);
     levelLine.append(space);
     const wallet = node('div', 'home-top-bp');
-    wallet.append(node('span', 'curren-b'), node('span', 'curren-b-num', '0'));
+    wallet.append(node('span', 'curren-b'), node('span', 'curren-b-num', format(data.bcoins)));
     wallet.append(navLink('/account/coins', '', 'coin-link'), node('span', 'curren-b-num', format(data.coins)));
     right.append(msg, levelLine, wallet);
     info.append(head, right);
