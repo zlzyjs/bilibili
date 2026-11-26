@@ -110,11 +110,12 @@ async function setupWatchComments(videoId) {
   const guest = el('comment-guest'), form = el('comment-entry-form');
   const input = el('comment-text'), send = el('comment-send'), avatarImage = el('comment-current-avatar');
   const fileInput = el('comment-image-file'), preview = el('comment-image-preview'), previewImage = el('comment-preview-image');
-  let selectedImage = null, previewUrl, posting = false, composerUid;
+  const emptyNotice = el('comment-empty-notice');
+  let selectedImage = null, previewUrl, posting = false, composerUid, emptyNoticeTimer;
   function updateSend() {
     const hasContent = Boolean(input.value?.trim());
     form.setAttribute('data-has-content', String(hasContent));
-    send.disabled = posting || !hasContent;
+    send.disabled = posting;
   }
   function showImage(file) {
     if (previewUrl) {
@@ -145,7 +146,14 @@ async function setupWatchComments(videoId) {
     event.preventDefault();
     if (!signedIn()) return openLogin(guest);
     const value = input.value.trim(), image = selectedImage, uid = composerUid;
-    if (posting || !value) return;
+    if (posting) return;
+    clearTimeout(emptyNoticeTimer);
+    if (!value) {
+      emptyNotice.textContent = '你还没有评论！';
+      emptyNoticeTimer = setTimeout(() => { emptyNotice.textContent = ''; }, 1800);
+      return;
+    }
+    emptyNotice.textContent = '';
     posting = true;
     updateSend();
     try {

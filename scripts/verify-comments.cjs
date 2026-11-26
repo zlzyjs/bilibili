@@ -9,10 +9,12 @@ class E {
   const els=new Map(),el=id=>{if(!els.has(id))els.set(id,new E());return els.get(id);};let prompts=0,sort='',observer,resize;
   const item={userId:'1',author:'A',level:'LV3',content:'Hello',sentAt:'2026-11-13T10:00:00',likes:2};
   let comments = [{...item,replyCount:8,replies:[item,item,item]},{...item,replyCount:2,replies:[item,item]},item];
-  const accountEvents = {}, submissions = [];
+  const accountEvents = {}, submissions = [], timers = new Map();
+  let nextTimer = 0;
   const context={el,node:(t,c,text)=>Object.assign(new E(),{className:c,textContent:text}),link:(href,text,c)=>Object.assign(new E(),{href,textContent:text,className:c}),shortCount:String,card:()=>new E(),
     openLogin:()=>prompts++,api:async url=>{sort=url;return {total:20,items:comments};},
     interaction:async (...args)=>{submissions.push(args);},
+    setTimeout:callback=>{timers.set(++nextTimer,callback);return nextTimer;},clearTimeout:id=>timers.delete(id),
     FormData:class { constructor(){this.values={};} append(key,value){this.values[key]=value;} },
     URL:{createObjectURL:()=> 'blob:preview',revokeObjectURL(){}},
     document:{body:new E(),fullscreenElement:null,createElementNS:()=>new E(),querySelector:()=>new E(),addEventListener(){}},window:{innerWidth:1200,innerHeight:800,addEventListener(event,callback){accountEvents[event]=callback;}},
@@ -32,29 +34,44 @@ class E {
   assert.equal(el('comment-current-avatar').src, '/api/authors/123/avatar');
   assert.equal(el('comment-entry-form').hidden, false);
   const commentText = el('comment-text'), publish = el('comment-send');
-  assert.equal(publish.disabled, true);
+  const form = el('comment-entry-form'), notice = el('comment-empty-notice');
+  const submit = () => form.onsubmit({preventDefault(){}});
+  assert.equal(publish.disabled, false);
+  commentText.value = '';
+  await submit();
+  assert.equal(notice.textContent, '你还没有评论！');
   commentText.value = '  ';
   commentText.oninput();
-  assert.equal(publish.disabled, true);
+  assert.equal(form.attributes['data-has-content'], 'false');
+  assert.equal(publish.disabled, false);
+  await submit();
+  assert.equal(notice.textContent, '你还没有评论！');
+  assert.equal(submissions.length, 0);
+  assert.equal(timers.size, 1);
+  timers.values().next().value();
+  assert.equal(notice.textContent, '');
   commentText.value = 'Comment';
   commentText.oninput();
-  assert.equal(publish.disabled, false);
-  const submit = () => el('comment-entry-form').onsubmit({preventDefault(){}});
-  await submit();
+  assert.equal(form.attributes['data-has-content'], 'true');
+  const posting = submit();
+  assert.equal(publish.disabled, true);
+  await posting;
   assert.equal(submissions[0][0], '/videos/123/comments');
   assert.equal(submissions[0][2].value, 'Comment');
-  assert.equal(publish.disabled, true);
+  assert.equal(publish.disabled, false);
+  assert.equal(form.attributes['data-has-content'], 'false');
   const image = {size:123, type:'image/png'};
   const imageFile = el('comment-image-file');
   imageFile.files = [image];
   imageFile.onchange();
   assert.equal(el('comment-image-preview').hidden, false);
-  assert.equal(publish.disabled, true, 'image alone cannot be posted');
+  assert.equal(publish.disabled, false, 'the empty-state button can show the notice');
   commentText.value = ' \t\n ';
   commentText.oninput();
-  assert.equal(publish.disabled, true, 'whitespace and an image cannot be posted');
+  assert.equal(form.attributes['data-has-content'], 'false', 'an image does not satisfy the text requirement');
   await submit();
   assert.equal(submissions.length, 1, 'submitting the form cannot bypass the text requirement');
+  assert.equal(notice.textContent, '你还没有评论！');
   commentText.value = ' Photo comment ';
   commentText.oninput();
   assert.equal(publish.disabled, false);
@@ -90,5 +107,5 @@ class E {
   assert.equal(el('watch-mini-toggle').attributes['aria-pressed'],'false','manual dismissal survives scrolling up and back down');
   assert.equal(el('watch-mini-toggle').hidden,false,'toggle remains available after dismissal');
   el('watch-mini-toggle').onclick();assert.equal(el('watch-mini-toggle').attributes['aria-pressed'],'true');
-  console.log('PASS: two-comment/two-reply cap, login gates, sorting, recommendation expand/collapse, floating same player, drag boundary');
+  console.log('PASS: empty comment notice, text and image publishing, two-comment/two-reply cap, login gates, sorting, recommendation expand/collapse, floating same player, drag boundary');
 })().catch(e=>{console.error(e);process.exitCode=1;});

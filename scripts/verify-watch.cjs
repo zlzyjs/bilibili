@@ -1,4 +1,4 @@
-﻿const assert = require('node:assert/strict');
+const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 class Element {
@@ -16,6 +16,7 @@ class Element {
   addEventListener(event, fn) { (this.listeners[event] ||= []).push(fn); }
   emit(event, details) { (this.listeners[event] || []).forEach(fn => fn(details)); }
   setAttribute(k,v) { this.attributes[k] = v; }
+  getAttribute(k) { return this.attributes[k] ?? null; }
   querySelectorAll() { return []; }
   getBoundingClientRect() { return {left:100,top:100,width:500,height:281,bottom:125}; }
 }
@@ -34,7 +35,7 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
     setupVideoInteractions:(_id,_author,_player,_duration,callback)=>{ postDanmaku=callback; },
     node:(tag,cls,text)=>Object.assign(new Element(),{className:cls,textContent:text}),
     link:(href,label,className)=>Object.assign(new Element(),{href,className,textContent:label}),
-    icon:name=>Object.assign(new Element(),{name}),card:()=>new Element(),
+    icon:name=>Object.assign(new Element(),{name}),card:()=>new Element(),attachCover:(img,url)=>{img.src=url;},
     api:async url=> url.endsWith('/collection')?collection:url.endsWith('/engagement')?{like:3,coin:4,favorite:5,share:6}:url.endsWith('/danmaku')?[
       {id:'1',userId:'7',content:'A',timestamp:2,sentAt:'2026-11-12T12:00:00'}, {id:'2',userId:'7',content:'B',timestamp:3,sentAt:'2026-11-12T12:01:00'}, {id:'3',userId:'8',content:'C',timestamp:4,sentAt:'2026-11-12T12:02:00'}
     ]:url.startsWith('/authors/')?{followers:10}:url.startsWith('/videos?')?{items:[]}: {video:{id:'10001',title:'Test',authorId:'1',streamUrl:'/test.mp4',plays:1,danmaku:3},tags:[],...accolades}
@@ -201,9 +202,32 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   t.el('auto-start').onchange({target:{checked:false}});const noAutoplay=await setup(t.storage);assert.equal(noAutoplay.el('auto-start').checked,false);
   t.el('mirror-toggle').onchange({target:{checked:true}});assert.ok(t.p.attributes.style.includes('scaleX(-1)'));
   t.el('loop-toggle').onchange({target:{checked:true}});assert.equal(t.p.loop,true);
-  const collectionPage = await setup(new Map(), {title:'Test collection',plays:30,items:[{id:'10001',title:'First',duration:60},{id:'10002',title:'Second',duration:90}]});
+  const collectionPage = await setup(new Map(), {title:'Test collection',plays:30,items:[{id:'10001',title:'First',duration:60,plays:20,danmaku:3,coverUrl:'/first.jpg'},{id:'10002',title:'Second',duration:90,plays:10,danmaku:2,coverUrl:'/second.jpg'}]});
   assert.equal(collectionPage.el('video-collection').hidden,false);assert.equal(collectionPage.el('collection-position').textContent,'(1/2)');
-  assert.equal(collectionPage.el('collection-list').children.length,2);assert.equal(t.el('video-collection').hidden,true);
+  const collectionList = collectionPage.el('collection-list');
+  const [activeEpisode, otherEpisode] = collectionList.children;
+  assert.equal(collectionList.children.length, 2);
+  assert.equal(activeEpisode.getAttribute('aria-current'), 'true');
+  assert.equal(activeEpisode.children[0].children[0].src, '/first.jpg');
+  assert.equal(otherEpisode.href, '/video/10002');
+  assert.equal(otherEpisode.children[2].textContent, '01:30');
+  const collectionExpand = collectionPage.el('collection-expand');
+  collectionList.scrollTop = 32;
+  activeEpisode.offsetTop = 72;
+  collectionExpand.onclick();
+  assert.equal(collectionExpand.getAttribute('aria-expanded'), 'true');
+  assert.equal(collectionList.dataset.expanded, 'true');
+  assert.equal(collectionPage.el('danmaku-panel').inert, true);
+  assert.equal(collectionList.scrollTop, 72);
+  assert.equal(collectionExpand.getAttribute('aria-label'), '收起合集列表');
+  collectionExpand.onclick();
+  assert.equal(collectionExpand.getAttribute('aria-expanded'), 'false');
+  assert.equal(collectionList.dataset.expanded, 'false');
+  assert.equal(collectionPage.el('danmaku-panel').inert, false);
+  assert.equal(collectionList.scrollTop, 32);
+  assert.equal(collectionExpand.getAttribute('aria-label'), '展开合集列表');
+  assert.equal(collectionList.children.length, 2);
+  assert.equal(t.el('video-collection').hidden, true);
   t.el('dm-area').oninput({target:{value:50}});assert.ok(t.el('danmaku-overlay').attributes.style.includes('height:42.5%'));
   t.el('dm-opacity').oninput({target:{value:40}});assert.ok(t.el('danmaku-overlay').attributes.style.includes('opacity:0.4'));
   t.el('ratio-4').onclick();assert.equal(t.p.dataset.ratio,'4');

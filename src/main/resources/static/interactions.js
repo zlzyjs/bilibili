@@ -89,6 +89,243 @@ function reportInteraction(kind, id) {
   }, document.fullscreenElement || document.body);
 }
 
+async function danmakuReportInteraction(playerShell, danmaku, shieldDanmaku) {
+  if (playerShell.querySelector('.danmaku-report[open]')) return;
+
+  const dialog = node('dialog', 'danmaku-report');
+  const title = node('h2', 'danmaku-report-title', danmaku.content);
+  title.id = 'danmaku-report-title';
+  dialog.setAttribute('aria-labelledby', title.id);
+  const close = node('button', 'danmaku-report-close', '×');
+  close.type = 'button';
+  close.setAttribute('aria-label', '关闭弹幕举报');
+  close.onclick = () => dialog.close();
+  const status = node('p', 'danmaku-report-status', '正在加载举报类型…');
+  status.setAttribute('role', 'status');
+  dialog.append(title, close, status);
+  dialog.addEventListener('close', () => dialog.remove(), { once:true });
+  dialog.addEventListener('keydown', event => {
+    event.stopPropagation();
+    if (event.key === 'Escape') dialog.close();
+  });
+  playerShell.append(dialog);
+  dialog.show();
+
+  try {
+    const reasons = await interaction('/reports/danmaku/reasons');
+    if (!dialog.open) return;
+    if (!reasons.length) { status.textContent = '当前没有可选的举报原因'; return; }
+    status.textContent = '';
+
+    const form = node('form', 'danmaku-report-form');
+    const choices = node('fieldset', 'danmaku-report-choices');
+    choices.setAttribute('aria-label', '弹幕举报原因');
+    const details = node('label', 'danmaku-report-details');
+    const description = node('textarea');
+    description.maxLength = 200;
+    description.placeholder = '请填写违规内容出现的时间点和详细描述';
+    details.append(node('span', '', '详细描述（选填）'), description);
+
+    const options = node('div', 'danmaku-report-options');
+    const shieldLabel = node('label', 'danmaku-report-check');
+    const shield = node('input', 'report-check');
+    shield.type = 'checkbox';
+    shield.checked = true;
+    shieldLabel.append(shield, '屏蔽相同弹幕与该用户发送的弹幕');
+    const blockLabel = node('label', 'danmaku-report-check');
+    const block = node('input', 'report-check');
+    block.type = 'checkbox';
+    blockLabel.append(block, '拉黑该用户');
+    options.append(shieldLabel, blockLabel);
+
+    const footer = node('div', 'danmaku-report-footer');
+    const cancel = node('button', 'danmaku-report-cancel', '取消');
+    cancel.type = 'button';
+    cancel.onclick = close.onclick;
+    const send = node('button', 'danmaku-report-send', '提交');
+    send.type = 'submit';
+    send.disabled = true;
+    footer.append(cancel, send);
+
+    let selected, submitting = false;
+    for (const reason of reasons) {
+      const row = node('div', 'danmaku-report-row');
+      const label = node('label', 'danmaku-report-reason');
+      const radio = node('input', 'report-radio');
+      radio.type = 'radio';
+      radio.name = 'danmaku-report-reason';
+      radio.value = reason.id;
+      radio.onchange = () => {
+        if (!radio.checked || submitting) return;
+        selected = reason.id;
+        row.append(details);
+        send.disabled = false;
+        status.textContent = '';
+        const bounds = choices.getBoundingClientRect();
+        const top = row.getBoundingClientRect().top - bounds.top;
+        const overflow = details.getBoundingClientRect().bottom - bounds.bottom;
+        if (top < 0) choices.scrollTop += top;
+        else if (overflow > 0) choices.scrollTop += Math.min(top, overflow);
+      };
+      label.append(node('span', '', reason.name), radio);
+      row.append(label);
+      choices.append(row);
+    }
+    form.append(choices, options, status, footer);
+    dialog.append(form);
+    form.onsubmit = async event => {
+      event.preventDefault();
+      if (submitting || !selected) return;
+      submitting = true;
+      send.disabled = choices.disabled = true;
+      status.textContent = '';
+      const shouldShield = shield.checked;
+      try {
+        await interaction('/reports/danmaku/' + encodeURIComponent(danmaku.id), 'POST', {
+          reason: selected,
+          description: description.value.trim(),
+          blockAuthor: block.checked
+        });
+        if (shouldShield) shieldDanmaku();
+        dialog.close();
+        accountNotice('举报已提交');
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        submitting = false;
+        send.disabled = choices.disabled = false;
+      }
+    };
+  } catch (error) {
+    status.textContent = error.message;
+  }
+}
+
+function videoReportInteraction(id, authorId, authorName) {
+  interactionPanel('举报', async (body, status, close) => {
+    const dialog = body.closest('dialog');
+    dialog.classList.add('video-report-dialog');
+    const closeButton = dialog.querySelector('.interaction-close');
+    closeButton.textContent = '×';
+    closeButton.setAttribute('aria-label', '关闭举报弹窗');
+    status.textContent = '正在加载举报类型…';
+    const reasons = await interaction('/reports/video/reasons');
+    status.textContent = '';
+    if (!reasons.length) {
+      status.textContent = '当前没有可选的举报原因';
+      return;
+    }
+
+    const form = node('form', 'video-report-form');
+    const choices = node('div', 'video-report-choices');
+    const details = node('div', 'video-report-details');
+    const guidance = node('p', 'video-report-guidance');
+    const descriptionLabel = node('label', 'video-report-description-label', '详细描述');
+    descriptionLabel.htmlFor = 'video-report-description';
+    const requiredMark = node('span', 'video-report-required', '*');
+    requiredMark.setAttribute('aria-hidden', 'true');
+    descriptionLabel.append(requiredMark);
+
+    const limit = 200;
+    const inputBox = node('div', 'video-report-input');
+    const description = node('textarea');
+    description.id = descriptionLabel.htmlFor;
+    description.required = true;
+    description.maxLength = limit;
+    description.rows = 3;
+    description.placeholder = '请填写违规内容的具体片段（X分X秒）和详细描述';
+    const count = node('span', 'video-report-count', '0/' + limit);
+    count.setAttribute('aria-hidden', 'true');
+    inputBox.append(description, count);
+    details.append(guidance, descriptionLabel, inputBox);
+
+    const footer = node('div', 'video-report-footer');
+    const blockLabel = node('label', 'video-report-block');
+    const block = node('input', 'report-check');
+    block.type = 'checkbox';
+    blockLabel.hidden = true;
+    blockLabel.append(block, '拉黑@' + authorName);
+    const cancel = node('button', 'video-report-cancel', '取消');
+    cancel.type = 'button';
+    cancel.onclick = close;
+    const send = node('button', 'video-report-send', '提交');
+    send.type = 'submit';
+    footer.append(blockLabel, cancel, send);
+
+    let selected, submitting = false;
+    function updateSend() {
+      count.textContent = description.value.length + '/' + limit;
+      send.disabled = submitting || !selected || !description.value.trim();
+    }
+    description.oninput = updateSend;
+    const groups = [
+      ['侵犯合法权益', reasons.filter(reason => reason.name.startsWith('侵犯'))],
+      ['违反社区规则', reasons.filter(reason => !reason.name.startsWith('侵犯'))]
+    ];
+    for (const [title, entries] of groups) {
+      if (!entries.length) continue;
+      const group = node('fieldset', 'video-report-group');
+      group.append(node('legend', '', title));
+      for (let index = 0; index < entries.length; index += 3) {
+        const row = node('div', 'video-report-row');
+        for (const reason of entries.slice(index, index + 3)) {
+          const option = node('label', 'video-report-option');
+          const radio = node('input', 'report-radio');
+          radio.type = 'radio';
+          radio.name = 'video-report-reason';
+          radio.value = reason.id;
+          radio.onchange = () => {
+            if (!radio.checked) return;
+            selected = reason.id;
+            guidance.textContent = reason.description;
+            row.after(details);
+            blockLabel.hidden = String(currentAccount?.uid) === String(authorId);
+            status.textContent = '';
+            updateSend();
+            const view = choices.getBoundingClientRect();
+            const rowTop = row.getBoundingClientRect().top - view.top;
+            const overflow = details.getBoundingClientRect().bottom - view.bottom;
+            if (rowTop < 0) choices.scrollTop += rowTop;
+            else if (overflow > 0) choices.scrollTop += Math.min(rowTop, overflow);
+          };
+          const name = reason.name.match(/^(.+?)(（[^）]+）)$/);
+          const label = node('span', '', name ? name[1] : reason.name);
+          if (name) label.append(node('span', 'video-report-option-note', name[2]));
+          option.append(radio, label);
+          row.append(option);
+        }
+        group.append(row);
+      }
+      choices.append(group);
+    }
+
+    form.append(choices, footer);
+    body.append(form);
+    updateSend();
+    form.onsubmit = async event => {
+      event.preventDefault();
+      if (send.disabled) return;
+      submitting = true;
+      updateSend();
+      status.textContent = '';
+      try {
+        await interaction('/reports/video/' + encodeURIComponent(id), 'POST', {
+          reason: selected,
+          description: description.value.trim(),
+          blockAuthor: !blockLabel.hidden && block.checked
+        });
+        close();
+        accountNotice('举报已提交');
+      } catch (error) {
+        status.textContent = error.message;
+      } finally {
+        submitting = false;
+        updateSend();
+      }
+    };
+  });
+}
+
 function pressInteraction(button, enabled) {
   button.setAttribute('aria-pressed', String(enabled));
 }
@@ -168,7 +405,7 @@ function setupPeopleList(button, id, kind, title) {
   }));
 }
 
-function setupVideoInteractions(id, author, player, duration, onDanmaku) {
+function setupVideoInteractions(id, author, player, duration, onDanmaku, authorName) {
   const root = el('video-page');
   const resource = '/videos/' + id;
   const like = el('video-like'), favorite = el('video-favorite'), subscribe = el('video-subscribe');
@@ -212,10 +449,10 @@ function setupVideoInteractions(id, author, player, duration, onDanmaku) {
     const result = await interaction(resource + '/forward', 'POST', { value });
     el('share-count').textContent = shortCount(result.count);
   }, false));
-  memberAction(el('video-report'), () => reportInteraction('video', id));
+  memberAction(el('video-report'), () => videoReportInteraction(id, author, authorName));
   const renderSubscription = (on) => {
     pressInteraction(subscribe, on);
-    subscribe.textContent = on ? '已订阅合集' : '订阅合集';
+    subscribe.textContent = on ? '已订阅' : '订阅合集';
   };
   memberAction(subscribe, async () => {
     const state = await interaction(resource + '/state');

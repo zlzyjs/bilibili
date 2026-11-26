@@ -443,9 +443,9 @@ class InteractionController {
     List<Reason> reportReasons(@PathVariable String kind, HttpServletRequest request) {
         read(request);
         return jdbc.sql("""
-                SELECT ReportTypeID,ReportTypeName FROM reporttypetable
+                SELECT ReportTypeID,ReportTypeName,ReportTypeDescription FROM reporttypetable
                 WHERE TargetType=:type AND ReportTypeStatus=1 ORDER BY ReportTypeID
-                """).param("type", target(kind).code).query((rs, row) -> new Reason(rs.getString(1), rs.getString(2))).list();
+                """).param("type", target(kind).code).query((rs, row) -> new Reason(rs.getString(1), rs.getString(2), rs.getString(3))).list();
     }
 
     @PostMapping("/reports/{kind}/{id}")
@@ -456,7 +456,17 @@ class InteractionController {
         var target = target(kind);
         requireTarget(target, id);
         requireId(input.reason());
-        String description = input.description() == null || input.description().isBlank() ? "" : content(input.description(), 200);
+        String description = target != Target.VIDEO && (input.description() == null || input.description().isBlank())
+                ? "" : content(input.description(), 200);
+        if (Boolean.TRUE.equals(input.blockAuthor())) {
+            String query = switch (target) {
+                case VIDEO -> "SELECT UID FROM videotable WHERE VideoID=CAST(:id AS UNSIGNED)";
+                case DANMAKU -> "SELECT UID FROM danmakutable WHERE DanmakuID=CAST(:id AS UNSIGNED)";
+                default -> throw error(BAD_REQUEST, "仅支持在稿件或弹幕举报时拉黑发送者");
+            };
+            String author = jdbc.sql(query).param("id", id).query(String.class).single();
+            relation(author, "block", new Toggle(true), request);
+        }
         // Serialize repeat reports by the same user so retries cannot open duplicates.
         jdbc.sql("SELECT UID FROM usertable WHERE UID=CAST(:uid AS UNSIGNED) FOR UPDATE").param("uid", member.uid()).query(String.class).single();
         if (jdbc.sql("""
@@ -636,8 +646,8 @@ class InteractionController {
     record Text(String value) {}
     record NumberInput(Integer value) {}
     record TimedText(String value, Integer position, String mode, String size, String color) {}
-    record Report(String reason, String description) {}
-    record Reason(String id, String name) {}
+    record Report(String reason, String description, Boolean blockAuthor) {}
+    record Reason(String id, String name, String description) {}
     record ToggleView(boolean enabled, long count) {}
     record VideoState(boolean liked, boolean favorited, boolean subscribed, int position) {}
     record Folder(String id, String name, boolean selected) {}

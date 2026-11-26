@@ -141,10 +141,10 @@
   el('dm-action-like').onclick = () => { if (activeDanmaku) openLogin(el('dm-action-like')); };
   el('dm-action-report').onclick = () => {
     if (!activeDanmaku || ownsDanmaku(activeDanmaku)) return;
-    if (!signedIn || typeof reportInteraction !== 'function') return openLogin(el('dm-action-report'));
-    const target = activeDanmaku.id;
+    if (!signedIn || typeof danmakuReportInteraction !== 'function') return openLogin(el('dm-action-report'));
+    const target = activeDanmaku;
     hideDanmakuActions();
-    reportInteraction('danmaku', target);
+    danmakuReportInteraction(shell, target, () => watchSidebar.shieldDanmaku(target));
   };
   el('dm-action-copy').onclick = async () => {
     if (!activeDanmaku) return;
@@ -450,7 +450,7 @@
         if (enabled && !player.seeking && time >= row.timestamp && time < end
             && watchSidebar.allowed(row) && watchPreferences.allows(mode, row.color)
             && displayDanmaku(row, mode)) shown.add(row.id);
-      });
+      }, video.author);
     }
   } catch (error) { el('video-title').textContent = error.message === '404' ? '视频不存在或已下架' : '视频加载失败'; el('player-status').hidden = false; el('player-status').textContent = '请返回首页选择其他视频'; }
   let collectionNext = null, collectionPrevious = null;
@@ -461,10 +461,29 @@
       el('collection-title').textContent = collection.title;
       el('collection-position').textContent = '(' + (index + 1) + '/' + collection.items.length + ')';
       el('collection-plays').textContent = shortCount(collection.plays) + '播放';
-      el('collection-list').replaceChildren(...collection.items.map(v => {
-        const item = link('/video/' + encodeURIComponent(v.id), null, 'collection-item' + (String(v.id) === id ? ' current' : ''));
-        item.setAttribute('aria-current', String(v.id) === id ? 'true' : 'false');
-        item.append(node('span', '', v.title), node('time', '', clock(v.duration))); item.title = v.title;
+      const collectionList = el('collection-list'), expand = el('collection-expand');
+      collectionList.replaceChildren(...collection.items.map(v => {
+        const current = String(v.id) === id;
+        const item = link('/video/' + encodeURIComponent(v.id), null, 'collection-item' + (current ? ' current' : ''));
+        if (current) item.setAttribute('aria-current', 'true');
+        item.title = v.title;
+        const cover = node('div', 'card-cover');
+        const image = node('img');
+        image.alt = '';
+        image.loading = 'lazy';
+        cover.append(image);
+        attachCover(image, v.coverUrl, v.category);
+        const details = node('div', 'collection-item-details');
+        const stats = node('div', 'collection-item-stats');
+        for (const [symbol, label, count] of [['play', '播放', v.plays], ['list', '弹幕', v.danmaku]]) {
+          const stat = node('span');
+          const total = shortCount(count);
+          stat.append(icon(symbol), total);
+          stat.setAttribute('aria-label', label + ' ' + total);
+          stats.append(stat);
+        }
+        details.append(node('span', 'collection-item-title', v.title), stats);
+        item.append(cover, details, node('time', 'collection-item-duration', clock(v.duration)));
         return item;
       }));
       el('fullscreen-collection-list').replaceChildren(...collection.items.map(v => {
@@ -472,6 +491,18 @@
         return item;
       }));
       el('video-collection').hidden = false;
+      const activeEpisode = collectionList.children[index];
+      const danmakuPanel = el('danmaku-panel');
+      let compactScrollTop = 0;
+      expand.onclick = () => {
+        const expanded = expand.getAttribute('aria-expanded') !== 'true';
+        if (expanded) compactScrollTop = collectionList.scrollTop;
+        expand.setAttribute('aria-expanded', String(expanded));
+        expand.setAttribute('aria-label', expanded ? '收起合集列表' : '展开合集列表');
+        danmakuPanel.inert = expanded;
+        collectionList.dataset.expanded = String(expanded);
+        collectionList.scrollTop = expanded ? activeEpisode?.offsetTop ?? 0 : compactScrollTop;
+      };
       collectionNext = collection.items[index + 1] || null; collectionPrevious = collection.items[index - 1] || null;
     } else el('video-collection').hidden = true;
   } catch { el('video-collection').hidden = true; }
@@ -536,7 +567,7 @@ function setupWatchHeatmap(player, { read, save, rows }) {
 
 function setupPlayerControlsIdle(shell) {
   let timer;
-  const interacting = () => Array.from(shell.querySelectorAll('.hover-panel')).some(panel => {
+  const interacting = () => shell.querySelectorAll('.danmaku-report[open]').length > 0 || Array.from(shell.querySelectorAll('.hover-panel')).some(panel => {
     const style = getComputedStyle(panel);
     return style.display !== 'none' && style.visibility === 'visible' && Number(style.opacity) > 0;
   });
