@@ -2,11 +2,12 @@
 const fs = require('node:fs');
 const vm = require('node:vm');
 const classes = new Set(), events = {}, timers = new Map();
-let sequence = 0, panelOpen = false, scrubActive = false;
+let sequence = 0, panelOpen = false, scrubActive = false, reportOpen = false;
 const shell = {
   classList: { add:c=>classes.add(c), remove:(...names)=>names.forEach(c=>classes.delete(c)), contains:c=>classes.has(c) },
   // The collection panel always exists, even when CSS hides it.
-  querySelectorAll:selector=>selector === '.hover-panel' || scrubActive ? [{}] : [],
+  querySelectorAll:selector=>selector === '.danmaku-report[open]' ? (reportOpen ? [{}] : [])
+    : selector === '.hover-panel' || scrubActive ? [{}] : [],
   addEventListener:(name, callback)=>events[name]=callback
 };
 const context = {
@@ -24,7 +25,8 @@ scrubActive=true;expire();assert.ok(!classes.has('controls-idle'),'active seekin
 classes.add('fullscreen-layout');wake();expire();assert.ok(classes.has('fullscreen-idle'),'fullscreen goes idle after 2s');
 events.pointermove();assert.ok(!classes.has('fullscreen-idle'),'movement reveals controls');
 panelOpen=true;expire();assert.ok(!classes.has('fullscreen-idle'),'menu interaction keeps controls visible');assert.equal(timers.size,1);
-panelOpen=false;expire();assert.ok(classes.has('fullscreen-idle'),'controls hide after menu interaction ends');
+panelOpen=false;reportOpen=true;expire();assert.ok(!classes.has('fullscreen-idle'),'report dialog keeps the cursor visible');
+reportOpen=false;expire();assert.ok(classes.has('fullscreen-idle'),'controls hide after menu interaction ends');
 events.keydown();assert.ok(!classes.has('fullscreen-idle'),'keyboard interaction reveals controls');
 classes.delete('fullscreen-layout');wake();assert.equal(timers.size,1);assert.ok(!classes.has('fullscreen-idle'),'fullscreen exit restores normal controls');
 classes.add('scroll-mini');wake();assert.equal(timers.size,0,'small window keeps its own controls');

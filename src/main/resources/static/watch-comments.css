@@ -35,7 +35,24 @@
 #comment-image-select:hover { color:var(--blue);border-color:var(--blue); }
 #comment-send { min-width:70px;height:32px;border-radius:4px;background:var(--blue);color:#fff;font-size:16px;padding:0 12px; }
 #comment-send:not(:disabled):hover { background:#21b8ef; }
-#comment-send:disabled { background:#80d3ef;cursor:default; }
+.comment-entry-form[data-has-content="false"] #comment-send,
+#comment-send:disabled { background:#80d3ef; }
+.comment-entry-form[data-has-content="false"] #comment-send:not(:disabled):is(:hover,:focus-visible) { background:var(--blue); }
+#comment-send:disabled { cursor:default; }
+#comment-empty-notice {
+  position:fixed;
+  z-index:1100;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  border-radius:2px;
+  background:#595959;
+  color:#fff;
+  font:14px/19px "Microsoft YaHei",sans-serif;
+  white-space:nowrap;
+  pointer-events:none;
+}
+#comment-empty-notice:not(:empty) { padding:3px 6px; }
 .comment-image-preview { display:flex;align-items:flex-start;gap:6px;margin-top:8px; }
 .comment-image-preview img { display:block;max-width:120px;max-height:100px;border-radius:5px; }
 .comment-image-preview button { padding:0 5px;color:#61666d;font-size:18px; }

@@ -7,12 +7,12 @@
   <title>dilidili · 第二组课程项目</title>
   <link rel="stylesheet" href="/nav-brand.css?v=1">
   <link rel="stylesheet" href="/home.css?v=93">
-  <link rel="stylesheet" href="/watch.css?v=36">
+  <link rel="stylesheet" href="/watch.css?v=47">
   <link rel="stylesheet" href="/watch-fullscreen.css?v=4">
   <link rel="stylesheet" href="/banner-leaves.css?v=1">
   <script src="/banner-leaves.js?v=3" defer></script>
-  <link rel="stylesheet" href="/watch-comments.css?v=13">
-  <link rel="stylesheet" href="/interactions.css?v=5">
+  <link rel="stylesheet" href="/watch-comments.css?v=14">
+  <link rel="stylesheet" href="/interactions.css?v=12">
   <link rel="stylesheet" href="/space.css?v=12">
   <script src="/space.js?v=7" defer></script>
   <link rel="stylesheet" href="/personal-space.css?v=6">
@@ -20,13 +20,13 @@
   <link rel="stylesheet" href="/search.css?v=10">
   <script src="/search.js?v=9" defer></script>
   <script src="/watch-preferences.js?v=12" defer></script>
-  <script src="/watch-sidebar.js?v=4" defer></script>
+  <script src="/watch-sidebar.js?v=5" defer></script>
   <script src="/viewer-presence.js?v=1" defer></script>
-  <script src="/watch-comments.js?v=14" defer></script>
-  <script src="/watch.js?v=34" defer></script>
+  <script src="/watch-comments.js?v=15" defer></script>
+  <script src="/watch.js?v=40" defer></script>
   <script src="/home.js?v=45" defer></script>
   <script src="/login.js?v=16" defer></script>
-  <script src="/interactions.js?v=27" defer></script>
+  <script src="/interactions.js?v=33" defer></script>
   <link rel="stylesheet" href="/messages.css?v=38">
   <script src="/messages.js?v=27" defer></script>
   <link rel="stylesheet" href="/account-center.css?v=4">
@@ -263,7 +263,7 @@
 </div></div></div><button id="pip-toggle" aria-label="画中画" aria-pressed="false" data-tooltip="开启画中画"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#pip"/></svg></button><button id="wide-toggle" type="button" aria-label="宽屏模式" aria-pressed="false" data-tooltip="宽屏模式"><svg class="watch-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#wide"/></svg></button><button id="web-fullscreen" aria-label="网页全屏" aria-pressed="false" data-tooltip="网页全屏"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#web-full"/></svg></button><button id="fullscreen-toggle" aria-label="全屏" aria-pressed="false" data-tooltip="进入全屏 (f)"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#full"/></svg></button>
             </div>
           </div>
-          <div id="danmaku-actions" class="danmaku-actions" role="toolbar" aria-label="弹幕操作" hidden><button id="dm-action-like" aria-label="点赞" data-tooltip="点赞"><svg class="watch-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#like-outline"/></svg><svg class="watch-icon dm-like-filled" aria-hidden="true"><use href="/assets/watch-icons.svg#action-like"/></svg><span id="dm-like-count" class="dm-like-count" hidden></span></button><button id="dm-action-copy" aria-label="复制" data-tooltip="复制"><svg class="watch-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#note"/></svg></button><button id="dm-action-report" aria-label="举报" data-tooltip="举报"><svg class="watch-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#report"/></svg></button></div>
+          <div id="danmaku-actions" class="danmaku-actions" role="toolbar" aria-label="弹幕操作" hidden><button id="dm-action-like" aria-label="点赞" data-tooltip="点赞"><svg class="watch-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#like-outline"/></svg><svg class="watch-icon dm-like-filled" aria-hidden="true"><use href="/assets/watch-icons.svg#action-like"/></svg><span id="dm-like-count" class="dm-like-count" hidden></span></button><button id="dm-action-copy" aria-label="复制" data-tooltip="复制"><svg class="watch-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#note"/></svg></button><button id="dm-action-report" aria-label="举报" data-tooltip="举报"><svg class="watch-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#report"/></svg></button><button id="dm-action-withdraw" type="button" aria-label="撤回" data-tooltip="撤回" hidden><svg class="watch-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M10 5 4 11l6 6M4 11h17a8 8 0 0 1 0 16H10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
           <span id="control-notice" class="control-notice" role="status" hidden></span>
         </div>
         <div id="danmaku-compose-home"></div><div id="danmaku-compose" class="danmaku-compose"><span id="online-viewers" aria-live="polite">—人正在看</span><button id="danmaku-toggle" type="button" aria-label="弹幕" aria-keyshortcuts="D" aria-pressed="true" data-tooltip="关闭弹幕 (d)"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#danmaku"/></svg><svg class="watch-icon dm-badge" aria-hidden="true"><use href="/assets/watch-icons.svg#check"/></svg><svg class="watch-icon dm-badge dm-off-badge" aria-hidden="true"><use href="/assets/watch-icons.svg?v=2#dm-off"/></svg></button><div id="danmaku-control" class="control-popover"><button id="danmaku-settings" type="button" aria-label="弹幕设置"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#danmaku"/></svg><svg class="watch-icon dm-badge" aria-hidden="true"><use href="/assets/watch-icons.svg#dm-gear"/></svg></button><div class="hover-panel danmaku-settings-panel"><strong>按类型过滤</strong><div class="dm-filter-types"><button id="dm-filter-scroll"><svg class="dm-type-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#dm-scroll"/></svg><span>滚动</span></button><button id="dm-filter-fixed"><svg class="dm-type-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#dm-fixed"/></svg><span>固定</span></button><button id="dm-filter-color"><svg class="dm-type-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#dm-color"/></svg><span>彩色</span></button></div><div class="dm-checks"><label><input id="dm-scale" type="checkbox"> 弹幕随屏幕缩放</label><label><input id="dm-subtitle-safe" type="checkbox"> 防挡字幕</label><label><input id="dm-smart" type="checkbox" checked> 智能防挡弹幕</label></div><div class="dm-filter-actions"><button id="dm-keywords-open">弹幕观看屏蔽词</button><button data-login="同步屏蔽列表" data-login-only>同步屏蔽列表</button></div>
@@ -302,24 +302,24 @@
         <section id="video-comments" class="video-comments" aria-label="评论"><div class="comments-heading"><h2>评论 <span id="comment-total"></span></h2><button id="comments-hot" aria-pressed="true">最热</button><span class="comments-divider">|</span><button id="comments-latest" aria-pressed="false">最新</button></div><div class="comment-compose">
   <img id="comment-current-avatar" class="guest-avatar" src="/api/avatar/default" onerror="this.onerror=null;this.src='/assets/guest-avatar.gif'" alt="" width="48" height="48">
   <button id="comment-guest" type="button" aria-label="登录后发表评论">与其赞同别人的话语，不如自己畅所欲言。</button>
-  <form id="comment-entry-form" class="comment-entry-form" hidden>
+  <form id="comment-entry-form" class="comment-entry-form" data-has-content="false" hidden>
     <textarea id="comment-text" aria-label="评论内容" placeholder="与其赞同别人的话语，不如自己畅所欲言。" maxlength="1000"></textarea>
     <div id="comment-image-preview" class="comment-image-preview" hidden><img id="comment-preview-image" alt="待发布的图片"><button id="comment-image-remove" type="button" aria-label="移除图片">×</button></div>
     <div class="comment-compose-tools">
       <button id="comment-image-select" type="button" aria-label="添加图片" title="添加图片"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="9" r="1.5"/><path d="m5 17 4-4 3 3 3-4 4 4"/></svg></button>
       <input id="comment-image-file" type="file" accept="image/png,image/jpeg,image/gif" hidden>
-      <button id="comment-send" type="submit" disabled>发布</button>
+      <button id="comment-send" type="submit">发布</button>
     </div>
   </form>
 </div><div id="comment-list" aria-live="polite"></div><button id="comments-more" class="comments-more" type="button" hidden>登录后查看更多评论</button></section>
         </div>
       </article>
       <aside class="watch-sidebar">
-        <div class="watch-author"><div class="watch-author-heading"><a id="watch-author-link"><img id="watch-avatar" alt="UP主头像"><strong id="watch-author-name"></strong></a><button data-interaction="message" class="author-message"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#message"/></svg> 发消息</button></div><p id="watch-signature"></p><div><button data-login="充电" data-login-only class="charge-button"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#charge"/></svg> 充电</button><button data-interaction="follow" class="follow-button"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#plus"/></svg> <span data-follow-label>关注</span> <span id="watch-followers"></span></button></div></div>
-        <div class="watch-sidebar-content"><details id="danmaku-panel" class="danmaku-panel"><summary><span id="danmaku-sidebar-title">弹幕列表</span><span class="sidebar-menu-wrap"><button id="danmaku-sidebar-menu" aria-label="切换弹幕面板" aria-expanded="false"><svg class="watch-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#more"/></svg></button><span id="danmaku-sidebar-menu-items" class="sidebar-menu" hidden><button id="sidebar-view-list">弹幕列表</button><button id="sidebar-view-block">屏蔽设定</button></span></span><i></i></summary><div id="sidebar-list-view"><div class="danmaku-columns"><span>时间</span><span>弹幕内容</span><span>发送时间</span></div><div id="danmaku-list" class="danmaku-list"></div><button class="history-danmaku" data-login="查看历史弹幕" data-login-only>查看历史弹幕</button></div>
+        <div class="watch-author"><div class="watch-author-heading"><a id="watch-author-link"><img id="watch-avatar" alt="UP主头像"><strong id="watch-author-name"></strong></a><button data-interaction="message" class="author-message"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#message"/></svg> 发消息</button></div><p id="watch-signature"></p><div class="watch-author-actions"><button data-login="充电" data-login-only class="charge-button"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#charge"/></svg><span class="watch-charge-label">充电</span></button><button data-interaction="follow" class="follow-button"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#plus"/></svg><span class="watch-follow-label"><span data-follow-label>关注</span> <span id="watch-followers"></span></span></button></div></div>
+        <div class="watch-sidebar-content"><div class="watch-danmaku-slot"><div><details id="danmaku-panel" class="danmaku-panel"><summary><span id="danmaku-sidebar-title">弹幕列表</span><span class="sidebar-menu-wrap"><button id="danmaku-sidebar-menu" aria-label="切换弹幕面板" aria-expanded="false"><svg class="watch-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#more"/></svg></button><span id="danmaku-sidebar-menu-items" class="sidebar-menu" hidden><button id="sidebar-view-list">弹幕列表</button><button id="sidebar-view-block">屏蔽设定</button></span></span><i></i></summary><div id="sidebar-list-view"><div class="danmaku-columns"><span>时间</span><span>弹幕内容</span><span>发送时间</span></div><div id="danmaku-list" class="danmaku-list"></div><button class="history-danmaku" data-login="查看历史弹幕" data-login-only>查看历史弹幕</button></div>
 <div id="sidebar-block-view" class="sidebar-block-view" hidden><div class="block-heading"><label>屏蔽列表 <input id="shield-enabled" type="checkbox" role="switch" checked></label><button data-login="同步屏蔽列表" data-login-only>◌ 同步屏蔽列表</button></div><div id="shield-body"><div class="shield-input"><input id="shield-input" maxlength="100" placeholder='添加屏蔽词，正则以"/"开头"/"结尾'><button id="shield-add">添加</button></div><div class="shield-tabs" role="tablist"><button id="shield-tab-text" role="tab">屏蔽文本</button><button id="shield-tab-regex" role="tab">屏蔽正则</button><button id="shield-tab-user" role="tab">屏蔽用户</button></div><div class="shield-table"><div class="shield-table-head"><span id="shield-count">内容（-）</span><span>状态</span><span>操作</span></div><div id="shield-rows"></div></div></div></div>
-        </details>
-        <details id="video-collection" class="video-collection" open hidden><summary><span id="collection-title"></span><small id="collection-position"></small><i></i></summary><div class="collection-meta"><span id="collection-plays"></span><button id="video-subscribe" type="button">订阅合集</button></div><div id="collection-list" class="collection-list"></div></details><div class="related-heading"><h2>接下来播放</h2><label>自动连播 <input id="autoplay-next" type="checkbox" role="switch"></label></div><div id="related-videos"></div><button id="related-expand" class="related-expand" hidden>展开</button><div id="related-extra" hidden></div><button id="related-collapse" class="related-expand" hidden>收起</button>
+        </details></div></div>
+        <section id="video-collection" class="video-collection" aria-labelledby="collection-title" hidden><div class="collection-heading"><span id="collection-title"></span><small id="collection-position"></small><button id="collection-expand" type="button" aria-label="展开合集列表" aria-expanded="false" aria-controls="collection-list"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 5 4-4 4 4"/><path d="m4 11 4 4 4-4"/></svg></button></div><div class="collection-meta"><span id="collection-plays"></span><button id="video-subscribe" type="button" aria-pressed="false">订阅合集</button></div><div id="collection-list" class="collection-list"></div></section><div class="related-heading"><h2>接下来播放</h2><label>自动连播 <input id="autoplay-next" type="checkbox" role="switch"></label></div><div id="related-videos"></div><button id="related-expand" class="related-expand" hidden>展开</button><div id="related-extra" hidden></div><button id="related-collapse" class="related-expand" hidden>收起</button>
         </div>
       </aside>
     </section>
@@ -386,6 +386,7 @@
     <img class="login-mascot mascot-left" src="/assets/login-22-open.png" alt="" aria-hidden="true">
     <img class="login-mascot mascot-right" src="/assets/login-33-open.png" alt="" aria-hidden="true">
   </dialog>
+  <div id="comment-empty-notice" role="status"></div>
   <p id="account-notice" class="account-notice" role="status" hidden></p>
 </body>
 </html>
