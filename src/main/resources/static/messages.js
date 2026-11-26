@@ -18,6 +18,12 @@
     element.onclick = action;
     return element;
   };
+  let openMenu;
+  function closeMessageMenu() {
+    if (openMenu) openMenu.hidden = true;
+    openMenu = undefined;
+  }
+  addEventListener('click', closeMessageMenu);
 
   function readChatPrefs(uid) {
     try { return JSON.parse(localStorage.getItem('mc:chat:' + uid)) || {}; } catch { return {}; }
@@ -26,8 +32,8 @@
     localStorage.setItem('mc:chat:' + uid, JSON.stringify(prefs));
   }
 
-  function mcDialog(title, build) {
-    const dialog = node('dialog', 'mc-dialog');
+  function mcDialog(title, build, variant = '') {
+    const dialog = node('dialog', 'mc-dialog' + (variant ? ' ' + variant : ''));
     const heading = node('h2', '', title);
     const close = button('×', () => dialog.close(), 'mc-dialog-close');
     close.setAttribute('aria-label', '关闭');
@@ -45,17 +51,41 @@
       .catch(error => { status.textContent = error.message; });
   }
 
-  function mcConfirm(title, text, action) {
+  function mcConfirm(title, text, action, okText = '确定') {
     mcDialog(title, (content, actions, status, close) => {
       content.append(node('p', 'mc-dialog-text', text));
       const cancel = button('取消', close, 'mc-dialog-cancel');
-      const ok = button('确定', async () => {
+      const ok = button(okText, async () => {
         ok.disabled = cancel.disabled = true;
         try { await action(); close(); }
         catch (error) { status.textContent = error.message; ok.disabled = cancel.disabled = false; }
       }, 'mc-dialog-ok');
       actions.append(cancel, ok);
-    });
+    }, 'mc-dialog-confirm');
+  }
+
+  function zoomImage(src) {
+    let mask = el('mc-lightbox');
+    if (!mask) {
+      mask = node('div', 'mc-lightbox');
+      mask.id = 'mc-lightbox';
+      mask.setAttribute('role', 'dialog');
+      mask.setAttribute('aria-label', '查看图片');
+      const image = node('img');
+      image.alt = '私信图片';
+      const close = button('×', () => hide(), 'mc-lightbox-close');
+      close.setAttribute('aria-label', '关闭');
+      mask.append(image, close);
+      document.body.append(mask);
+    }
+    const hide = () => mask.classList.remove('is-open');
+    if (!mask.dataset.ready) {
+      mask.dataset.ready = '1';
+      mask.onclick = event => { if (event.target !== mask.querySelector('img')) hide(); };
+      document.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
+    }
+    mask.querySelector('img').src = src;
+    mask.classList.add('is-open');
   }
 
   function reportAccount(peer, name) {
@@ -352,6 +382,7 @@
       .then(result => { blocked = result.blocked; refreshMenuLabels(); })
       .catch(() => {});
     const history = node('div', 'mc-history');
+    history.addEventListener('scroll', closeMessageMenu, { passive: true });
     const older = button('加载更早消息', loadOlder, 'mc-load');
     const bubbles = node('div', 'mc-bubbles');
     const note = node('p', 'mc-chat-note');
@@ -366,13 +397,17 @@
     file.type = 'file';
     file.accept = 'image/png,image/jpeg,image/gif';
     file.hidden = true;
-    const picture = button('图片', () => file.click(), 'mc-tool');
+    const picture = button('', () => file.click(), 'mc-tool mc-icon-tool');
+    picture.setAttribute('aria-label', '发送图片');
+    picture.append(icon('image'));
     const faces = node('div', 'mc-emoji');
     faces.hidden = true;
-    const emoji = button('表情', () => {
+    const emoji = button('', () => {
       faces.hidden = !faces.hidden;
       emoji.setAttribute('aria-expanded', String(!faces.hidden));
-    }, 'mc-tool');
+    }, 'mc-tool mc-icon-tool');
+    emoji.setAttribute('aria-label', '表情');
+    emoji.append(icon('emoji'));
     emoji.setAttribute('aria-expanded', 'false');
     for (const face of MESSAGE_EMOJI) {
       faces.append(button(face, () => {
@@ -391,6 +426,16 @@
     actions.append(count, send);
     form.append(toolbar, text, actions);
     main.append(heading, history, form);
+    const toast = node('p', 'mc-toast');
+    toast.hidden = true;
+    main.append(toast);
+    let toastTimer;
+    function notice(message) {
+      clearTimeout(toastTimer);
+      toast.textContent = message;
+      toast.hidden = false;
+      toastTimer = setTimeout(() => { toast.hidden = true; }, 3000);
+    }
     let issue = '';
     let canSend = true;
     let busy = false;
@@ -402,6 +447,26 @@
     let oldest;
     let hasMore;
     let polling = false;
+    const recalls = [];
+
+    function chatTime(iso) {
+      if (!iso) return '';
+      const [date, time = ''] = String(iso).split('T');
+      const clock = time.slice(0, 5);
+      const [year, month, day] = date.split('-').map(Number);
+      const today = new Date();
+      const days = Math.round((new Date(today.getFullYear(), today.getMonth(), today.getDate()) - new Date(year, month - 1, day)) / 86400000);
+      if (days === 0) return '今天 ' + clock;
+      if (days === 1) return '昨天 ' + clock;
+      return date + ' ' + clock;
+    }
+
+    function recallRow(sentAt) {
+      const entry = node('div', 'mc-recall');
+      entry.dataset.sentAt = sentAt;
+      entry.append(node('time', '', chatTime(sentAt)), node('span', '', '你撤回了一条消息'));
+      return entry;
+    }
 
     function updateNote() {
       note.textContent = canSend ? '' : issue || (bubbles.querySelector('.mc-mine') ? '对方主动回复或关注你前，最多发送 1 条消息' : '');
@@ -440,20 +505,34 @@
         image.src = '/api/message-center/images/' + row.id;
         image.alt = '私信图片';
         image.onerror = () => image.replaceWith(node('span', '', '图片无法加载'));
+        image.onclick = () => zoomImage(image.src);
         body.append(image);
       } else if (row.type === 2) {
         if (row.videoId) body.append(videoCard(row));
         else body.textContent = '转发的视频已不可用';
       } else body.textContent = row.text;
+      const menu = node('div', 'mc-msg-menu');
+      menu.hidden = true;
+      if (!mine) menu.append(button('举报', () => reportInteraction('message', row.id, () => loadLatest(true).catch(() => {})), 'mc-msg-action'));
+      menu.append(button('删除', () => mcConfirm('提示', '消息删除后不再显示在聊天记录里，确认删除吗？', () => changeMessage(row.id, false), '确认'), 'mc-msg-action'));
+      if (mine) menu.append(button('撤回', () => changeMessage(row.id, true), 'mc-msg-action'));
+      body.append(menu);
+      body.oncontextmenu = event => {
+        event.preventDefault();
+        closeMessageMenu();
+        menu.hidden = false;
+        openMenu = menu;
+        const box = body.getBoundingClientRect();
+        const below = box.bottom + menu.offsetHeight + 4 <= innerHeight;
+        menu.style.top = Math.max(4, below ? box.bottom + 4 : box.top - menu.offsetHeight - 4) + 'px';
+        menu.style.left = mine ? Math.min(box.left, innerWidth - menu.offsetWidth - 8) + 'px' : 'auto';
+        menu.style.right = mine ? 'auto' : Math.min(innerWidth - box.right, innerWidth - menu.offsetWidth - 8) + 'px';
+      };
       const detail = node('div', 'mc-message-detail');
       entry.dataset.messageId = row.id;
-      const controls = node('div', 'mc-message-controls');
-      controls.append(button('删除', () => changeMessage(row.id, false), 'mc-text-button'));
-      const recall = button('撤回', () => changeMessage(row.id, true), 'mc-text-button mc-recall');
-      recall.hidden = !row.recallable;
-      if (mine) controls.append(recall);
-      detail.append(node('time', '', formatTime(row.sentAt)), body, controls);
-      entry.append(avatar(row.sender), detail);
+      entry.dataset.sentAt = row.sentAt;
+      detail.append(body);
+      entry.append(node('time', '', chatTime(row.sentAt)), avatar(row.sender), detail);
       return entry;
     }
 
@@ -469,7 +548,7 @@
         const ordered = [...olderPage.messages].reverse();
         bubbles.prepend(...ordered.map(bubble));
         loadedPages++;
-        latestIds = Array.from(bubbles.children, entry => entry.dataset.messageId).reverse().join(',');
+        latestIds = Array.from(bubbles.children, entry => entry.dataset.messageId).filter(Boolean).reverse().join(',');
         oldest = ordered[0]?.id || oldest;
         hasMore = olderPage.hasMore;
         older.hidden = !hasMore;
@@ -501,19 +580,25 @@
         const currentTop = history.scrollTop;
         const showLatest = latestIds === undefined || ids.split(',')[0] !== latestIds.split(',')[0];
         const ordered = messages.reverse();
-        bubbles.replaceChildren(...ordered.map(bubble));
+        const nodes = ordered.map(bubble);
+        for (const recall of recalls) {
+          const at = nodes.findIndex(entry => Date.parse(entry.dataset.sentAt) > Date.parse(recall.sentAt));
+          const row = recallRow(recall.sentAt);
+          if (at < 0) nodes.push(row); else nodes.splice(at, 0, row);
+        }
+        bubbles.replaceChildren(...nodes);
         oldest = ordered[0]?.id;
         hasMore = more;
         older.hidden = !hasMore;
         latestIds = ids;
-        history.scrollTop = showLatest ? history.scrollHeight : currentTop;
-        await loadThreads(true);
-      } else {
-        const recallable = new Set(messages.filter(row => row.recallable).map(row => row.id));
-        for (const entry of bubbles.children) {
-          const control = entry.querySelector('.mc-recall');
-          if (control) control.hidden = !recallable.has(entry.dataset.messageId);
+        history.scrollTop = currentTop;
+        if (showLatest) {
+          history.scrollTop = history.scrollHeight;
+          for (const image of bubbles.querySelectorAll('img')) {
+            if (!image.complete) image.addEventListener('load', () => { history.scrollTop = history.scrollHeight; }, { once: true });
+          }
         }
+        await loadThreads(true);
       }
       updateNote();
     }
@@ -524,9 +609,16 @@
       status.textContent = '';
       try {
         await inbox('/messages/' + encodeURIComponent(id) + (recall ? '/recall' : ''), 'DELETE');
+        if (recall) {
+          const entry = bubbles.querySelector('[data-message-id="' + id + '"]');
+          recalls.push({ sentAt: entry?.dataset.sentAt || new Date().toISOString() });
+          notice('撤回成功');
+        }
         await loadLatest(true);
-      } catch (error) { status.textContent = error.message; }
-      finally { updatingMessage = false; }
+      } catch (error) {
+        if (recall) notice(error.message);
+        else status.textContent = error.message;
+      } finally { updatingMessage = false; }
     }
 
     async function sendMessage(action, sent) {
@@ -604,7 +696,7 @@
       const item = node('article', tab === 'system' ? 'mc-system' : 'mc-event');
       const heading = node('div', 'mc-event-heading');
       if (tab === 'system') {
-        heading.append(node('strong', '', '系统通知'), node('time', '', formatTime(event.sentAt)));
+        heading.append(node('strong', '', '系统通知'), node('time', '', chatTime(event.sentAt)));
         item.append(heading, node('p', 'mc-event-body', event.body));
         return item;
       }
@@ -620,7 +712,7 @@
       body.append(heading);
       if (event.body) body.append(node('p', 'mc-event-body', event.body));
       const actions = node('div', 'mc-event-actions');
-      actions.append(node('time', '', formatTime(event.sentAt)));
+      actions.append(node('time', '', chatTime(event.sentAt)));
       body.append(actions);
       if (tab !== 'likes') {
         const reply = button('回复', () => { form.hidden = !form.hidden; if (!form.hidden) input.focus(); }, 'mc-text-button');

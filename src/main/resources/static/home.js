@@ -514,6 +514,8 @@ async function init() {
     document.body.classList.add('account-center-page');
     document.querySelector('.channels').hidden = true;
     document.querySelector('.feed').hidden = true;
+    setupChannelNavigation();
+    loadCategories();
     return;
   }
   if (path === '/messages') {
@@ -522,6 +524,8 @@ async function init() {
     document.querySelector('.feed').hidden = true;
     el('message-center').hidden = false;
     document.title = '消息中心 - dilidili';
+    setupChannelNavigation();
+    loadCategories();
     return;
   }
   document.body.classList.toggle('discovery-page', discoveryPage);
@@ -597,6 +601,8 @@ function setupChannelNavigation({ alwaysPinned = false, overCover = false } = {}
   const bar = document.querySelector('.navbar');
   const banner = document.querySelector('.banner');
   const homeLink = bar.querySelector('.home-link');
+  const inline = overCover || document.body.matches('.account-center-page,.message-center-page');
+  bar.classList.toggle('channel-nav-inline', inline);
   const start = node('div', 'channel-nav-start');
   const logo = link('/', null, 'channel-nav-logo');
   logo.setAttribute('aria-label', '返回首页');
@@ -619,9 +625,8 @@ function setupChannelNavigation({ alwaysPinned = false, overCover = false } = {}
   homeLink.before(start);
   trigger.append(homeLink, toggle);
   start.append(logo, trigger, panel);
-  bar.classList.toggle('channel-nav-over-cover', overCover);
   const setOpen = (open) => {
-    if (open && !overCover && !bar.classList.contains('channel-nav-stuck')) return;
+    if (open && !inline && !bar.classList.contains('channel-nav-stuck')) return;
     panel.inert = !open;
     toggle.setAttribute('aria-expanded', String(open));
     start.classList.toggle('channel-nav-open', open);
@@ -649,7 +654,7 @@ function setupChannelNavigation({ alwaysPinned = false, overCover = false } = {}
     if (!stuck) setOpen(false);
     bar.classList.toggle('channel-nav-stuck', stuck);
   };
-  if (overCover) return;
+  if (inline) return;
   if (alwaysPinned) {
     pin(true);
     return;
