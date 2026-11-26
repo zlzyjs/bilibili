@@ -4,7 +4,7 @@
 .interaction-close { position:absolute; top:20px; right:18px; padding:4px 8px; color:var(--muted); }
 .interaction-form, .interaction-form label { display:grid; gap:8px; }
 .interaction-form { gap:14px; }
-.interaction-form :is(input, textarea, select), .comment-entry-form textarea { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); font:inherit; }
+.interaction-form :is(input, textarea, select) { width:100%; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--ink); font:inherit; }
 .interaction-status { margin:10px 0 0; color:#b42318; font-size:14px; }
 .interaction-option { display:flex; align-items:center; gap:10px; padding:8px 2px; }
 .interaction-option input { accent-color:#00aeec; }
@@ -13,11 +13,8 @@
 .interaction-list a { color:#007da8; }
 .interaction-list small { display:block; color:var(--muted); }
 .interaction-list p { margin:4px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; }
-.video-actions button[aria-pressed="true"], .comment-actions button[aria-pressed="true"], #dm-action-like[aria-pressed="true"] { color:#0085b6; }
+.video-actions button[aria-pressed="true"], .comment-actions button[aria-pressed="true"] { color:#0085b6; }
 .follow-button[aria-pressed="true"], .space-actions .follow[aria-pressed="true"] { background:#f1f2f3; border-color:#e3e5e7; color:#61666d; }
 .danmaku-entry { display:flex; flex:1; min-width:0; }
-.danmaku-entry input { flex:1; min-width:0; padding:0 10px; border:0; background:transparent; color:inherit; }
-.danmaku-entry input:focus-visible { outline-offset:-2px; }
-.comment-entry-form { display:flex; gap:8px; flex:1; min-width:0; }
-.comment-entry-form textarea { min-height:50px; resize:vertical; }
-.comment-entry-form button { flex:0 0 68px; align-self:center; }
+.danmaku-entry > input { flex:1; min-width:0; padding:0 10px; border:0; background:transparent; color:inherit; }
+#danmaku-text:focus { outline: none; }

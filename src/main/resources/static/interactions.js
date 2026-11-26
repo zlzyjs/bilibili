@@ -93,19 +93,27 @@ function pressInteraction(button, enabled) {
   button.setAttribute('aria-pressed', String(enabled));
 }
 
+const likeBindings = new WeakMap();
+
 function bindLike(button, kind, id, render, load = true) {
   const resource = '/likes/' + kind + '/' + id;
-  const apply = (result) => {
+  const binding = { savingStarted: false };
+  likeBindings.set(button, binding);
+  const apply = (result, uid) => {
+    if (likeBindings.get(button) !== binding || currentAccount?.uid !== uid) return;
     pressInteraction(button, result.enabled);
     render(result.count);
   };
   memberAction(button, async () => {
-    const existing = await interaction(resource);
-    apply(await interaction(resource, 'PUT', { enabled: !existing.enabled }));
-  });
-  if (load && currentAccount) {
+    binding.savingStarted = true;
     const uid = currentAccount.uid;
-    interaction(resource).then(result => { if (currentAccount?.uid === uid && !button.disabled) apply(result); }).catch(() => {});
+    const existing = await interaction(resource);
+    if (currentAccount?.uid !== uid) return;
+    apply(await interaction(resource, 'PUT', { enabled: !existing.enabled }), uid);
+  });
+  if (load && (currentAccount || kind === 'danmaku')) {
+    const uid = currentAccount?.uid;
+    interaction(resource).then(result => { if (!binding.savingStarted) apply(result, uid); }).catch(() => {});
   }
 }
 
@@ -214,20 +222,57 @@ function setupVideoInteractions(id, author, player, duration, onDanmaku) {
     const result = await interaction(resource + '/subscription', 'PUT', { enabled: !state.subscribed });
     renderSubscription(result.enabled);
   });
-  el('danmaku-guest').onclick = () => openLogin(el('danmaku-guest'));
+  const guestPrompt = el('danmaku-guest'), guestSend = el('danmaku-guest-send');
+  guestPrompt.onclick = () => openLogin(guestPrompt);
   const composer = el('danmaku-entry'), danmaku = el('danmaku-text'), send = el('danmaku-send');
-  composer.onsubmit = async (event) => {
+  const color = setupDanmakuStyle();
+  let pending = null;
+  function finishSend() {
+    if (pending) clearInterval(pending.timer);
+    pending = null;
+    send.disabled = false;
+    send.textContent = '发送';
+  }
+  composer.onsubmit = (event) => {
     event.preventDefault();
-    if (!currentAccount) return openLogin(send);
-    if (send.disabled || !danmaku.value.trim()) return;
+    if (composer.inert) return;
+    const uid = currentAccount?.uid;
+    if (!uid) return openLogin(send);
+    const value = danmaku.value.trim();
+    if (pending || !value) return;
+    const mode = composer.elements.namedItem('mode').value;
+    const size = composer.elements.namedItem('size').value;
+    const style = { mode, size, color: color.value };
+    const deadline = performance.now() + 5000;
+    const queued = { uid, timer: null };
+    pending = queued;
+    danmaku.value = '';
     send.disabled = true;
-    try {
-      const row = await interaction(resource + '/danmaku', 'POST',
-        { value: danmaku.value, position: Math.max(0, Math.min(duration, Math.floor(player.currentTime))) });
-      danmaku.value = '';
-      onDanmaku(row);
-    } catch (error) { accountNotice(error.message); }
-    finally { send.disabled = false; }
+    send.textContent = '5 秒';
+    queued.timer = setInterval(async () => {
+      if (pending !== queued || currentAccount?.uid !== uid) return;
+      const remaining = Math.ceil((deadline - performance.now()) / 1000);
+      if (remaining > 0) {
+        const label = remaining + ' 秒';
+        if (send.textContent !== label) send.textContent = label;
+        return;
+      }
+      clearInterval(queued.timer);
+      send.textContent = '发送中';
+      const position = Math.max(0, Math.min(duration, Math.floor(player.currentTime)));
+      try {
+        const { token } = await authApi('csrf');
+        if (pending !== queued || currentAccount?.uid !== uid) return;
+        const row = await interaction(resource + '/danmaku', 'POST', { value, position, ...style }, false, token);
+        if (pending === queued) onDanmaku(row);
+      } catch (error) {
+        if (pending !== queued) return;
+        if (!danmaku.value) danmaku.value = value;
+        accountNotice(error.message);
+      } finally {
+        if (pending === queued) finishSend();
+      }
+    }, 100);
   };
 
   let viewer, progressToken, lastSaved, saving = false, progressReady = false, played = false;
@@ -253,7 +298,8 @@ function setupVideoInteractions(id, author, player, duration, onDanmaku) {
 
   async function refresh() {
     const uid = currentAccount?.uid;
-    el('danmaku-guest').hidden = Boolean(uid);
+    if (pending && pending.uid !== uid) finishSend();
+    guestPrompt.hidden = guestSend.hidden = Boolean(uid);
     composer.hidden = !uid;
     if (viewer !== uid) {
       viewer = uid;
@@ -326,6 +372,56 @@ function openHistoryPanel() {
       return item;
     });
   });
+}
+
+function setupDanmakuStyle() {
+  const control = el('dm-style-control'), toggle = el('dm-style-toggle'), panel = el('dm-style-panel');
+  const color = el('dm-color'), palette = el('dm-color-palette');
+  const swatches = ['#FF0000','#FF7300','#FFAA00','#FFD000','#FFFF00','#A0EE00','#00CD00',
+    '#0099A0','#4061B6','#8BD6FA','#D00069','#222222','#999999','#FFFFFF'].map(value => {
+    const option = node('button', 'dm-color-swatch');
+    option.type = 'button';
+    option.value = value;
+    option.style.backgroundColor = value;
+    option.setAttribute('aria-label', '弹幕颜色 ' + value);
+    option.onclick = () => { color.value = value.toLowerCase(); updateColor(); };
+    return option;
+  });
+  palette.append(...swatches);
+  function updateColor() {
+    const value = color.value.toUpperCase();
+    el('dm-color-value').textContent = value;
+    for (const option of swatches) option.setAttribute('aria-pressed', String(option.value === value));
+  }
+  color.oninput = updateColor;
+  updateColor();
+  function setOpen(open) {
+    panel.inert = !open;
+    control.dataset.open = String(open);
+    toggle.setAttribute('aria-expanded', String(open));
+  }
+  let hovering = false;
+  control.addEventListener('pointerenter', event => {
+    if (event.pointerType === 'mouse') { hovering = true; setOpen(true); }
+  });
+  control.addEventListener('pointerleave', () => {
+    hovering = false;
+    if (!panel.contains(document.activeElement)) setOpen(false);
+  });
+  control.addEventListener('focusout', event => {
+    if (!hovering && !control.contains(event.relatedTarget)) setOpen(false);
+  });
+  toggle.onclick = event => setOpen(event.detail > 0 && hovering || panel.inert);
+  control.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || panel.inert) return;
+    event.stopPropagation();
+    toggle.focus();
+    setOpen(false);
+  });
+  document.addEventListener('pointerdown', event => {
+    if (!control.contains(event.target)) setOpen(false);
+  });
+  return color;
 }
 
 function appendInteractionList(body, rows, render, className = 'interaction-list') {

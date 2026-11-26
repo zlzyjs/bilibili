@@ -6,6 +6,9 @@
   // Each visit gets its own trial budget; previous visits never lock this one.
   let watched = 0;
   let signedIn = typeof currentAccount !== 'undefined' && Boolean(currentAccount);
+  let viewerId = signedIn ? currentAccount.uid : null;
+  const ownsDanmaku = row => viewerId != null && String(row.userId) === String(viewerId);
+  const fixedDanmakuSeconds = 5;
   const trialExpired = () => !signedIn && watched >= 30;
   let blocked = new Set(read('bili-blocked-users', []));
   let danmaku = [], enabled = true, lastTick = performance.now(), lastVideoTime = 0, nextVideo = null, noticeTimer;
@@ -13,6 +16,22 @@
   const seek = el('seek'), seekBar = el('seek-bar');
   const seekPreview = el('seek-preview'), seekPreviewTime = el('seek-preview-time');
   const seekPreviewFrame = el('seek-preview-frame');
+  const rates = [2, 1.5, 1.25, 1, 0.75, 0.5];
+  function syncRate() {
+    if (!signedIn && player.playbackRate !== 1) player.playbackRate = 1;
+    const rate = player.playbackRate || 1;
+    el('speed-options').hidden = !signedIn;
+    el('speed-login').hidden = signedIn;
+    const label = Number.isInteger(rate) ? rate.toFixed(1) : String(rate);
+    el('playback-rate').textContent = rate === 1 ? '倍速' : label + 'x';
+    for (const option of rates) el('rate-' + option).setAttribute('aria-pressed', String(option === rate));
+  }
+  syncRate();
+  for (const rate of rates) el('rate-' + rate).onclick = () => {
+    if (signedIn) player.playbackRate = rate;
+  };
+  player.addEventListener('ratechange', syncRate);
+  const updateHeatmap = setupWatchHeatmap(player, { read, save, rows: () => danmaku });
   let seekValue = Number(seek.value);
   let previewTarget = null, seekHovered = false;
   const overlay = el('danmaku-overlay');
@@ -64,7 +83,13 @@
   window.addEventListener('pointercancel', finishSeek);
   seek.addEventListener('keyup', finishSeek);
   seek.addEventListener('blur', finishSeek);
-  const notice = (message) => { el('control-notice').textContent = message; el('control-notice').hidden = false; clearTimeout(noticeTimer); noticeTimer = setTimeout(() => el('control-notice').hidden = true, 2500); };
+  const notice = (message) => {
+    const status = el('control-notice');
+    status.textContent = message;
+    status.hidden = false;
+    clearTimeout(noticeTimer);
+    noticeTimer = setTimeout(() => { status.hidden = true; }, 2500);
+  };
   let activeDanmaku = null, activeLine = null, actionTimer;
   function hideDanmakuActions() {
     el('danmaku-actions').hidden = true;
@@ -76,11 +101,22 @@
     clearTimeout(actionTimer);
     if (activeLine && activeLine !== line) activeLine.style.animationPlayState = '';
     activeDanmaku = d; activeLine = line; line.style.animationPlayState = 'paused';
+    el('dm-action-report').hidden = ownsDanmaku(d);
     shell.classList.add('inspecting-danmaku');
     const rect = line.getBoundingClientRect(), frame = shell.getBoundingClientRect();
     const toolbar = el('danmaku-actions'); toolbar.hidden = false;
+    const likeButton = el('dm-action-like'), likeCount = el('dm-like-count');
+    const renderLikes = count => {
+      likeCount.textContent = count > 0 ? String(count) : '';
+      likeCount.hidden = !(count > 0);
+    };
+    likeButton.setAttribute('aria-pressed', 'false');
+    renderLikes(d.likes);
     if (typeof bindLike === 'function') {
-      bindLike(el('dm-action-like'), 'danmaku', d.id, () => {});
+      bindLike(likeButton, 'danmaku', d.id, count => {
+        d.likes = count;
+        renderLikes(count);
+      });
     }
     const width = toolbar.offsetWidth || 150, height = toolbar.offsetHeight || 44;
     const left = Math.max(8, Math.min(rect.left - frame.left + rect.width / 2 - width / 2, frame.width - width - 8));
@@ -92,14 +128,19 @@
     hideDanmakuActions();
     tracks.clear();
   }
-  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(clearOnscreenDanmaku).observe(overlay);
+  if (typeof ResizeObserver !== 'undefined') {
+    new ResizeObserver(() => {
+      hideDanmakuActions();
+      tracks.resize();
+    }).observe(overlay);
+  }
   el('danmaku-actions').addEventListener('mouseenter', () => clearTimeout(actionTimer));
   el('danmaku-actions').addEventListener('mouseleave', delayHideActions);
   el('danmaku-actions').addEventListener('focusin', () => clearTimeout(actionTimer));
   el('danmaku-actions').addEventListener('focusout', delayHideActions);
   el('dm-action-like').onclick = () => { if (activeDanmaku) openLogin(el('dm-action-like')); };
   el('dm-action-report').onclick = () => {
-    if (!activeDanmaku) return;
+    if (!activeDanmaku || ownsDanmaku(activeDanmaku)) return;
     if (!signedIn || typeof reportInteraction !== 'function') return openLogin(el('dm-action-report'));
     const target = activeDanmaku.id;
     hideDanmakuActions();
@@ -122,6 +163,11 @@
   }
   window.addEventListener('accountchange', (event) => {
     signedIn = Boolean(event.detail);
+    viewerId = event.detail?.uid;
+    hideDanmakuActions();
+    for (const line of overlay.children) line.classList.toggle('own-danmaku', ownsDanmaku(line.dataset));
+    renderDanmaku();
+    syncRate();
     if (signedIn) {
       el('trial-tip').hidden = true;
       el('trial-ended').hidden = true;
@@ -139,8 +185,12 @@
     try { await player.play(); } catch (error) { if (error.name !== 'AbortError') notice('请点击播放；若无法播放，请检查视频文件'); }
   }
   el('play-toggle').onclick = play; el('big-play').onclick = play; el('mini-play-toggle').onclick = play; player.onclick = play;
-  el('trial-start').onclick = play;
-  el('close-trial').onclick = () => el('trial-tip').hidden = true;
+  const hideTrialTip = () => { el('trial-tip').hidden = true; };
+  el('close-trial').onclick = hideTrialTip;
+  el('trial-start').onclick = () => {
+    hideTrialTip();
+    if (player.paused || trialExpired()) return play();
+  };
   player.addEventListener('play', () => { if (trialExpired()) return gate(); lastTick = performance.now(); shell.dataset.playing = 'true'; el('play-toggle').dataset.playing = 'true'; el('big-play').hidden = true; shell.classList.remove('paused-danmaku'); });
   player.addEventListener('pause', () => { shell.dataset.playing = 'false'; el('play-toggle').dataset.playing = 'false'; el('big-play').hidden = false; shell.classList.add('paused-danmaku'); });
   // Count elapsed playing time, never the timeline position or the seek distance.
@@ -171,21 +221,31 @@
       seek.value = player.currentTime / player.duration * 100;
       updateSeek(Number(seek.value), player.currentTime);
     }
-    if (!enabled || player.seeking || activeLine) return;
+    showTimedDanmaku();
+  });
+  function showTimedDanmaku() {
+    if (!enabled || player.seeking) return;
+    const time = player.currentTime;
+    if (activeDanmaku && modeOf(activeDanmaku) !== 'scroll' && time >= activeDanmaku.timestamp + fixedDanmakuSeconds) hideDanmakuActions();
+    tracks.expireFixed(time);
+    if (activeLine) return;
     let placed = 0;
     for (const d of danmaku) {
       if (placed >= watchPreferences.limit()) break;
-      if (d.timestamp > player.currentTime || d.timestamp <= player.currentTime - 0.6 || shown.has(d.id)) continue;
-      const mode = d.mode === 'top' || d.mode === 'bottom' ? d.mode : 'scroll';
-      if (!watchSidebar.allowed(d) || !watchPreferences.allows(mode)) continue;
+      const mode = modeOf(d);
+      const lifetime = mode === 'scroll' ? 0.6 : fixedDanmakuSeconds;
+      if (d.timestamp > time || time >= d.timestamp + lifetime || shown.has(d.id)) continue;
+      if (!watchSidebar.allowed(d) || !watchPreferences.allows(mode, d.color)) continue;
       if (displayDanmaku(d, mode)) { shown.add(d.id); placed++; }
     }
-  });
+  }
+  const modeOf = row => row.mode === 'top' || row.mode === 'bottom' ? row.mode : 'scroll';
   function displayDanmaku(d, mode) {
-    const line = node('span', 'flying-danmaku', d.content);
+    const line = node('span', 'flying-danmaku' + (ownsDanmaku(d) ? ' own-danmaku' : ''), d.content);
     line.dataset.userId = d.userId;
-    watchPreferences.decorate(line);
-    if (!tracks.add(line, mode, watchPreferences.travelSeconds())) return false;
+    if (/^#[\da-f]{6}$/i.test(d.color)) line.style.color = d.color;
+    watchPreferences.decorate(line, d.size);
+    if (!tracks.add(line, mode, watchPreferences.travelSeconds(), mode === 'scroll' ? undefined : d.timestamp + fixedDanmakuSeconds)) return false;
     line.tabIndex = 0; line.setAttribute('aria-label', d.content + '，查看弹幕操作');
     line.addEventListener('mouseenter', () => showDanmakuActions(d, line)); line.addEventListener('focus', () => showDanmakuActions(d, line));
     line.addEventListener('mouseleave', delayHideActions); line.addEventListener('blur', delayHideActions);
@@ -194,7 +254,7 @@
   }
   player.addEventListener('loadedmetadata', () => { el('play-time').textContent = clock(player.currentTime) + ' / ' + clock(player.duration); });
   player.addEventListener('seeking', () => { clearOnscreenDanmaku(); shown.clear(); lastTick = performance.now(); });
-  player.addEventListener('seeked', () => { lastVideoTime = player.currentTime; lastTick = performance.now(); });
+  player.addEventListener('seeked', () => { lastVideoTime = player.currentTime; lastTick = performance.now(); showTimedDanmaku(); });
   seek.oninput = () => {
     if (!Number.isFinite(player.duration) || player.duration <= 0) return;
     const value = Number(seek.value);
@@ -211,34 +271,12 @@
     if (!seekPreview.hidden) seekPreviewTime.textContent = clock(player.currentTime);
     updateSeek(value, player.currentTime);
   };
-  player.addEventListener('ratechange', () => { if (player.playbackRate !== 1) player.playbackRate = 1; });
   el('volume').oninput = e => { player.volume = Number(e.target.value); player.muted = false; el('volume-value').textContent = Math.round(player.volume * 100); };
   player.addEventListener('volumechange', () => { el('mute-toggle').dataset.muted = String(player.muted || player.volume === 0); el('mute-toggle').setAttribute('aria-label', player.muted ? '取消静音' : '静音'); el('volume-value').textContent = player.muted ? '0' : Math.round(player.volume * 100); el('volume').value = player.muted ? 0 : player.volume; });
   el('mute-toggle').onclick = () => { player.muted = !player.muted; el('mute-toggle').dataset.muted = String(player.muted); };
   el('quality').onclick = () => notice('当前播放原始文件，暂无其他清晰度');
-  el('subtitle-settings-open').onclick = () => { el('subtitle-main').hidden = true; el('subtitle-settings').hidden = false; };
-  el('subtitle-settings-back').onclick = () => { el('subtitle-main').hidden = false; el('subtitle-settings').hidden = true; };
   el('more-settings-open').onclick = () => { el('playback-main').hidden = true; el('playback-more').hidden = false; };
   el('more-settings-back').onclick = () => { el('playback-main').hidden = false; el('playback-more').hidden = true; };
-  const subtitleDefaults = { size:'medium', color:'white', outline:'none', position:'bottom', opacity:0.85, scale:true, fade:false };
-  function applySubtitleSettings(settings) {
-    for (const key of Object.keys(subtitleDefaults)) {
-      const field = el('subtitle-' + key);
-      if (typeof subtitleDefaults[key] === 'boolean') field.checked = settings[key]; else field.value = settings[key];
-    }
-    // Preferences remain editable without enabling the login-only subtitle track.
-    player.dataset.subtitleSize = settings.size; player.dataset.subtitleColor = settings.color;
-    player.dataset.subtitleOutline = settings.outline; player.dataset.subtitlePosition = settings.position;
-    player.dataset.subtitleOpacity = settings.opacity; player.dataset.subtitleScale = settings.scale; player.dataset.subtitleFade = settings.fade;
-    save('bili-subtitle-settings', settings);
-  }
-  applySubtitleSettings({ ...subtitleDefaults, ...read('bili-subtitle-settings', {}) });
-  for (const key of Object.keys(subtitleDefaults)) el('subtitle-' + key).onchange = () => {
-    const settings = {};
-    for (const name of Object.keys(subtitleDefaults)) settings[name] = typeof subtitleDefaults[name] === 'boolean' ? el('subtitle-' + name).checked : el('subtitle-' + name).value;
-    applySubtitleSettings(settings);
-  };
-  el('subtitle-reset').onclick = () => applySubtitleSettings(subtitleDefaults);
   const preferences = { autoStart:true, mirror:false, loop:false, fill:false, keyboard:true, muted:true, ...read('bili-playback-settings', {}) };
   function updatePreferences() { save('bili-playback-settings', preferences); }
   for (const [key, id] of [['autoStart','auto-start'],['mirror','mirror-toggle'],['loop','loop-toggle']]) {
@@ -252,24 +290,92 @@
   player.loop = preferences.loop;
   player.muted = preferences.muted;
   player.setAttribute('style', 'transform:' + (preferences.mirror ? 'scaleX(-1)' : 'none') + ';object-fit:' + (preferences.fill ? 'cover' : 'contain'));
-  const pip = async () => { if (!watchPreferences.nativePip()) { shell.classList.toggle('mini-player'); return; } try { if (!document.pictureInPictureEnabled) return notice('当前浏览器不支持画中画'); if (document.pictureInPictureElement) await document.exitPictureInPicture(); else await player.requestPictureInPicture(); } catch { notice('请先播放视频再开启画中画'); } };
-  el('pip-toggle').onclick = pip; el('pip-top').onclick = pip;
-  const wide = () => el('video-page').classList.toggle('wide-mode'); el('wide-top').onclick = wide;
+  const pip = el('pip-toggle'), wide = el('wide-toggle'), web = el('web-fullscreen'), full = el('fullscreen-toggle');
+  let restoreFloatingPlayer;
+  const setControl = (button, active, enter, exit) => {
+    button.setAttribute('aria-pressed', String(active));
+    button.setAttribute('data-tooltip', active ? exit : enter);
+  };
+  const syncPip = () => setControl(pip, document.pictureInPictureElement === player || shell.classList.contains('mini-player'), '开启画中画', '退出画中画');
+  for (const event of ['enterpictureinpicture','leavepictureinpicture']) player.addEventListener(event, syncPip);
+  pip.onclick = async () => {
+    try {
+      if (document.pictureInPictureElement === player) await document.exitPictureInPicture();
+      else if (shell.classList.contains('mini-player') || !watchPreferences.nativePip()) shell.classList.toggle('mini-player');
+      else if (document.pictureInPictureEnabled) await player.requestPictureInPicture();
+      else notice('当前浏览器不支持原生画中画，可在更多播放设置中切换');
+    } catch { notice('视频准备好后可开启画中画'); }
+    syncPip();
+  };
+  wide.onclick = () => {
+    const active = el('video-page').classList.toggle('wide-mode');
+    setControl(wide, active, '宽屏模式', '退出宽屏');
+  };
   const wakePlayerControls = setupPlayerControlsIdle(shell);
   const syncFullscreenLayout = () => {
-    const fullscreen = document.fullscreenElement === shell || shell.classList.contains('web-full');
+    const native = document.fullscreenElement === shell;
+    const webFullscreen = shell.classList.contains('web-full');
+    const fullscreen = native || webFullscreen;
     shell.classList.toggle('fullscreen-layout', fullscreen);
     wakePlayerControls();
     if (fullscreen) el('fullscreen-danmaku-slot').append(el('danmaku-compose'));
     else el('danmaku-compose-home').after(el('danmaku-compose'));
-    el('fullscreen-toggle').setAttribute('data-tooltip', fullscreen ? '退出全屏 (f)' : '进入全屏 (f)');
+    document.body.classList.toggle('watch-web-fullscreen', webFullscreen);
+    setControl(web, webFullscreen, '网页全屏', '退出网页全屏');
+    setControl(full, native, '进入全屏 (f)', '退出全屏 (f)');
   };
   document.addEventListener('fullscreenchange', syncFullscreenLayout);
-  el('web-fullscreen').onclick = () => { shell.classList.toggle('web-full'); syncFullscreenLayout(); };
-  el('fullscreen-toggle').onclick = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await shell.requestFullscreen(); } catch { notice('当前浏览器无法开启全屏'); } };
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') { shell.classList.remove('web-full'); syncFullscreenLayout(); for (const id of ['speed-control','subtitle-control','settings-control']) el(id).dataset.open = 'false'; } if (preferences.keyboard && e.key.toLowerCase() === 'f' && !el('login-dialog').open && !['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); el('fullscreen-toggle').onclick(); } if (preferences.keyboard && e.code === 'Space' && !el('login-dialog').open && !['INPUT','BUTTON','SELECT','TEXTAREA'].includes(document.activeElement.tagName)) { e.preventDefault(); play(); } });
-  el('danmaku-toggle').onclick = () => { enabled = !enabled; el('danmaku-toggle').setAttribute('aria-pressed', String(enabled)); el('danmaku-toggle').dataset.enabled = String(enabled); overlay.hidden = !enabled; if (!enabled) clearOnscreenDanmaku(); };
-  const watchPreferences = setupWatchPreferences(player, { read, save, notice, onDanmakuChange: clearOnscreenDanmaku });
+  web.onclick = () => {
+    restoreFloatingPlayer?.();
+    shell.classList.remove('mini-player');
+    syncPip();
+    shell.classList.toggle('web-full');
+    syncFullscreenLayout();
+  };
+  full.onclick = async () => {
+    try {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else {
+        restoreFloatingPlayer?.();
+        await shell.requestFullscreen();
+        shell.classList.remove('web-full', 'mini-player');
+        syncPip();
+        syncFullscreenLayout();
+      }
+    } catch { notice('当前浏览器无法开启全屏'); }
+  };
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && shell.classList.contains('web-full')) {
+      shell.classList.remove('web-full');
+      syncFullscreenLayout();
+    }
+    if (!preferences.keyboard || el('login-dialog').open) return;
+    const activeTag = document.activeElement.tagName;
+    if (['INPUT','SELECT','TEXTAREA'].includes(activeTag)) return;
+    if (event.key.toLowerCase() === 'f') {
+      event.preventDefault();
+      full.onclick();
+    } else if (event.key.toLowerCase() === 'd' && !event.repeat && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      toggleDanmaku();
+    } else if (event.code === 'Space' && activeTag !== 'BUTTON') {
+      event.preventDefault();
+      play();
+    }
+  });
+  const danmakuToggle = el('danmaku-toggle');
+  function toggleDanmaku() {
+    enabled = !enabled;
+    danmakuToggle.setAttribute('aria-pressed', String(enabled));
+    danmakuToggle.dataset.tooltip = enabled ? '关闭弹幕 (d)' : '开启弹幕 (d)';
+    el('danmaku-settings').disabled = !enabled;
+    el('danmaku-guest').disabled = !enabled;
+    el('danmaku-entry').inert = !enabled;
+    overlay.hidden = !enabled;
+    if (!enabled) clearOnscreenDanmaku();
+  }
+  danmakuToggle.onclick = toggleDanmaku;
+  const watchPreferences = setupWatchPreferences(player, { read, save, onDanmakuChange: clearOnscreenDanmaku });
   const watchSidebar = setupWatchSidebar({ read, save, notice, getUsers:()=>blocked,
     setUsers: users => { blocked = users; save('bili-blocked-users', [...blocked]); },
     onChange: () => { clearOnscreenDanmaku(); renderDanmaku(); }
@@ -278,12 +384,17 @@
     el('danmaku-list').replaceChildren(...danmaku.map(d => {
       const isBlocked = watchSidebar.isBlocked(d.userId), row = node('div', 'danmaku-row' + (isBlocked ? ' blocked' : ''));
       const date = node('span', 'danmaku-date', isBlocked ? '已屏蔽' : d.sentAt?.replace('T', ' ').slice(5, 16));
-      const button = node('button', '', isBlocked ? '取消屏蔽' : '屏蔽用户');
-      button.setAttribute('aria-label', isBlocked ? '取消屏蔽该弹幕的发送者' : '屏蔽该弹幕的发送者');
-      button.addEventListener('mouseenter', () => showSenderTooltip(button, isBlocked)); button.addEventListener('focus', () => showSenderTooltip(button, isBlocked));
-      button.addEventListener('mouseleave', () => el('sender-tooltip').hidden = true); button.addEventListener('blur', () => el('sender-tooltip').hidden = true);
-      button.onclick = () => { el('sender-tooltip').hidden = true; watchSidebar.setUserBlocked(d.userId, !isBlocked); };
-      row.append(node('span', '', clock(d.timestamp)), node('span', '', d.content), date, button); row.children[1].title = d.content;
+      const content = node('span', '', d.content);
+      content.title = d.content;
+      row.append(node('span', '', clock(d.timestamp)), content, date);
+      if (!ownsDanmaku(d)) {
+        const button = node('button', '', isBlocked ? '取消屏蔽' : '屏蔽用户');
+        button.setAttribute('aria-label', isBlocked ? '取消屏蔽该弹幕的发送者' : '屏蔽该弹幕的发送者');
+        button.addEventListener('mouseenter', () => showSenderTooltip(button, isBlocked)); button.addEventListener('focus', () => showSenderTooltip(button, isBlocked));
+        button.addEventListener('mouseleave', () => el('sender-tooltip').hidden = true); button.addEventListener('blur', () => el('sender-tooltip').hidden = true);
+        button.onclick = () => { el('sender-tooltip').hidden = true; watchSidebar.setUserBlocked(d.userId, !isBlocked); };
+        row.append(button);
+      }
       return row;
     }));
     if (!danmaku.length) el('danmaku-list').append(node('p', 'status', '暂无弹幕'));
@@ -324,14 +435,21 @@
     api('/videos/' + id + '/engagement').then(stats => { for (const key of ['like','coin','favorite','share']) el(key + '-count').textContent = shortCount(stats[key]); }).catch(() => { document.querySelector('.video-actions').title = '互动数据暂时加载失败'; });
     api('/videos/' + id + '/danmaku').then(rows => {
       danmaku = [...new Map([...rows, ...danmaku].map(row => [row.id, row])).values()];
+      updateHeatmap();
       renderDanmaku();
+      showTimedDanmaku();
     }).catch(() => el('danmaku-list').append(node('p', 'status', '弹幕加载失败，请刷新重试')));
     if (typeof setupVideoInteractions === 'function') {
       setupVideoInteractions(id, video.authorId, player, video.duration, row => {
         danmaku.push(row);
+        updateHeatmap();
         renderDanmaku();
-        if (enabled && watchSidebar.allowed(row) && watchPreferences.allows('scroll')
-            && displayDanmaku(row, 'scroll')) shown.add(row.id);
+        const mode = modeOf(row);
+        const time = player.currentTime;
+        const end = row.timestamp + (mode === 'scroll' ? 1 : fixedDanmakuSeconds);
+        if (enabled && !player.seeking && time >= row.timestamp && time < end
+            && watchSidebar.allowed(row) && watchPreferences.allows(mode, row.color)
+            && displayDanmaku(row, mode)) shown.add(row.id);
       });
     }
   } catch (error) { el('video-title').textContent = error.message === '404' ? '视频不存在或已下架' : '视频加载失败'; el('player-status').hidden = false; el('player-status').textContent = '请返回首页选择其他视频'; }
@@ -358,7 +476,7 @@
     } else el('video-collection').hidden = true;
   } catch { el('video-collection').hidden = true; }
   setupWatchComments(id);
-  setupWatchScroll(player, shell);
+  restoreFloatingPlayer = setupWatchScroll(player, shell);
   try {
     const result = await api('/videos?size=40');
     const related = result.items.filter(v => String(v.id) !== id);
@@ -368,6 +486,52 @@
   el('fullscreen-prev').onclick = () => { if (collectionPrevious) location.assign('/video/' + collectionPrevious.id); else notice('没有上一集'); };
   el('fullscreen-next').onclick = () => { if (collectionNext || nextVideo) location.assign('/video/' + (collectionNext || nextVideo).id); else notice('没有下一集'); };
   player.addEventListener('ended', () => { if (el('autoplay-next').checked && (collectionNext || nextVideo) && !trialExpired()) location.assign('/video/' + (collectionNext || nextVideo).id); });
+}
+
+function setupWatchHeatmap(player, { read, save, rows }) {
+  const toggle = el('heatmap-toggle'), pin = el('heatmap-pin'), display = el('heatmap-display');
+  let pinned = read('bili-heatmap-pinned', false) === true;
+  toggle.checked = pinned;
+  function render() {
+    display.hidden = !toggle.checked;
+    el('player-shell').classList.toggle('heatmap-pinned', pinned);
+    pin.setAttribute('aria-pressed', String(pinned));
+    pin.setAttribute('data-tooltip', pinned ? '关闭高能进度条常驻' : '打开高能进度条常驻');
+    if (!toggle.checked) return;
+    const duration = player.duration;
+    const bins = Array.from({ length:50 }, () => 0);
+    if (Number.isFinite(duration) && duration > 0) {
+      for (const { timestamp } of rows()) {
+        if (Number.isFinite(timestamp) && timestamp >= 0 && timestamp <= duration) {
+          bins[Math.min(bins.length - 1, Math.floor(timestamp / duration * bins.length))]++;
+        }
+      }
+    }
+    const peak = Math.max(1, ...bins);
+    const points = bins.map((count, index) => [index * 100 / (bins.length - 1), 32 - Math.sqrt(count / peak) * 30]);
+    const curve = points.slice(1).map(([x, y], index) => {
+      const [previousX, previousY] = points[index];
+      const middle = (previousX + x) / 2;
+      return ' C' + middle + ',' + previousY + ' ' + middle + ',' + y + ' ' + x + ',' + y;
+    }).join('');
+    el('heatmap-path').setAttribute('d', 'M0,32 L' + points[0].join(',') + curve + ' L100,32 Z');
+  }
+  pin.onclick = () => { pinned = !pinned; save('bili-heatmap-pinned', pinned); render(); };
+  toggle.onchange = () => {
+    if (!toggle.checked && pinned) { pinned = false; save('bili-heatmap-pinned', false); }
+    render();
+  };
+  player.addEventListener('durationchange', render);
+  window.addEventListener('pageshow', event => {
+    if (!event.persisted) return;
+    const saved = read('bili-heatmap-pinned', false) === true;
+    if (saved === pinned) return;
+    pinned = saved;
+    toggle.checked = saved;
+    render();
+  });
+  render();
+  return render;
 }
 
 function setupPlayerControlsIdle(shell) {
@@ -400,7 +564,12 @@ function setupDanmakuTracks(overlay) {
     overlay.replaceChildren();
   }
 
-  function add(line, mode, travelSeconds) {
+  function remove(line) {
+    active.delete(line);
+    line.remove();
+  }
+
+  function add(line, mode, travelSeconds, end) {
     const width = overlay.clientWidth, height = overlay.clientHeight;
     if (!width || !height) return false;
     const entrance = overlay.getBoundingClientRect().left + width;
@@ -420,14 +589,32 @@ function setupDanmakuTracks(overlay) {
       if (overlaps) continue;
       line.style.top = top + 'px';
       line.style.setProperty('--danmaku-travel', width + 'px');
-      line.style.animationDuration = (mode === 'scroll' ? travelSeconds * (1 + lineWidth / width) : 4) + 's';
-      active.set(line, { scrolling, top, bottom: top + lineHeight });
-      line.addEventListener('animationend', () => { active.delete(line); line.remove(); });
+      if (scrolling) line.style.animationDuration = travelSeconds * (1 + lineWidth / width) + 's';
+      const availableHeight = height - lineHeight;
+      const position = availableHeight > 0 ? top / availableHeight : Number(mode === 'bottom');
+      active.set(line, { scrolling, top, bottom: top + lineHeight, position, end });
+      line.addEventListener('animationend', () => remove(line));
       return true;
     }
     line.remove();
     return false;
   }
 
-  return { add, clear };
+  function expireFixed(time) {
+    for (const [line, track] of active) if (track.end !== undefined && time >= track.end) remove(line);
+  }
+
+  function resize() {
+    const width = overlay.clientWidth, height = overlay.clientHeight;
+    if (!width || !height) return;
+    for (const [line, track] of active) {
+      const lineHeight = line.offsetHeight;
+      track.top = track.position * Math.max(0, height - lineHeight);
+      track.bottom = track.top + lineHeight;
+      line.style.top = track.top + 'px';
+      if (track.scrolling) line.style.setProperty('--danmaku-travel', width + 'px');
+    }
+  }
+
+  return { add, clear, expireFixed, resize };
 }

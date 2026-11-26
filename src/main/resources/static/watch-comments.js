@@ -47,7 +47,16 @@ async function setupWatchComments(videoId) {
     }));
     const report = action('举报', 'comment-options', () => reportInteraction(kind, entry.id));
     actions.append(like, replyButton, report);
-    body.append(byline, content, actions);
+    content.hidden = !entry.content;
+    body.append(byline, content);
+    if (!reply && entry.hasImage) {
+      const attachment = node('img', 'comment-attachment');
+      attachment.src = '/api/interactions/comments/' + encodeURIComponent(entry.id) + '/image';
+      attachment.alt = '评论图片';
+      attachment.loading = 'lazy';
+      body.append(attachment);
+    }
+    body.append(actions);
     article.append(avatar(entry), body);
     if (!reply) {
       const previews = node('div', 'comment-replies');
@@ -55,8 +64,9 @@ async function setupWatchComments(videoId) {
         const rows = await interaction('/comments/' + entry.id + '/replies');
         previews.replaceChildren(...rows.map(row => renderEntry(row, true, expand)));
       };
-      (entry.replies || []).slice(0, 2).forEach(row => previews.append(renderEntry(row, true, expand)));
-      if (entry.replyCount > 0) {
+      const visibleReplies = (entry.replies || []).slice(0, 2);
+      visibleReplies.forEach(row => previews.append(renderEntry(row, true, expand)));
+      if (entry.replyCount > visibleReplies.length) {
         previews.append(action('共 ' + entry.replyCount + ' 条回复，点击查看', 'comment-view-replies', expand));
       }
       body.append(previews);
@@ -98,23 +108,76 @@ async function setupWatchComments(videoId) {
   el('comments-latest').onclick = () => signedIn() ? load('latest') : openLogin(el('comments-latest'));
   moreComments.onclick = () => signedIn() ? load(sort, page + 1) : openLogin(moreComments);
   const guest = el('comment-guest'), form = el('comment-entry-form');
+  const input = el('comment-text'), send = el('comment-send'), avatarImage = el('comment-current-avatar');
+  const fileInput = el('comment-image-file'), preview = el('comment-image-preview'), previewImage = el('comment-preview-image');
+  let selectedImage = null, previewUrl, posting = false, composerUid;
+  function updateSend() {
+    const hasContent = Boolean(input.value?.trim() || selectedImage);
+    form.setAttribute('data-has-content', String(hasContent));
+    send.disabled = posting || !hasContent;
+  }
+  function showImage(file) {
+    if (previewUrl) {
+      previewImage.removeAttribute('src');
+      URL.revokeObjectURL(previewUrl);
+      previewUrl = undefined;
+    }
+    selectedImage = file;
+    preview.hidden = !file;
+    if (file) {
+      previewUrl = URL.createObjectURL(file);
+      previewImage.src = previewUrl;
+    }
+    updateSend();
+  }
   guest.onclick = () => openLogin(guest);
+  input.oninput = updateSend;
+  el('comment-image-select').onclick = () => fileInput.click();
+  el('comment-image-remove').onclick = () => { showImage(null); input.focus(); };
+  fileInput.onchange = () => {
+    const [file] = fileInput.files;
+    fileInput.value = '';
+    if (!file) return;
+    if (file.size > 4 * 1024 * 1024) return accountNotice('图片大小不能超过 4 MB');
+    showImage(file);
+  };
   form.onsubmit = async event => {
     event.preventDefault();
-    const input = el('comment-text'), send = el('comment-send');
     if (!signedIn()) return openLogin(guest);
-    if (send.disabled || !input.value.trim()) return;
-    send.disabled = true;
+    const value = input.value.trim(), image = selectedImage, uid = composerUid;
+    if (posting || (!value && !image)) return;
+    posting = true;
+    updateSend();
     try {
-      await interaction(endpoint, 'POST', { value: input.value });
-      input.value = '';
+      if (image) {
+        const payload = new FormData();
+        payload.append('image', image);
+        payload.append('value', value);
+        await interaction(endpoint + '/image', 'POST', payload);
+      } else {
+        await interaction(endpoint, 'POST', { value });
+      }
+      if (composerUid !== uid) return;
+      if (input.value.trim() === value) input.value = '';
+      if (selectedImage === image) showImage(null);
       await load('latest');
     } catch (error) { accountNotice(error.message); }
-    finally { send.disabled = false; }
+    finally { posting = false; updateSend(); }
   };
   function updateComposer() {
-    guest.hidden = signedIn();
-    form.hidden = !signedIn();
+    const uid = signedIn() ? currentAccount.uid : null;
+    if (uid !== composerUid) {
+      if (composerUid != null) {
+        input.value = '';
+        showImage(null);
+      }
+      composerUid = uid;
+      avatarImage.onerror = () => { avatarImage.onerror = null; avatarImage.src = '/assets/guest-avatar.gif'; };
+      avatarImage.src = uid ? '/api/authors/' + encodeURIComponent(uid) + '/avatar' : '/api/avatar/default';
+    }
+    guest.hidden = Boolean(uid);
+    form.hidden = !uid;
+    updateSend();
   }
   window.addEventListener('accountchange', () => { updateComposer(); load(signedIn() ? sort : 'hot'); });
   updateComposer();
@@ -147,7 +210,7 @@ function setupWatchScroll(player,shell) {
     if(!floating)return;floating=false;shell.classList.remove('scroll-mini');home.append(shell);home.style.height='';shell.style.removeProperty('left');shell.style.removeProperty('top');shell.style.removeProperty('right');shell.style.removeProperty('bottom');syncMiniButton();
   }
   function float(){
-    if(floating||dismissed||document.fullscreenElement||shell.classList.contains('web-full')||window.innerWidth<801)return;
+    if(floating||dismissed||document.fullscreenElement||shell.classList.contains('web-full')||el('video-page').classList.contains('wide-mode')||window.innerWidth<801)return;
     home.style.height=home.getBoundingClientRect().height+'px';document.body.append(shell);shell.classList.add('scroll-mini');floating=true;revealed=true;syncMiniButton();
     if(manualPosition){shell.style.left=manualPosition.x+'px';shell.style.top=manualPosition.y+'px';shell.style.right='auto';shell.style.bottom='auto';}
   }
@@ -158,6 +221,7 @@ function setupWatchScroll(player,shell) {
     syncMiniButton();
   },{rootMargin:'-76px 0px 0px 0px',threshold:0});observer.observe(home);
   document.addEventListener('fullscreenchange',()=>{if(document.fullscreenElement)restore();});
+  el('wide-toggle').addEventListener('click',restore);
   miniToggle.onclick=()=>{dismissed=!dismissed;if(dismissed)restore();else if(pastPlayer)float();syncMiniButton();};
   el('mini-close').onclick=()=>{dismissed=true;restore();syncMiniButton();};
   const handle=el('mini-drag-handle');
@@ -174,4 +238,5 @@ function setupWatchScroll(player,shell) {
   function end(){drag=null;}handle.addEventListener('pointerup',end);handle.addEventListener('pointercancel',end);
   window.addEventListener('resize',()=>{measure();if(window.innerWidth<801)restore();else if(floating&&manualPosition){manualPosition.x=Math.min(manualPosition.x,window.innerWidth-shell.offsetWidth);manualPosition.y=Math.max(0,Math.min(manualPosition.y,window.innerHeight-shell.offsetHeight));shell.style.left=manualPosition.x+'px';shell.style.top=manualPosition.y+'px';}});
   window.addEventListener('pagehide',()=>{observer.disconnect();resize.disconnect();},{once:true});
+  return restore;
 }

@@ -1,6 +1,6 @@
-﻿body:has(.watch-layout:not([hidden])) .layout{max-width:1740px;padding:28px 5%}.watch-layout{grid-template-columns:minmax(0,1fr) 350px;max-width:1600px;gap:30px}.watch-main{min-width:0}.video-meta{font-size:13px;color:#9499a0;margin-bottom:24px}.player-shell{position:relative;background:#000;aspect-ratio:16/9;color:#fff;overflow:hidden}.player-shell video{height:100%;object-fit:contain}.player-shell button{color:inherit;background:none;border:0;cursor:pointer}.player-follow{position:absolute;top:20px;left:20px;background:#334b51aa!important;border-radius:24px!important;padding:9px 18px!important}.player-help{position:absolute;right:20px;top:20px}.player-tools{position:absolute;top:20px;left:45%;background:#2229;border-radius:8px;padding:8px;opacity:0}.player-shell:hover .player-tools{opacity:1}.player-tools button{font-size:25px}.trial-tip{position:absolute;bottom:75px;left:14px;background:#18191ce8;border-radius:5px;display:flex;align-items:center;padding:8px;gap:8px;font-size:14px}.trial-tip button{padding:4px}.trial-tip #close-trial{font-size:28px}.trial-tip em{color:#fb7299;font-style:normal}.trial-tip #trial-start,.trial-ended button{background:#fb7299;padding:8px 12px;border-radius:4px}.big-play{position:absolute;bottom:85px;right:32px;font-size:48px;filter:drop-shadow(0 2px 3px #333);opacity:.85}.player-controls{position:absolute;bottom:0;left:0;right:0;padding:8px 14px;background:linear-gradient(transparent,#000c)}.seek{width:100%;height:4px;display:block;margin:8px 0 14px;accent-color:#00aeec;cursor:pointer}.control-row{display:flex;align-items:center;gap:12px;min-height:32px;font-size:12px}.control-row button{font-size:16px;white-space:nowrap;padding:0}.control-spacer{flex:1}#volume{width:55px;accent-color:#00aeec}#play-time{white-space:nowrap}.control-notice{position:absolute;top:45%;left:25%;right:25%;text-align:center;background:#000b;padding:12px;border-radius:5px}.trial-ended{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:#000b;z-index:3}.danmaku-compose{display:flex;align-items:center;gap:16px;padding:10px 12px;box-shadow:0 2px 8px #0001;color:#61666d;font-size:13px}.danmaku-compose>button{font-size:18px;color:#61666d;background:none;border:0;cursor:pointer}.danmaku-input{display:flex;flex:1;background:#f1f2f3;border-radius:8px;overflow:hidden}.danmaku-input button{border:0;background:none;color:#9499a0;padding:10px;cursor:pointer}.danmaku-input button:first-child{flex:1;text-align:left}.danmaku-input button:last-child{background:#e3e5e7}.video-actions{display:flex;align-items:center;gap:28px;border-bottom:1px solid #e3e5e7;padding:22px 0;color:#61666d}.video-actions button{display:flex;align-items:center;gap:9px;border:0;background:none;color:inherit;cursor:pointer;white-space:nowrap;font-size:14px}.video-actions button:hover{color:#00aeec}.video-actions svg{width:28px;height:28px;fill:currentColor}#video-description{white-space:pre-wrap;line-height:1.8;font-size:14px;margin:20px 0}.video-tags a{border-radius:20px;background:#f1f2f3;padding:7px 13px;color:#61666d}.watch-author{position:relative;min-height:98px;margin-bottom:24px;padding-left:60px;font-size:14px}.watch-author>a{display:flex;align-items:center;min-height:25px}.watch-author img{position:absolute;left:0;top:5px;width:48px;height:48px;border-radius:50%;object-fit:cover;background:#f1f2f3}.watch-author strong{max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}.author-message{border:0;background:none;color:#61666d;font-size:12px;cursor:pointer}.watch-author p{font-size:12px;color:#9499a0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:6px 0 10px}.watch-author>div{display:flex;gap:12px}.watch-author>div button{border-radius:5px;cursor:pointer;padding:7px 12px}.charge-button{background:#fff;color:#fb7299;border:1px solid #fb7299;flex:1}.follow-button{background:#00aeec;border:1px solid #00aeec;color:#fff;flex:1.5}.danmaku-panel summary{list-style:none;background:#f1f2f3;border-radius:6px;padding:16px;display:flex;align-items:center;cursor:pointer;font-size:16px}.danmaku-panel summary::-webkit-details-marker{display:none}.danmaku-panel summary span{margin-left:18px;color:#61666d}.danmaku-panel summary i{margin-left:auto;border-right:2px solid #61666d;border-bottom:2px solid #61666d;width:8px;height:8px;transform:rotate(45deg)}.danmaku-panel[open] summary i{transform:rotate(225deg)}.danmaku-columns,.danmaku-row{display:grid;grid-template-columns:48px minmax(0,1fr) 94px;gap:8px;align-items:center;padding:9px 12px;font-size:12px}.danmaku-columns{color:#61666d;padding-top:14px}.danmaku-list{max-height:480px;overflow:auto;scrollbar-width:thin}.danmaku-row{min-height:32px;position:relative}.danmaku-row:hover{background:#f1f2f3}.danmaku-row>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.danmaku-row>span:first-child,.danmaku-date{color:#61666d}.danmaku-row button{display:none;color:#00aeec;border:1px solid #00aeec;border-radius:2px;background:white;cursor:pointer;padding:2px 4px;font-size:12px}.danmaku-row:hover button,.danmaku-row:focus-within button{display:block}.danmaku-row:hover .danmaku-date,.danmaku-row:focus-within .danmaku-date{display:none}.danmaku-row.blocked>span{color:#c9ccd0}.danmaku-row.blocked button{background:#00aeec;color:white}.history-danmaku{width:100%;border:0;border-radius:5px;background:#f1f2f3;color:#61666d;padding:10px;margin-top:14px;cursor:pointer}.related-heading{display:flex;align-items:center;justify-content:space-between;margin:28px 0 16px}.watch-layout .related-heading h2{margin:0}.related-heading label{font-size:12px;color:#9499a0;display:flex;gap:4px;align-items:center}.related-heading input{accent-color:#00aeec}.watch-layout.wide-mode{grid-template-columns:1fr}.wide-mode .watch-sidebar{display:none}.player-shell.web-full{position:fixed;inset:0;z-index:1000;aspect-ratio:auto}.danmaku-overlay{position:absolute;inset:55px 0 110px;pointer-events:none;overflow:hidden}.flying-danmaku{position:absolute;left:100%;white-space:nowrap;font-size:22px;color:white;text-shadow:1px 1px 2px black,-1px -1px 1px black;animation:danmaku-track-scroll 8s linear forwards}.paused-danmaku .flying-danmaku{animation-play-state:paused}@media(min-width:1700px){.watch-layout{grid-template-columns:minmax(0,1fr) 400px}}@media(max-width:1100px){.watch-layout{grid-template-columns:minmax(0,1fr) 290px;gap:20px}.control-row{gap:8px}#volume{display:none}.video-actions{gap:16px}.video-actions button:nth-last-child(2) span{display:none}}@media(max-width:800px){.watch-layout{grid-template-columns:1fr}.watch-sidebar{margin-top:16px}.control-row{gap:10px}.control-row #quality,.control-row #subtitle-toggle,.control-row #pip-toggle{display:none}.video-actions{gap:16px}.video-actions button{font-size:12px}.video-actions button:nth-last-child(3),.video-actions button:nth-last-child(2){display:none}.trial-tip{font-size:12px;bottom:70px}.danmaku-compose{gap:8px}}
+﻿body:has(.watch-layout:not([hidden])) .layout{max-width:1740px;padding:28px 5%}.watch-layout{grid-template-columns:minmax(0,1fr) 350px;max-width:1600px;gap:30px}.watch-main{min-width:0}.video-meta{font-size:13px;color:#9499a0;margin-bottom:24px}.player-shell{position:relative;background:#000;aspect-ratio:16/9;color:#fff;overflow:hidden}.player-shell video{height:100%;object-fit:contain}.player-shell button{color:inherit;background:none;border:0;cursor:pointer}.player-follow{position:absolute;top:20px;left:20px;background:#334b51aa!important;border-radius:24px!important;padding:9px 18px!important}.player-help{position:absolute;right:20px;top:20px}.player-tools{position:absolute;top:20px;left:45%;background:#2229;border-radius:8px;padding:8px;opacity:0}.player-shell:hover .player-tools{opacity:1}.player-tools button{font-size:25px}.trial-tip{position:absolute;bottom:75px;left:14px;background:#18191ce8;border-radius:5px;display:flex;align-items:center;padding:8px;gap:8px;font-size:14px}.trial-tip button{padding:4px}.trial-tip #close-trial{font-size:28px}.trial-tip em{color:#fb7299;font-style:normal}.trial-tip #trial-start,.trial-ended button{background:#fb7299;padding:8px 12px;border-radius:4px}.big-play{position:absolute;bottom:85px;right:32px;font-size:48px;filter:drop-shadow(0 2px 3px #333);opacity:.85}.player-controls{position:absolute;bottom:0;left:0;right:0;padding:8px 14px;background:linear-gradient(transparent,#000c)}.seek{width:100%;height:4px;display:block;margin:8px 0 14px;accent-color:#00aeec;cursor:pointer}.control-row{display:flex;align-items:center;gap:12px;min-height:32px;font-size:12px}.control-row button{font-size:16px;white-space:nowrap;padding:0}.control-spacer{flex:1}#volume{width:55px;accent-color:#00aeec}#play-time{white-space:nowrap}.control-notice{position:absolute;top:45%;left:25%;right:25%;text-align:center;background:#000b;padding:12px;border-radius:5px}.trial-ended{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:#000b;z-index:3}.danmaku-compose{display:flex;align-items:center;gap:16px;padding:10px 12px;box-shadow:0 2px 8px #0001;color:#61666d;font-size:13px}.danmaku-compose>button{font-size:18px;color:#61666d;background:none;border:0;cursor:pointer}.danmaku-input{display:flex;flex:1;background:#f1f2f3;border-radius:8px;overflow:hidden}.danmaku-input button{border:0;background:none;color:#9499a0;padding:10px;cursor:pointer}.danmaku-input button:first-child{flex:1;text-align:left}.danmaku-input button:is(:last-child, :where(#danmaku-guest-send)){background:#e3e5e7}.video-actions{display:flex;align-items:center;gap:28px;border-bottom:1px solid #e3e5e7;padding:22px 0;color:#61666d}.video-actions button{display:flex;align-items:center;gap:9px;border:0;background:none;color:inherit;cursor:pointer;white-space:nowrap;font-size:14px}.video-actions button:hover{color:#00aeec}.video-actions svg{width:28px;height:28px;fill:currentColor}#video-description{white-space:pre-wrap;line-height:1.8;font-size:14px;margin:20px 0}.video-tags a{border-radius:20px;background:#f1f2f3;padding:7px 13px;color:#61666d}.watch-author{position:relative;min-height:98px;margin-bottom:24px;padding-left:60px;font-size:14px}.watch-author>a{display:flex;align-items:center;min-height:25px}.watch-author img{position:absolute;left:0;top:5px;width:48px;height:48px;border-radius:50%;object-fit:cover;background:#f1f2f3}.watch-author strong{max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500}.author-message{border:0;background:none;color:#61666d;font-size:12px;cursor:pointer}.watch-author p{font-size:12px;color:#9499a0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:6px 0 10px}.watch-author>div{display:flex;gap:12px}.watch-author>div button{border-radius:5px;cursor:pointer;padding:7px 12px}.charge-button{background:#fff;color:#fb7299;border:1px solid #fb7299;flex:1}.follow-button{background:#00aeec;border:1px solid #00aeec;color:#fff;flex:1.5}.danmaku-panel summary{list-style:none;background:#f1f2f3;border-radius:6px;padding:16px;display:flex;align-items:center;cursor:pointer;font-size:16px}.danmaku-panel summary::-webkit-details-marker{display:none}.danmaku-panel summary span{margin-left:18px;color:#61666d}.danmaku-panel summary i{margin-left:auto;border-right:2px solid #61666d;border-bottom:2px solid #61666d;width:8px;height:8px;transform:rotate(45deg)}.danmaku-panel[open] summary i{transform:rotate(225deg)}.danmaku-columns,.danmaku-row{display:grid;grid-template-columns:48px minmax(0,1fr) 94px;gap:8px;align-items:center;padding:9px 12px;font-size:12px}.danmaku-columns{color:#61666d;padding-top:14px}.danmaku-list{max-height:480px;overflow:auto;scrollbar-width:thin}.danmaku-row{min-height:32px;position:relative}.danmaku-row:hover{background:#f1f2f3}.danmaku-row>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.danmaku-row>span:first-child,.danmaku-date{color:#61666d}.danmaku-row button{display:none;color:#00aeec;border:1px solid #00aeec;border-radius:2px;background:white;cursor:pointer;padding:2px 4px;font-size:12px}.danmaku-row:hover button,.danmaku-row:focus-within button{display:block}.danmaku-row:has(button):is(:hover,:focus-within) .danmaku-date{display:none}.danmaku-row.blocked>span{color:#c9ccd0}.danmaku-row.blocked button{background:#00aeec;color:white}.history-danmaku{width:100%;border:0;border-radius:5px;background:#f1f2f3;color:#61666d;padding:10px;margin-top:14px;cursor:pointer}.related-heading{display:flex;align-items:center;justify-content:space-between;margin:28px 0 16px}.watch-layout .related-heading h2{margin:0}.related-heading label{font-size:12px;color:#9499a0;display:flex;gap:4px;align-items:center}.related-heading input{accent-color:#00aeec}.player-shell.web-full{position:fixed;inset:0;z-index:1000;aspect-ratio:auto}.danmaku-overlay{position:absolute;inset:55px 0 110px;pointer-events:none;overflow:hidden}.flying-danmaku{position:absolute;left:100%;white-space:nowrap;font-size:22px;color:white;text-shadow:1px 1px 2px black,-1px -1px 1px black;animation:danmaku-track-scroll 8s linear forwards}.paused-danmaku .flying-danmaku{animation-play-state:paused}@media(min-width:1700px){.watch-layout{grid-template-columns:minmax(0,1fr) 400px}}@media(max-width:1100px){.watch-layout{grid-template-columns:minmax(0,1fr) 290px;gap:20px}.control-row{gap:8px}#volume{display:none}.video-actions{gap:16px}}@media(max-width:800px){.watch-layout{grid-template-columns:1fr}.watch-sidebar{margin-top:16px}.control-row{gap:10px}.control-row #quality,.control-row #subtitle-toggle,.control-row #pip-toggle{display:none}.video-actions{gap:16px}.video-actions button{font-size:12px}.trial-tip{font-size:12px;bottom:70px}.danmaku-compose{gap:8px}}
 /* Keep the sender action in the date column, including keyboard focus. */
-.danmaku-row .danmaku-date{grid-column:3;grid-row:1}.danmaku-row button{display:block;grid-column:3;grid-row:1;opacity:0;pointer-events:none;justify-self:start}.danmaku-row:hover button,.danmaku-row:focus-within button{opacity:1;pointer-events:auto}.danmaku-row:hover .danmaku-date,.danmaku-row:focus-within .danmaku-date{display:block;visibility:hidden}.danmaku-row:focus-within{background:#f1f2f3}.player-shell:fullscreen{width:100%;height:100%;aspect-ratio:auto}
+.danmaku-row .danmaku-date{grid-column:3;grid-row:1}.danmaku-row button{display:block;grid-column:3;grid-row:1;opacity:0;pointer-events:none;justify-self:start}.danmaku-row:hover button,.danmaku-row:focus-within button{opacity:1;pointer-events:auto}.danmaku-row:has(button):is(:hover,:focus-within) .danmaku-date{display:block;visibility:hidden}.danmaku-row:focus-within{background:#f1f2f3}.player-shell:fullscreen{width:100%;height:100%;aspect-ratio:auto}
 
 /* Reference proportions: 1635px player, 36px controls, 46px action icons. */
 .watch-main {
@@ -102,40 +102,77 @@
 .danmaku-compose > button { position: relative; padding: 0; display: flex; align-items: center; font-size: inherit; flex-shrink: 0; }
 .danmaku-compose > button > .watch-icon { width: clamp(26px, 2.7cqw, 44px); height: clamp(26px, 2.7cqw, 44px); }
 .danmaku-compose .dm-badge { position: absolute; inset: 0; }
-#danmaku-toggle[data-enabled="false"] .dm-badge { opacity: 0; }
+#danmaku-toggle[aria-pressed="true"] .dm-off-badge,
+#danmaku-toggle[aria-pressed="false"] .dm-badge:not(.dm-off-badge) { display: none; }
+#danmaku-toggle:is(:hover, :focus-visible) { color: #00aeec; }
+.danmaku-input :is(.danmaku-off-message, .danmaku-off-send) { display: none; }
+.danmaku-compose:has(#danmaku-toggle[aria-pressed="false"]) .danmaku-input {
+  background: #f1f2f3;
+  overflow: hidden;
+}
+.danmaku-compose:has(#danmaku-toggle[aria-pressed="false"]) .danmaku-input > :not(.danmaku-off-message, .danmaku-off-send) { display: none; }
+.danmaku-compose:has(#danmaku-toggle[aria-pressed="false"]) .danmaku-off-message {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  padding-inline: .6em;
+  color: #9499a0;
+}
+.danmaku-compose:has(#danmaku-toggle[aria-pressed="false"]) .danmaku-off-send {
+  display: inline-flex;
+  background: #e3e5e7;
+  color: #9499a0;
+  cursor: default;
+}
 .danmaku-input { min-width: 0; border-radius: clamp(6px, 1cqw, 16px); align-items: stretch; height: clamp(36px, 3.9cqw, 64px); }
 .danmaku-input button { font-size: inherit; line-height: 1; white-space: nowrap; padding: 0 1.3cqw; display: inline-flex; align-items: center; justify-content: center; gap: .35em; }
 .danmaku-input button:first-child { justify-content: flex-start; }
 .danmaku-input em { color: #00aeec; font-style: normal; }
-.danmaku-input .danmaku-etiquette { padding-left: 0; gap: 0; font-size: .9em; }
-.danmaku-etiquette .watch-icon { width: 1.1em; height: 1.1em; }
-.danmaku-input button:last-child { padding: 0 2.2cqw; }
+.danmaku-input .danmaku-login { min-inline-size: 0; overflow: hidden; }
+.danmaku-input #danmaku-guest-send:disabled {
+  flex: none;
+  background: #e3e5e7;
+  color: #9499a0;
+  cursor: default;
+}
+.danmaku-input button:is(:last-child, :where(#danmaku-guest-send)) { padding: 0 2.2cqw; }
+.danmaku-input :is(#danmaku-send, #danmaku-guest-send) {
+  inline-size: clamp(56px, 7.6cqw, 108px);
+  padding: 0;
+}
+.danmaku-input:has(.danmaku-entry:not([hidden])) { overflow: visible; }
+.danmaku-input .danmaku-entry { border-radius: inherit; align-items: stretch; }
+.danmaku-input #danmaku-text { padding-inline: 0 8px; }
+.danmaku-input #danmaku-send {
+  flex: none;
+  border-start-end-radius: inherit;
+  border-end-end-radius: inherit;
+  color: #fff;
+  background: var(--blue);
+}
+.danmaku-input #danmaku-send:not(:disabled):hover { background: #21b8ef; }
+.danmaku-input #danmaku-send:disabled { background: #e3e5e7; color: #9499a0; cursor: default; }
 .video-actions { min-height: clamp(68px, 6.5cqw, 106px); box-sizing: border-box; padding: 1.8cqw 0; gap: clamp(24px, 4.1cqw, 66px); color: #61666d; }
 .video-actions button { gap: clamp(8px, 1.2cqw, 20px); font-size: clamp(14px, 1.65cqw, 26px); line-height: 1; padding: 0; font-weight: 400; }
 .video-actions svg { width: clamp(26px, 2.9cqw, 46px); height: clamp(26px, 2.9cqw, 46px); flex-shrink: 0; }
 .video-actions .watch-icon { fill: none; width: clamp(21px, 2.1cqw, 34px); height: clamp(21px, 2.1cqw, 34px); }
 .video-actions .control-spacer { min-width: 0; }
-.video-actions button:nth-last-child(-n+3) { gap: .6cqw; font-size: clamp(12px, 1.55cqw, 25px); }
-.video-actions button:last-child .watch-icon { width: 1em; }
 .video-actions button:focus-visible, .player-shell button:focus-visible, .danmaku-compose button:focus-visible { outline: 2px solid #00aeec; outline-offset: 4px; }
 .watch-author .watch-icon { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: middle; }
 .watch-author > div button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; }
 .danmaku-panel summary span .watch-icon { width: 16px; height: 16px; }
 @media(max-width:1100px) {
   .video-actions { gap: 24px; }
-  .video-actions button:nth-last-child(3) span, .video-actions button:nth-last-child(2) span { display: none; }
 }
 @media(max-width:800px) {
   .control-row { gap: clamp(8px, 2cqw, 15px); }
   .player-shell .control-row .watch-icon { width: 22px; height: 22px; }
-  .danmaku-input .danmaku-etiquette { display: none; }
   .video-actions { gap: clamp(20px, 5cqw, 40px); }
   .trial-tip { bottom: 70px; }
 }
 /* At narrow player widths, keep secondary actions compact without squeezing counts. */
 @container (max-width: 850px) {
   .video-actions { gap: 22px; }
-  .video-actions button:nth-last-child(3) span, .video-actions button:nth-last-child(2) span { display: none; }
 }
 
 /* Player menus match the reference's dark hover cards. */
@@ -151,6 +188,17 @@
 }
 .hover-panel::after { content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 24px; }
 .control-popover:hover > .hover-panel { visibility: visible; opacity: 1; pointer-events: auto; }
+.player-shell .control-row:has(> .control-popover:is(:hover,:focus-within)) {
+  position:relative;
+  z-index:7;
+}
+.player-shell .control-row > .control-popover > .hover-panel {
+  bottom:100%;
+}
+.player-shell .control-row > .control-popover::before,
+.player-shell .control-row > .control-popover > .hover-panel::after {
+  content:none;
+}
 .hover-panel strong { display: block; font-size: inherit; font-weight: 500; margin: 0 0 1.4cqw; }
 .player-shell .hover-panel button { font-size: inherit; font-weight: 500; line-height: 1.5; }
 .login-feature-panel { width: clamp(150px, 17cqw, 275px); }
@@ -187,13 +235,14 @@
   opacity: 1; pointer-events: auto; cursor: pointer;
 }
 .player-shell [data-tooltip] { position: relative; }
-.player-shell [data-tooltip]::after {
+.player-shell [data-tooltip]::after, .danmaku-compose [data-tooltip]::after {
   content: attr(data-tooltip); position: absolute; bottom: calc(100% + 16px); left: 50%; transform: translateX(-50%);
   color: #fff; background: #000e; border-radius: 2px; padding: .5em .7em;
   font-size: clamp(12px, 1.4cqw, 22px); font-weight: 400; line-height: 1.2;
   white-space: nowrap; pointer-events: none; opacity: 0; visibility: hidden;
 }
-.player-shell [data-tooltip]:hover::after, .player-shell [data-tooltip]:focus-visible::after { opacity: 1; visibility: visible; }
+:is(.player-shell, .danmaku-compose) [data-tooltip]:is(:hover, :focus-visible)::after { opacity: 1; visibility: visible; }
+#danmaku-toggle::after { z-index: 6; background: #000; }
 .player-shell #fullscreen-toggle[data-tooltip]::after { left: auto; right: 0; transform: none; }
 .player-shell .big-play[data-tooltip], .player-shell .player-tools [data-tooltip] { position: absolute; }
 .player-shell .player-tools [data-tooltip] { position: relative; }
@@ -235,14 +284,26 @@ body:has(.watch-layout:not([hidden])) .layout { max-width: 2440px; width: 84%; m
 #player[data-ratio="4"] { width: 75%; margin: auto; aspect-ratio: 4/3; object-fit: fill !important; }
 #player[data-ratio="16"] { width: 100%; object-fit: fill !important; }
 #player[data-hide-bars="true"] { object-fit: cover !important; }
-body.watch-lights-off::after { content: ""; position: fixed; inset: 0; background: #000c; z-index: 90; pointer-events: none; }
-.watch-lights-off .player-shell,.watch-lights-off .danmaku-compose { position: relative; z-index: 91; }
+.watch-lights-off .watch-main { z-index:95; }
+.watch-lights-off .watch-player-block { position:relative; z-index:95; box-shadow:0 0 0 150vmax #000d; }
+.watch-lights-off .watch-player-block > .danmaku-compose { background:#242528; color:#ddd; }
+.watch-lights-off .watch-player-block > .danmaku-compose .danmaku-input { background:#414348; }
 #danmaku-control { align-items: center; position: relative; flex-shrink: 0; }
 #danmaku-control > button { display: flex; position: relative; border: 0; background: none; color: #61666d; padding: 0; cursor: pointer; }
 #danmaku-control > button > .watch-icon { width: clamp(24px, 2.65cqw, 42px); height: clamp(24px, 2.65cqw, 42px); }
 #danmaku-control > button > .dm-badge { position: absolute; inset: 0; }
-#danmaku-control:hover > button { color: #00aeec; }
-.danmaku-settings-panel { left: -12cqw; transform: none; width: clamp(330px, 39cqw, 640px); bottom: calc(100% + 22px); padding: clamp(15px, 2.4cqw, 38px); font-size: clamp(12px, 1.5cqw, 24px); font-weight: 500; max-height: min(86vh, 48cqw); overflow-y: auto; }
+#danmaku-control:hover > button:not(:disabled),
+#danmaku-settings:focus-visible { color: #00aeec; }
+#danmaku-control > button:disabled { opacity: .45; cursor: default; }
+#danmaku-control:has(> button:disabled) > .hover-panel { display: none; }
+#danmaku-control::before, .danmaku-settings-panel::after { content: none; }
+#danmaku-control > .danmaku-settings-panel { bottom: 100%; }
+#danmaku-control:has(> button:focus-visible, > .hover-panel :focus-visible) > .danmaku-settings-panel {
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
+}
+.danmaku-settings-panel { left: -12cqw; transform: none; width: clamp(330px, 39cqw, 640px); padding: clamp(15px, 2.4cqw, 38px); font-size: clamp(12px, 1.5cqw, 24px); font-weight: 500; max-height: 70vh; overflow-y: auto; scrollbar-width: none; }
 .danmaku-settings-panel button { font-family: inherit; color: #eee; font-size: inherit; border: 0; background: none; cursor: pointer; }
 .dm-filter-types { display: flex; gap: 2.6cqw; margin: 0 0 1.4cqw; }
 .dm-filter-types button { display: flex; flex-direction: column; gap: .3em; color: #c9ccd0; font-size: 1.2em; padding: 0; }
@@ -259,11 +320,6 @@ body.watch-lights-off::after { content: ""; position: fixed; inset: 0; backgroun
 .dm-density span { margin-right: auto; }
 .dm-density button { padding: 0; }
 .dm-density button[aria-pressed="true"] { color: #00aeec; }
-.danmaku-settings-panel .panel-next { display: flex; justify-content: space-between; width: 100%; border-top: 1px solid #ffffff20; margin-top: 2cqw; padding: 1em 0 0; color: white; }
-.dm-keywords { display: flex; flex-direction: column; gap: .5em; }
-.dm-keywords textarea { background: #ffffff10; color: white; border: 1px solid #ffffff40; border-radius: 3px; font: inherit; padding: .5em; resize: vertical; }
-.danmaku-settings-panel .panel-login { background: #00aeec; width: 100%; padding: .5em; margin-top: .6em; border-radius: 4px; }
-.danmaku-settings-panel .subtitle-reset { border: 1px solid #ffffff40; margin-top: 1em; }
 .video-actions button:hover svg,.video-actions button:focus-visible svg { animation: icon-nudge .38s ease-in-out; }
 @keyframes icon-nudge { 0%,100% { transform: translateY(0) rotate(0); } 35% { transform: translateY(-3px) rotate(-7deg); } 65% { transform: translateY(-1px) rotate(5deg); } }
 @media(prefers-reduced-motion:reduce) { .video-actions button:hover svg,.video-actions button:focus-visible svg { animation: none; } }
@@ -284,9 +340,9 @@ body.watch-lights-off::after { content: ""; position: fixed; inset: 0; backgroun
 .collection-item.current::before { content: "▥"; color: #00aeec; }
 .collection-item:hover { background: #fff9; }
 .player-shell.mini-player { position: fixed; bottom: 18px; right: 18px; width: 360px; height: 203px; z-index: 1000; aspect-ratio: 16/9; box-shadow: 0 4px 24px #0006; }
-.mini-player .control-popover,.mini-player #quality,.mini-player #web-fullscreen,.mini-player #fullscreen-toggle,.mini-player .player-follow,.mini-player .player-tools,.mini-player .trial-tip { display: none; }
+.mini-player .control-popover,.mini-player #quality,.mini-player .player-follow,.mini-player .player-tools,.mini-player .trial-tip { display: none; }
 @media(max-width:1100px) { body:has(.watch-layout:not([hidden])) .layout { width: 94%; }.watch-layout { grid-template-columns: minmax(0, 2.335fr) minmax(240px, 1fr); gap: 22px; } .control-row { gap: 10px; } }
-@media(max-width:800px) { .watch-layout { grid-template-columns: 1fr; }.danmaku-settings-panel { left: -110px; width: min(360px, 88vw); max-height: 70vh; font-size: 13px; }.playback-settings:has(#playback-more:not([hidden])) { max-height: 70cqw; }.control-row { gap: 12px; } }
+@media(max-width:800px) { .watch-layout { grid-template-columns: 1fr; }.danmaku-settings-panel { left: -110px; width: min(360px, 88vw); font-size: 13px; }.playback-settings:has(#playback-more:not([hidden])) { max-height: 70cqw; }.control-row { gap: 12px; } }
 .control-popover::before { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 24px; }
 .dm-filter-types .dm-type-icon { display: block; width: 2em; height: 1.7em; padding: .2em; box-sizing: border-box; background: #d2d2d2; color: #333; border-radius: 5px; }
 .dm-filter-types button[aria-pressed="false"] .dm-type-icon { background: #00aeec; }
@@ -296,29 +352,19 @@ body.watch-lights-off::after { content: ""; position: fixed; inset: 0; backgroun
 .danmaku-compose > #danmaku-toggle, #danmaku-control, #danmaku-control > #danmaku-settings { height: clamp(28px, 2.9cqw, 46px); min-height: 0; align-items: center; justify-content: center; padding: 0; margin: 0; vertical-align: middle; }
 .danmaku-compose > #danmaku-toggle > .watch-icon, #danmaku-control > #danmaku-settings > .watch-icon { width: clamp(24px, 2.65cqw, 42px); height: clamp(24px, 2.65cqw, 42px); }
 .danmaku-compose .dm-badge { top: 50% !important; left: 0 !important; transform: translateY(-50%); }
-.control-row button:hover > svg, .control-popover > button:hover > svg, .control-row button:focus-visible > svg { animation: player-icon-nudge .34s ease-in-out; }
+.control-row button:not(.danmaku-compose *):is(:hover, :focus-visible) > svg, .control-popover > button:not(.danmaku-compose *):hover > svg { animation: player-icon-nudge .34s ease-in-out; }
 @keyframes player-icon-nudge { 0%,100% { transform: translateY(0) rotate(0); } 40% { transform: translateY(-2px) rotate(-6deg); } 70% { transform: translateY(-1px) rotate(4deg); } }
 /* These labels are visible at every desktop player width. */
-.watch-layout .video-actions button:nth-last-child(3) span, .watch-layout .video-actions button:nth-last-child(2) span { display: inline; }
-.watch-layout .video-actions button:nth-last-child(3), .watch-layout .video-actions button:nth-last-child(2) { display: inline-flex; }
 .video-actions { gap: clamp(14px, 2.9cqw, 46px); }
-.video-actions button:nth-last-child(-n+3) { font-size: clamp(11px, 1.5cqw, 24px); }
-.watch-sidebar .danmaku-panel { width: 96%; margin-left: auto; margin-right: auto; }
+.video-actions #video-report { gap: .6cqw; font-size: clamp(11px, 1.5cqw, 24px); }
+.watch-sidebar-content > :is(.danmaku-panel, .video-collection) {
+  box-sizing: border-box;
+  width: 96%;
+  margin-inline: auto;
+}
 .danmaku-panel summary { padding: 14px 16px; }
 .danmaku-columns,.danmaku-row { padding-left: 16px; padding-right: 12px; }
 .watch-sidebar .danmaku-panel .history-danmaku { padding: 9px 0; font-size: 12px; font-weight: 400; line-height: 20px; }
-.dm-sync { display: flex; align-items: center; gap: .5em; padding: 1em 0; border-top: 1px solid #ffffff25; white-space: nowrap; }
-.dm-sync input,.dm-font-row input { accent-color: #00aeec; width: 1em; height: 1em; margin: 0; }
-.dm-font-label { display: block; margin-bottom: .4em; }
-.dm-font-row { display: flex; align-items: center; gap: 1.8em; margin-bottom: 1.2em; }
-.dm-font-row select { width: 70%; min-width: 0; background: #ffffff06; border: 1px solid #ffffff40; color: white; padding: .25em .5em; font: inherit; border-radius: 2px; }
-.dm-font-row option { background: #252525; }
-.dm-font-row label { display: flex; gap: .4em; align-items: center; white-space: nowrap; }
-.danmaku-settings-panel .dm-outline-label { margin-bottom: .4em; }
-.danmaku-settings-panel .preference-segments button { flex: 1; padding: .3em .2em; border-radius: 2px; background: #ffffff40; color: white; white-space: nowrap; }
-.danmaku-settings-panel .preference-segments button[aria-pressed="true"] { background: #00aeec; }
-.danmaku-settings-panel:has(#dm-settings-advanced:not([hidden])) { width: clamp(280px, 31cqw, 500px); }
-#dm-settings-advanced .subtitle-reset { display: block; padding: .2em 1.8em; border-radius: 2px; margin-top: 1.5em; }
 .danmaku-overlay[data-font="heiti"] { font-family: SimHei, "Microsoft YaHei", sans-serif; }
 .danmaku-overlay[data-font="songti"] { font-family: SimSun, serif; }
 .danmaku-overlay[data-font="yahei"] { font-family: "Microsoft YaHei", sans-serif; }
@@ -328,18 +374,24 @@ body.watch-lights-off::after { content: ""; position: fixed; inset: 0; backgroun
 .danmaku-overlay[data-outline="stroke"] .flying-danmaku { -webkit-text-stroke: .6px #000; text-shadow: none; }
 .danmaku-overlay[data-outline="shadow"] .flying-danmaku { text-shadow: 2px 2px 1px #000; }
 .flying-danmaku { width: max-content; line-height: 1.2; pointer-events: auto; cursor: pointer; animation-name: danmaku-track-scroll; }
-.flying-danmaku:not([data-mode="scroll"]) { left: 50%; max-width: 100%; transform: translateX(-50%); overflow: hidden; text-overflow: ellipsis; animation-name: danmaku-track-fixed; }
+.flying-danmaku:not([data-mode="scroll"]) { left: 50%; max-width: 100%; transform: translateX(-50%); overflow: hidden; text-overflow: ellipsis; animation-name: none; }
+.flying-danmaku.own-danmaku { box-shadow: inset 0 0 0 1px #70e5ed; }
 .inspecting-danmaku .flying-danmaku { animation-play-state: paused; }
 @keyframes danmaku-track-scroll { to { transform: translateX(calc(-100% - var(--danmaku-travel))); } }
-@keyframes danmaku-track-fixed { from, to { opacity: 1; } }
 .danmaku-actions { position: absolute; z-index: 7; display: flex; align-items: center; justify-content: space-around; gap: 18px; background: #303030e8; border: 1px solid #ffffff80; border-radius: 30px; padding: 9px 18px; }
 .danmaku-actions::before { content: ""; position: absolute; left: 45%; top: -7px; width: 12px; height: 12px; background: #303030; transform: rotate(45deg); border-top: 1px solid #ffffff80; border-left: 1px solid #ffffff80; }
 .danmaku-actions::after { content: ""; position: absolute; left: 0; right: 0; bottom: 100%; height: 16px; }
 .player-shell .danmaku-actions button { padding: 0; color: white; }
 .player-shell .danmaku-actions .watch-icon { width: clamp(20px, 2.2cqw, 35px); height: clamp(20px, 2.2cqw, 35px); }
 .player-shell .danmaku-actions button:hover { color: #00aeec; }
+.player-shell #dm-action-like { gap: 2px; }
+.player-shell #dm-action-like:hover { color: #fff; }
+#dm-action-like .dm-like-filled,
+#dm-action-like[aria-pressed="true"] .watch-icon:not(.dm-like-filled) { display: none; }
+#dm-action-like[aria-pressed="true"] .dm-like-filled { display: inline-block; fill: currentColor; }
+.dm-like-count { align-self: flex-start; font-size: clamp(11px, 1.4cqw, 18px); line-height: 1; font-variant-numeric: tabular-nums; }
 .sender-tooltip { position: fixed; z-index: 1100; transform: translate(-50%, -100%); border-radius: 2px; padding: 8px 10px; background: #000; color: #fff; font-size: 13px; line-height: 1.4; pointer-events: none; white-space: nowrap; }
-@media(prefers-reduced-motion:reduce) { .control-row button:hover > svg, .control-popover > button:hover > svg, .control-row button:focus-visible > svg { animation: none; } }
+@media(prefers-reduced-motion:reduce) { .control-row button:not(.danmaku-compose *):is(:hover, :focus-visible) > svg, .control-popover > button:not(.danmaku-compose *):hover > svg { animation: none; } }
 @container(max-width:600px) { .video-actions { gap: 12px; flex-wrap: wrap; }.video-actions .control-spacer { min-width: 0; } }
 
 /* Sidebar modes share the original list's exact outer edges. */
@@ -376,10 +428,6 @@ body.watch-lights-off::after { content: ""; position: fixed; inset: 0; backgroun
 .shield-table-head,.shield-row { display:grid; grid-template-columns:minmax(0,1fr) 40px 35px; gap:4px; align-items:center; padding:3px 8px; font-size:12px; }
 .shield-table-head { color:#9499a0; }.shield-row { background:white; }.shield-row > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .shield-row button { border:0; background:none; font:inherit; padding:2px 0; cursor:pointer; color:#00aeec; }.shield-row .shield-delete { color:#9499a0; font-size:11px; }
-.sidebar-advanced-view { padding:16px; font-size:12px; }.sidebar-advanced-view fieldset { border:0; padding:0; margin:0; color:#b6b6b6; }.sidebar-advanced-view input,.sidebar-advanced-view select { box-sizing:border-box; max-width:100%; border:1px solid #e3e5e7; color:#bbb; padding:3px; margin-top:6px; }.sidebar-advanced-view input[type=number] { width:65px; }.sidebar-advanced-view input[type=color] { display:block; opacity:.3; }
-.advanced-fields { display:grid; grid-template-columns:1fr 1fr; gap:16px 14px; margin-top:20px; }.advanced-fields label { display:flex; flex-direction:column; }.advanced-fields label:has(input[type=checkbox]) { flex-direction:row; align-items:center; gap:4px; }
-.sidebar-advanced-view fieldset button { color:#bbb; background:#f1f2f3; border:0; padding:6px; margin:0 6px 6px 0; }
-.advanced-login { background:#00aeec; color:#fff; border:0; border-radius:4px; width:100%; padding:8px; margin-top:18px; cursor:pointer; }
 .fullscreen-title,.fullscreen-only,#fullscreen-danmaku-slot { display:none; }
 .fullscreen-layout .fullscreen-title { display:block; position:absolute; left:1.2%; top:2.5%; z-index:2; color:#fff; font-size:clamp(18px,1.4cqw,32px); line-height:1.5; font-weight:500; text-shadow:0 1px 3px #000; }
 .fullscreen-layout .player-follow { top:8%; }
@@ -395,17 +443,17 @@ body.watch-lights-off::after { content: ""; position: fixed; inset: 0; backgroun
 .fullscreen-layout .danmaku-compose > span { display:none; }
 .fullscreen-layout .danmaku-compose .danmaku-input { height:36px; min-width:0; background:#4b4b4b; }
 .fullscreen-layout .danmaku-input button { padding:0 10px; font-size:inherit; }
-.fullscreen-layout .danmaku-input button:last-child { background:#aaa; color:#eee; }
+.fullscreen-layout .danmaku-input button:is(:last-child, :where(#danmaku-guest-send)) { background:#aaa; color:#eee; }
 .fullscreen-layout .danmaku-compose > #danmaku-toggle,.fullscreen-layout #danmaku-control,.fullscreen-layout #danmaku-settings { height:30px; }
 .fullscreen-layout #danmaku-toggle>.watch-icon,.fullscreen-layout #danmaku-settings>.watch-icon { width:28px; height:28px; }
-.fullscreen-layout #web-fullscreen { display:none; }
+.player-shell:fullscreen #web-fullscreen,.fullscreen-layout #wide-toggle { display:none; }
 .fullscreen-layout .big-play { width:auto; right:3%; bottom:11%; }
 .fullscreen-layout .big-play .watch-icon { width:clamp(52px,4cqw,100px); height:clamp(52px,4cqw,100px); }
-.fullscreen-layout .danmaku-settings-panel { left:0; bottom:calc(100% + 18px); }
+.fullscreen-layout .danmaku-settings-panel { left:0; }
 .fullscreen-collection { position:absolute; bottom:80px; right:18%; width:300px; max-height:55%; overflow:auto; z-index:8; background:#18191cee; color:white; padding:16px; border-radius:4px; }
 .fullscreen-episode { display:block; color:#fff; padding:8px 0; font-size:14px; }.fullscreen-episode.current { color:#00aeec; }
-@media(max-width:1000px) { .fullscreen-layout #fullscreen-danmaku-slot { margin-left:1cqw; margin-right:0; }.fullscreen-layout .danmaku-etiquette { display:none; }.fullscreen-layout .control-row { gap:10px; } }
-@media(max-width:700px) { .fullscreen-layout #fullscreen-danmaku-slot { flex:1; }.fullscreen-layout #quality,.fullscreen-layout #fullscreen-episodes { display:none; }.fullscreen-layout .danmaku-compose { gap:5px; }.fullscreen-layout #play-time { font-size:11px; } }
+@media(max-width:1000px) { .fullscreen-layout #fullscreen-danmaku-slot { margin-left:1cqw; margin-right:0; }.fullscreen-layout .control-row { gap:10px; } }
+@media(max-width:700px) { .fullscreen-layout #fullscreen-danmaku-slot { flex:1; }.fullscreen-layout #quality,.fullscreen-layout #episodes-control { display:none; }.fullscreen-layout .danmaku-compose { gap:5px; }.fullscreen-layout #play-time { font-size:11px; } }
 .danmaku-panel summary .sidebar-menu { margin:0; }
 
 /* Fullscreen uses its own compact scale; override the regular controls' ID selectors. */
@@ -442,8 +490,6 @@ body.watch-lights-off::after { content: ""; position: fixed; inset: 0; backgroun
 .shield-row > button { width:100%; margin:0; line-height:20px; font-size:12px; }
 .shield-row .shield-delete { font-size:12px; }
 
-/* A common width prevents the collection from protruding past the list above. */
-.watch-sidebar > .video-collection { width:96%; box-sizing:border-box; margin:18px auto 0; }
 .collection-list { overflow-x:hidden; overflow-y:auto; }
 .collection-item { width:100%; box-sizing:border-box; min-width:0; margin:3px 0; }
 .collection-item span { flex:1; min-width:0; }
@@ -483,6 +529,187 @@ body.watch-lights-off::after { content: ""; position: fixed; inset: 0; backgroun
   opacity:0;visibility:hidden;pointer-events:none;
 }
 .player-shell:not(.fullscreen-layout):not(.scroll-mini):is(:hover,:has(:focus-visible)) :is(.player-follow,.player-tools),
-.player-shell:not(.fullscreen-layout):not(.scroll-mini):not(.controls-idle):is(:hover,:has(:focus-visible)) :is(.player-controls,.trial-tip) {
+.player-shell:not(.fullscreen-layout):not(.scroll-mini):not(.controls-idle):is(:hover,:focus-within) :is(.player-controls,.trial-tip) {
   opacity:1;visibility:visible;pointer-events:auto;
 }
+
+.player-shell .control-popover:has(:focus-visible) > .hover-panel {
+  visibility:visible;
+  opacity:1;
+  pointer-events:auto;
+}
+#playback-rate { cursor:default; }
+.player-shell .speed-panel { width:max-content; min-width:70px; max-height:min(calc(100cqw * 9 / 16 - 60px),calc(100dvh - 85px)); padding:4px; }
+.speed-panel:has(#speed-options:not([hidden])) { overflow-y:auto; }
+.player-shell .speed-panel :is(#speed-options button,#speed-login) { display:block; width:100%; padding:5px 10px; }
+.player-shell .speed-panel:has(#speed-login:not([hidden])) {
+  width:138px;
+  padding:16px 20px;
+  font-size:14px;
+}
+.speed-panel .speed-guest-title { display:none; }
+.speed-panel:has(#speed-login:not([hidden])) .speed-guest-title {
+  display:block;
+  margin:0 0 12px;
+  font-weight:600;
+}
+.player-shell .speed-panel #speed-login {
+  min-height:34px;
+  padding:4px 0;
+  border-radius:6px;
+  text-align:center;
+  font-weight:400;
+}
+.player-shell .speed-panel #speed-options button:hover { background:#ffffff18; }
+.player-shell .speed-panel #speed-options button[aria-pressed="true"] { color:var(--blue); }
+.player-shell #subtitle-availability { width:max-content; max-width:160px; padding:10px 12px; }
+.player-shell :is(#wide-toggle,#pip-toggle,#web-fullscreen,#fullscreen-toggle)[aria-pressed="true"] { color:var(--blue); }
+html:has(body.watch-web-fullscreen), body.watch-web-fullscreen { overflow:hidden; }
+.watch-web-fullscreen :is(.masthead,.watch-heading,.watch-details,.watch-sidebar,footer,.back-top,#watch-mini-toggle,#sender-tooltip) {
+  visibility:hidden;
+}
+.watch-web-fullscreen .watch-layout > .watch-main { z-index:1001; }
+.watch-web-fullscreen #player-shell-home { aspect-ratio:16/9; }
+.watch-player-block:has(.mini-player) #player-shell-home { aspect-ratio:16/9; background:#18191c; }
+.player-shell.web-full { width:100%; height:100%; }
+.watch-layout.wide-mode > :is(.watch-main,.watch-sidebar) { display:contents; }
+.wide-mode .watch-heading { grid-area:heading; min-width:0; }
+.wide-mode .watch-author { grid-area:author; min-width:0; margin-bottom:0; }
+.wide-mode .watch-player-block { grid-area:player; min-width:0; container-type:inline-size; }
+.wide-mode .watch-details { grid-area:details; min-width:0; container-type:inline-size; }
+.wide-mode .watch-sidebar-content { grid-area:sidebar; min-width:0; }
+.watch-layout.wide-mode {
+  grid-template-columns:minmax(0,2.335fr) minmax(0,1fr);
+  grid-template-areas:"heading author" "player player" "details sidebar";
+  row-gap:16px;
+}
+.wide-mode .watch-sidebar-content .danmaku-panel { margin-top:12px; }
+body:has(.wide-mode) #watch-mini-toggle { display:none; }
+.heatmap-display { position:absolute; inset:auto 0 50%; height:clamp(16px,3.9cqw,44px); pointer-events:none; }
+.heatmap-graph { display:block; width:100%; height:100%; fill:#ffffff52; stroke:none; }
+.player-shell #heatmap-pin {
+  position:absolute; right:0; bottom:3px; padding:2px; pointer-events:auto; z-index:2;
+}
+.player-shell #heatmap-pin .watch-icon { width:clamp(14px,2cqw,23px); height:clamp(14px,2cqw,23px); transform:rotate(-20deg); }
+.player-shell #heatmap-pin[aria-pressed="true"] .watch-icon { color:var(--blue); transform:none; }
+.player-shell #heatmap-pin::after { left:auto; right:0; transform:none; }
+.mini-player .heatmap-display,.scroll-mini .heatmap-display,.mini-player #wide-toggle { display:none; }
+.player-shell.heatmap-pinned:not(.scroll-mini):not(.mini-player):is(.controls-idle,.fullscreen-idle,:not(:hover,:focus-within):not(.fullscreen-layout)) .player-controls {
+  opacity:1; visibility:visible; pointer-events:none; background:none; padding-block:0;
+}
+.player-shell.heatmap-pinned:not(.scroll-mini):not(.mini-player):is(.controls-idle,.fullscreen-idle,:not(:hover,:focus-within):not(.fullscreen-layout)) :is(.control-row,#heatmap-pin,.seek-preview) { display:none; }
+@media(max-width:800px) {
+  .watch-layout.wide-mode { grid-template-columns:minmax(0,1fr); grid-template-areas:"heading" "author" "player" "details" "sidebar"; }
+}
+@media(max-width:480px) {
+  .player-shell .control-row { gap:6px; }
+  .player-shell .control-row .watch-icon { width:18px; height:18px; }
+  .player-shell #subtitle-control { display:none; }
+}
+
+.player-shell .control-row {
+  --control-icon-size:clamp(17px,2.2cqw,20px);
+  --control-icon-slot:clamp(21px,3.4cqw,28px);
+  --control-label-size:clamp(12px,1.7cqw,14px);
+  gap:clamp(5px,1cqw,8px);
+}
+.player-shell.fullscreen-layout .control-row {
+  --control-icon-size:clamp(18px,1.5cqw,24px);
+  --control-icon-slot:clamp(22px,2.25cqw,36px);
+  --control-label-size:clamp(12px,1.05cqw,16px);
+  --fullscreen-control-slot:max(var(--control-icon-slot), calc(var(--control-label-size) * 2.25));
+  gap:clamp(6px,1cqw,16px);
+}
+.control-row > :is(#play-toggle,#fullscreen-prev,#fullscreen-next,#pip-toggle,#wide-toggle,#web-fullscreen,#fullscreen-toggle),
+.control-row :is(#mute-toggle,#settings-toggle) {
+  flex:0 0 auto;
+  inline-size:var(--control-icon-slot);
+  min-inline-size:0;
+  min-block-size:28px;
+}
+.player-shell .control-row :is(#play-toggle,#fullscreen-prev,#fullscreen-next,#pip-toggle,#wide-toggle,#web-fullscreen,#fullscreen-toggle,#mute-toggle,#settings-toggle) > .watch-icon {
+  inline-size:var(--control-icon-size);
+  block-size:var(--control-icon-size);
+  margin-inline:auto;
+}
+.player-shell .control-row :is(#quality,#playback-rate,#subtitle-toggle,#fullscreen-episodes) {
+  font-size:var(--control-label-size);
+}
+.player-shell #speed-control {
+  flex:0 0 calc(var(--control-label-size) * 3.5);
+  inline-size:calc(var(--control-label-size) * 3.5);
+}
+#playback-rate { inline-size:100%; text-align:center; font-variant-numeric:tabular-nums; }
+.player-shell.fullscreen-layout .control-row > :is(
+  #quality, #episodes-control, #speed-control, #subtitle-control,
+  #volume-control, #settings-control, #pip-toggle, #web-fullscreen, #fullscreen-toggle
+) {
+  flex: 0 0 var(--fullscreen-control-slot);
+  inline-size: var(--fullscreen-control-slot);
+}
+.player-shell.fullscreen-layout .control-row > .control-popover > button {
+  inline-size: 100%;
+}
+.player-shell .speed-panel:has(#speed-options:not([hidden])) {
+  inline-size:70px;
+  padding:0;
+}
+.player-shell .speed-panel #speed-options button {
+  min-block-size:36px;
+  padding:0 6px;
+  font-size:14px;
+  font-variant-numeric:tabular-nums;
+  filter:none;
+}
+@media(max-width:480px) {
+  .player-shell .control-row,
+  .player-shell.fullscreen-layout .control-row { --control-icon-slot:21px; gap:5px; }
+}
+
+.danmaku-input #dm-style-toggle {
+  align-self: stretch;
+  padding: 0 clamp(8px, 1.1cqw, 18px);
+  border-radius: 0;
+  background: transparent;
+  color: #61666d;
+  font-size: 1.22em;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: .13em;
+}
+.fullscreen-layout .danmaku-input #dm-style-toggle { color: #fff; }
+.danmaku-input #dm-style-control[data-open="true"] #dm-style-toggle,
+.danmaku-input #dm-style-toggle:is(:hover, :focus-visible) { color: var(--blue); }
+.danmaku-input #dm-style-control::before,
+.danmaku-input #dm-style-panel::after { content: none; }
+.danmaku-input #dm-style-panel {
+  bottom: 100%;
+  width: min(clamp(190px, 26cqw, 240px), calc(100vw - 28px));
+  padding: 14px 16px;
+  color: #fff;
+  background: #18191ced;
+  font-size: 13px;
+  line-height: 1.4;
+  z-index: 9;
+}
+.danmaku-input #dm-style-control:not([data-open="true"]) #dm-style-panel { visibility: hidden; opacity: 0; pointer-events: none; }
+.danmaku-input #dm-style-control[data-open="true"] #dm-style-panel { visibility: visible; opacity: 1; pointer-events: auto; }
+.dm-style-panel fieldset { margin: 0; padding: 0; border: 0; min-inline-size: 0; }
+.dm-style-panel fieldset + fieldset { margin-top: 12px; }
+.dm-style-panel legend { padding: 0; margin-bottom: 6px; }
+.dm-style-sizes, .dm-style-modes, .dm-style-color { display: flex; gap: 8px; }
+.dm-style-sizes label { flex: 1; }
+.dm-style-modes label { width: 44px; }
+.dm-style-panel label { position: relative; cursor: pointer; }
+.dm-style-panel input[type="radio"] { position: absolute; opacity: 0; }
+.dm-style-panel label > span { display: grid; justify-items: center; gap: 3px; border-radius: 4px; }
+.dm-style-sizes label > span { padding: 4px 8px; background: #ffffff35; }
+.dm-style-modes svg { border-radius: 4px; padding: 3px; width: 29px; height: 24px; background: #ddd; color: #242424; }
+.dm-style-sizes input:checked + span, .dm-style-modes input:checked + span svg { background: var(--blue); }
+.dm-style-modes input:checked + span { color: var(--blue); }
+.dm-style-panel input:focus-visible + span { outline: 2px solid #fff; outline-offset: 2px; }
+.dm-style-color output { flex: 1; border: 1px solid #ffffff50; border-radius: 3px; padding: 3px 6px; }
+.dm-style-color input { width: 52px; height: 26px; border: 0; padding: 0; background: transparent; cursor: pointer; }
+.dm-color-palette { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; margin-top: 7px; }
+.danmaku-input #dm-color-palette .dm-color-swatch { padding: 0; border: 1px solid #0006; border-radius: 3px; aspect-ratio: 1; }
+.dm-color-swatch[aria-pressed="true"] { outline: 1px solid #fff; outline-offset: 1px; }
