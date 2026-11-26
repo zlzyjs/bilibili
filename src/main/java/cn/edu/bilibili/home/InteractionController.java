@@ -488,7 +488,7 @@ class InteractionController {
                                 HttpServletRequest request) {
         var member = write(request, "举报", "Lv1");
         var target = target(kind);
-        requireTarget(target, id);
+        requireTarget(target, id, member.uid());
         requireId(input.reason());
         String description = target != Target.VIDEO && (input.description() == null || input.description().isBlank())
                 ? "" : content(input.description(), 200);
@@ -589,6 +589,10 @@ class InteractionController {
     }
 
     private void requireTarget(Target target, String id) {
+        requireTarget(target, id, "0");
+    }
+
+    private void requireTarget(Target target, String id, String uid) {
         requireId(id);
         String publicVideo = "v.VideoStatus='published' AND v.VisibleStatus='public'";
         String query = switch (target) {
@@ -611,9 +615,13 @@ class InteractionController {
                     SELECT 1 FROM chain t JOIN commenttable c ON t.ReplyTargetType=1 AND t.ReplyTargetID=c.CommentID
                     JOIN videotable v USING(VideoID) WHERE c.CommentStatus='active' AND
                     """ + " " + publicVideo;
+            case MESSAGE -> """
+                    SELECT 1 FROM privatemessagetable m
+                    WHERE m.MessageID=CAST(:id AS UNSIGNED) AND m.ReceiverUID=CAST(:uid AS UNSIGNED) AND m.ReceiverDel=0
+                    """;
             case ACCOUNT -> "SELECT 1 FROM usertable WHERE UID=CAST(:id AS UNSIGNED) AND AccountStatus='active'";
         };
-        if (!jdbc.sql("SELECT EXISTS(" + query + ")").param("id", id).query(Boolean.class).single()) {
+        if (!jdbc.sql("SELECT EXISTS(" + query + ")").param("id", id).param("uid", uid).query(Boolean.class).single()) {
             throw error(NOT_FOUND, "操作对象不存在或已不可见");
         }
     }
@@ -656,6 +664,7 @@ class InteractionController {
             case "danmaku" -> Target.DANMAKU;
             case "comment" -> Target.COMMENT;
             case "reply" -> Target.REPLY;
+            case "message" -> Target.MESSAGE;
             case "account" -> Target.ACCOUNT;
             default -> throw error(BAD_REQUEST, "无效的操作对象");
         };
@@ -676,7 +685,7 @@ class InteractionController {
     }
 
     private enum Target {
-        VIDEO(0), DANMAKU(1), COMMENT(2), REPLY(3), ACCOUNT(5);
+        VIDEO(0), DANMAKU(1), COMMENT(2), REPLY(3), MESSAGE(4), ACCOUNT(5);
         final int code;
         Target(int code) { this.code = code; }
     }

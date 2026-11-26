@@ -100,7 +100,7 @@ class MessageStore {
                 WHERE MessageID=CAST(:id AS UNSIGNED) AND SenderUID=CAST(:uid AS UNSIGNED) AND SenderDel=0
                   AND SendTime BETWEEN CURRENT_TIMESTAMP - INTERVAL 180 SECOND AND CURRENT_TIMESTAMP
                 """).param("uid", uid).param("id", id).update();
-        if (deleted == 0) throw new ResponseStatusException(CONFLICT, "只能撤回三分钟内自己发送的消息");
+        if (deleted == 0) throw new ResponseStatusException(CONFLICT, "发送时间超过3分钟不能撤回");
     }
 
     List<Conversation> conversations(String uid, int offset) {
@@ -130,10 +130,7 @@ class MessageStore {
         String issue = blocked ? "双方存在黑名单关系，无法发送" : null;
         boolean canSend = !blocked && !(restricted(uid, peer) && sentBefore(uid, peer));
         List<Chat> rows = jdbc.sql("""
-                SELECT m.MessageID,m.SenderUID,m.MessageType,IF(m.MessageType=0,m.MessageContent,NULL),m.SendTime,v.VideoID,u.Name,v.UID,
-                       (m.SenderUID=CAST(:uid AS UNSIGNED) AND m.SendTime
-                         BETWEEN CURRENT_TIMESTAMP - INTERVAL 180 SECOND AND CURRENT_TIMESTAMP
-                         AND NOT EXISTS (SELECT 1 FROM reporttable WHERE TargetType=4 AND TargetID=m.MessageID)) AS recallable
+                SELECT m.MessageID,m.SenderUID,m.MessageType,IF(m.MessageType=0,m.MessageContent,NULL),m.SendTime,v.VideoID,u.Name,v.UID
                 FROM privatemessagetable m
                 LEFT JOIN LATERAL (
                     SELECT VideoID,UID FROM videotable WHERE VideoContent=m.MessageContent
@@ -144,7 +141,7 @@ class MessageStore {
                 ORDER BY m.MessageID DESC LIMIT 41
                 """.formatted(PAIR, VISIBLE)).param("uid", uid).param("peer", peer).param("before", before)
                 .query((rs, row) -> new Chat(rs.getString(1), rs.getString(2), rs.getInt(3), rs.getString(4),
-                        rs.getObject(5, LocalDateTime.class), rs.getString(6), rs.getString(7), rs.getString(8), rs.getBoolean("recallable"))).list();
+                        rs.getObject(5, LocalDateTime.class), rs.getString(6), rs.getString(7), rs.getString(8))).list();
         return new ThreadView(name, canSend, issue, rows.stream().limit(40).toList(), rows.size() > 40);
     }
 
@@ -203,7 +200,7 @@ class MessageStore {
     record Image(String mime, byte[] bytes) {}
     record Conversation(String uid, String name, int type, String preview) {}
     record Chat(String id, String sender, int type, String text, LocalDateTime sentAt, String videoId,
-                String author, String authorId, boolean recallable) {}
+                String author, String authorId) {}
     record ThreadView(String name, boolean canSend, String issue, List<Chat> messages, boolean hasMore) {}
 }
 

@@ -59,7 +59,8 @@ html:has(body.message-center-page){scrollbar-gutter:auto}
 .mc-history{flex:1;padding:0 16px;background:#f6f7f8}
 .mc-chat-note{width:fit-content;margin:0 auto;padding:16px 10px;color:#61666d;text-align:center;font-size:12px}
 .mc-bubbles{display:block}
-.mc-message{display:flex;align-items:flex-start;gap:10px;margin:0 0 16px}
+.mc-message{display:flex;flex-wrap:wrap;align-items:flex-start;gap:10px;margin:0 0 16px}
+.mc-message>time{flex:0 0 100%;text-align:center}
 .mc-message .mc-avatar{width:30px;height:30px}
 .mc-mine{flex-direction:row-reverse}
 .mc-message-detail{display:grid;justify-items:start;gap:5px;max-width:80%}
@@ -156,4 +157,7 @@ html:has(body.message-center-page){scrollbar-gutter:auto}
   .mc-context{grid-column:2;-webkit-line-clamp:2}
 }
 
-.mc-message-controls{display:flex;gap:10px}
+.mc-msg-menu{position:fixed;z-index:30;display:flex;flex-direction:column;min-width:96px;padding:6px;border-radius:8px;background:#e9eaec;box-shadow:0 4px 16px rgba(24,25,28,.16)}
+.mc-msg-action{padding:7px 12px;border:0;border-radius:4px;background:none;color:#18191c;text-align:left;white-space:nowrap;font:inherit;font-size:14px;line-height:1.4;cursor:pointer}
+.mc-msg-action:hover{color:var(--mc-accent)}
+.mc-toast{position:absolute;left:50%;top:50%;z-index:20;transform:translate(-50%,-50%);margin:0;padding:10px 16px;border-radius:8px;background:#24272e;color:#fff;font-size:14px;white-space:nowrap;pointer-events:none}

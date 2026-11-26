@@ -68,7 +68,7 @@ class AccountCenterController {
             if (type >= 0 && type < earned.length) earned[type] = rs.getInt(2);
             return type;
         }).list();
-        return new Overview(identity, balance(uid), List.of(
+        return new Overview(identity, balance(uid), bcoins(uid), List.of(
                 new Reward("每日登录", earned[0], 2),
                 new Reward("观看视频", earned[1], 10),
                 new Reward("发布视频", earned[2], 5)));
@@ -222,6 +222,15 @@ class AccountCenterController {
                 .param("uid", uid).query(BigDecimal.class).single();
     }
 
+    private BigDecimal bcoins(String uid) {
+        return jdbc.sql("""
+                SELECT (SELECT COALESCE(SUM(p.BCoinAmount),0) FROM bcoinpurchasetable p
+                        WHERE p.UID=CAST(:uid AS UNSIGNED) AND p.OrderStatus=0)
+                     - (SELECT COALESCE(SUM(cc.BCoinAmount),0) FROM bcoinconsumptiontable cc
+                        WHERE cc.UID=CAST(:uid AS UNSIGNED) AND cc.OrderStatus=0)
+                """).param("uid", uid).query(BigDecimal.class).single();
+    }
+
     private AuthController.Member member(HttpServletRequest request, boolean write) {
         var member = auth.currentMember(request);
         if (member == null) throw new ResponseStatusException(UNAUTHORIZED, "请先登录");
@@ -255,7 +264,7 @@ class AccountCenterController {
     record Profile(String name, String signature, int gender, LocalDate birthday,
                    @com.fasterxml.jackson.annotation.JsonIgnore String headUrl) {}
     record Identity(String name, BigDecimal experience, String level, BigDecimal threshold, BigDecimal nextThreshold) {}
-    record Overview(Identity identity, BigDecimal coins, List<Reward> rewards) {}
+    record Overview(Identity identity, BigDecimal coins, BigDecimal bcoins, List<Reward> rewards) {}
     record Reward(String title, int earned, int maximum) {}
     record Blocked(String uid, String name, boolean active, LocalDateTime time) {}
     record Entry(BigDecimal change, String reason, String video, LocalDateTime time) {}
