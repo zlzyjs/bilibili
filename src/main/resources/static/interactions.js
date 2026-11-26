@@ -615,17 +615,12 @@ function setupMessageDropdown(button) {
   navDropdown(button, 'dd-message', () => {
     const menu = node('div', 'dd-menu');
     [
-      ['/messages?tab=replies', '回复我的', 'replies'],
-      ['/messages?tab=mentions', '@我的', 'mentions'],
-      ['/messages?tab=likes', '收到的赞', 'likes'],
-      ['/messages?tab=system', '系统消息', 'system'],
-      ['/messages?tab=chat', '我的消息', 'chat']
-    ].forEach(([href, label, key]) => {
-      const item = link(href, label, 'dd-menu-item');
-      item.dataset.messageTab = key;
-      menu.append(item);
-    });
-    if (window.refreshMessageBadges) window.refreshMessageBadges();
+      ['/messages?tab=replies', '回复我的'],
+      ['/messages?tab=mentions', '@我的'],
+      ['/messages?tab=likes', '收到的赞'],
+      ['/messages?tab=system', '系统消息'],
+      ['/messages?tab=chat', '我的消息']
+    ].forEach(([href, label]) => menu.append(link(href, label, 'dd-menu-item')));
     return [menu];
   });
 }

@@ -353,14 +353,15 @@ class MysqlVideoCatalog {
         long total = jdbc.sql("SELECT COUNT(*) FROM commenttable WHERE VideoID=CAST(:id AS UNSIGNED) AND CommentStatus='active'")
                 .param("id", videoId).query(Long.class).single();
         var comments = jdbc.sql("""
-                SELECT c.CommentID, c.UID, u.Name, l.LevelName, c.Content, c.CommentTime,
-                  (c.ImageMime IS NOT NULL AND c.ImageBytes IS NOT NULL) AS HasImage,
+                SELECT c.CommentID, c.UID, u.Name, l.LevelName, %s AS Content, c.CommentTime,
+                  (%s IS NOT NULL) AS HasImage,
                   (SELECT COUNT(*) FROM liketable k WHERE k.LikeTargetType=2 AND k.LikeTargetID=c.CommentID) AS Likes
                 FROM commenttable c JOIN usertable u ON u.UID=c.UID
                 LEFT JOIN userleveltable l ON l.LevelID=u.LevelID
                 WHERE c.VideoID=CAST(:id AS UNSIGNED) AND c.CommentStatus='active'
                 ORDER BY
-                """ + (latest ? "" : " Likes DESC, ") + " c.CommentTime DESC, c.CommentID DESC LIMIT :size OFFSET :offset")
+                """.formatted(CommentContent.text("c"), CommentContent.IMAGE)
+                + (latest ? "" : " Likes DESC, ") + " c.CommentTime DESC, c.CommentID DESC LIMIT :size OFFSET :offset")
                 .param("id", videoId).param("size", member ? 20 : 2).param("offset", member ? (page - 1) * 20 : 0)
                 .query((rs, row) -> {
                     var replies = previewReplies(rs.getString("CommentID"));
@@ -385,12 +386,13 @@ class MysqlVideoCatalog {
                     ON r.ReplyTargetType=0 AND r.ReplyTargetID=t.ReplyID
                   WHERE r.ReplyStatus='active' AND t.depth<30
                 )
-                SELECT t.ReplyID, t.UID, u.Name, l.LevelName, t.Content, t.ReplyTime,
+                SELECT t.ReplyID, t.UID, u.Name, l.LevelName, %s AS Content, t.ReplyTime,
                   (SELECT COUNT(*) FROM liketable k WHERE k.LikeTargetType=3 AND k.LikeTargetID=t.ReplyID) AS Likes,
                   COUNT(*) OVER() AS Total FROM thread t JOIN usertable u ON u.UID=t.UID
                 LEFT JOIN userleveltable l ON l.LevelID=u.LevelID
                 ORDER BY t.ReplyTime, t.ReplyID LIMIT :limit
-                """).param("id", commentId).param("limit", limit).query((rs, row) -> new ReplyPreview(rs.getString("ReplyID"),
+                """.formatted(CommentContent.text("t"))).param("id", commentId).param("limit", limit)
+                .query((rs, row) -> new ReplyPreview(rs.getString("ReplyID"),
                     rs.getString("UID"), rs.getString("Name"), rs.getString("LevelName"), rs.getString("Content"),
                     rs.getObject("ReplyTime", LocalDateTime.class), rs.getLong("Likes"), rs.getLong("Total"))).list();
     }

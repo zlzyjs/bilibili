@@ -8,11 +8,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import javax.imageio.ImageIO;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.jdbc.core.ConnectionCallback;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,13 +31,13 @@ class StudioUploadController {
     private static final long COVER_LIMIT = 5L * 1024 * 1024;
     private static final int MAX_DURATION = 36000;
     private final AuthController auth;
-    private final JdbcClient jdbc;
-    private final Path mediaRoot;
+    private final JdbcTemplate jdbc;
+    private final OssMedia oss;
 
-    StudioUploadController(AuthController auth, JdbcClient jdbc, @Value("${app.media-root}") String mediaRoot) {
+    StudioUploadController(AuthController auth, JdbcTemplate jdbc, OssMedia oss) {
         this.auth = auth;
         this.jdbc = jdbc;
-        this.mediaRoot = Path.of(mediaRoot).toAbsolutePath().normalize();
+        this.oss = oss;
     }
 
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -65,55 +67,62 @@ class StudioUploadController {
             throw new ResponseStatusException(PAYLOAD_TOO_LARGE, "视频或封面超过大小限制");
         }
         String name = account.uid() + "-" + token;
-        String videoPath = "media/videos/studio/" + name + "/video.mp4";
-        String coverPath = "media/covers/studio/" + name + ".jpg";
-        String existing = receipt(account.uid(), videoPath);
-        if (existing != null) return Map.of("id", existing);
+        String videoKey = "media/videos/studio/" + name + "/video.mp4";
+        String coverKey = "media/covers/studio/" + name + ".jpg";
+        String lock = "studio:" + name;
+        return jdbc.execute((ConnectionCallback<Map<String, String>>) connection -> {
+            // Keep the MySQL lock and submission procedure on the same connection.
+            var session = JdbcClient.create(new SingleConnectionDataSource(connection, true));
+            Integer acquired = session.sql("SELECT GET_LOCK(:lock, 0)").param("lock", lock)
+                    .query(Integer.class).optional().orElse(0);
+            if (acquired != 1) {
+                throw new ResponseStatusException(CONFLICT, "??????????????????");
+            }
+            try {
+                String existing = receipt(session, account.uid(), oss.reference(videoKey), videoKey);
+                if (existing != null) return Map.of("id", existing);
+                return uploadAndSubmit(session, account.uid(), video, cover, videoKey, coverKey,
+                        title, description, category, Integer.parseInt(statement), visibility);
+            } finally {
+                session.sql("SELECT RELEASE_LOCK(:lock)").param("lock", lock).query(Integer.class).optional();
+            }
+        });
+    }
 
+    private Map<String, String> uploadAndSubmit(JdbcClient session, String uid, MultipartFile video,
+            MultipartFile cover, String videoKey, String coverKey, String title, String description,
+            String category, int statement, String visibility) {
+        Path directory = null;
         Path videoFile = null;
         Path coverFile = null;
-        boolean ownsDirectory = false;
-        boolean submitted = false;
-        boolean mayHaveCommitted = false;
         try {
-            Path directory = storageDirectory("media/videos/studio").resolve(name);
-            try {
-                Files.createDirectory(directory);
-            } catch (java.nio.file.FileAlreadyExistsException ex) {
-                existing = receipt(account.uid(), videoPath);
-                if (existing != null) return Map.of("id", existing);
-                throw new ResponseStatusException(CONFLICT, "这次投稿正在处理，请稍后查看稿件管理");
-            }
-            ownsDirectory = true;
+            directory = Files.createTempDirectory("bili-studio-");
             videoFile = directory.resolve("video.mp4");
-            coverFile = storageDirectory("media/covers/studio").resolve(name + ".jpg");
+            coverFile = directory.resolve("cover.jpg");
             video.transferTo(videoFile);
             int duration = mp4Duration(videoFile);
             writeCover(cover, coverFile);
-            mayHaveCommitted = true;
-            String id = jdbc.sql("""
+            String coverPath = oss.putFile(coverKey, "image/jpeg", coverFile);
+            String videoPath = oss.putFile(videoKey, "video/mp4", videoFile);
+            String id = session.sql("""
                 CALL sp_submit_video_audit_with_tags(:uid,NULL,:title,:description,:cover,:video,
                     :statement,:category,NULL,:duration,:visibility,NULL)
-                """).param("uid", account.uid()).param("title", title).param("description", description)
-                    .param("cover", coverPath).param("video", videoPath).param("statement", Integer.parseInt(statement))
+                """).param("uid", uid).param("title", title).param("description", description)
+                    .param("cover", coverPath).param("video", videoPath).param("statement", statement)
                     .param("category", category).param("duration", duration).param("visibility", visibility)
                     .query((rs, row) -> rs.getString("VideoID")).single();
-            submitted = true;
             return Map.of("id", id);
         } catch (DataAccessException error) {
             if (error.getMostSpecificCause() instanceof java.sql.SQLException sql && "45000".equals(sql.getSQLState())) {
-                mayHaveCommitted = false;
-                throw new ResponseStatusException(CONFLICT, "投稿未通过校验，请检查账号等级和所选分区");
+                throw new ResponseStatusException(CONFLICT, "????????????????????");
             }
             throw error;
         } catch (IOException error) {
-            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "投稿文件保存失败，请稍后重试", error);
+            throw new ResponseStatusException(INTERNAL_SERVER_ERROR, "??????????????", error);
         } finally {
-            if (ownsDirectory && !submitted && !mayHaveCommitted) {
-                delete(coverFile);
-                delete(videoFile);
-                if (videoFile != null) delete(videoFile.getParent());
-            }
+            delete(coverFile);
+            delete(videoFile);
+            delete(directory);
         }
     }
 
@@ -129,18 +138,18 @@ class StudioUploadController {
         return ResponseEntity.status(error.getStatusCode()).body(Map.of("message", message));
     }
 
-    private String receipt(String uid, String videoPath) {
-        return jdbc.sql("""
+    private String receipt(JdbcClient session, String uid, String remotePath, String localPath) {
+        return session.sql("""
             SELECT CAST(VideoID AS CHAR) FROM videopendingaudittable
-            WHERE UID=CAST(:uid AS UNSIGNED) AND VideoContent=:path ORDER BY PendingAuditID LIMIT 1
-            """).param("uid", uid).param("path", videoPath).query(String.class).optional().orElse(null);
-    }
-
-    private Path storageDirectory(String name) throws IOException {
-        Path expected = mediaRoot.toRealPath().resolve(name);
-        Files.createDirectories(expected);
-        if (!expected.toRealPath().equals(expected)) throw new IOException("Unexpected upload directory");
-        return expected;
+            WHERE UID=CAST(:uid AS UNSIGNED) AND VideoContent IN (:remote,:local)
+            ORDER BY PendingAuditID LIMIT 1
+            """).param("uid", uid).param("remote", remotePath).param("local", localPath)
+                .query(String.class).optional().orElseGet(() -> session.sql("""
+                    SELECT CAST(VideoID AS CHAR) FROM videotable
+                    WHERE UID=CAST(:uid AS UNSIGNED) AND VideoContent IN (:remote,:local)
+                    ORDER BY VideoID LIMIT 1
+                    """).param("uid", uid).param("remote", remotePath).param("local", localPath)
+                        .query(String.class).optional().orElse(null));
     }
 
     private static String field(MultipartHttpServletRequest body, String name) {

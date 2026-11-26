@@ -112,7 +112,7 @@ async function setupWatchComments(videoId) {
   const fileInput = el('comment-image-file'), preview = el('comment-image-preview'), previewImage = el('comment-preview-image');
   let selectedImage = null, previewUrl, posting = false, composerUid;
   function updateSend() {
-    const hasContent = Boolean(input.value?.trim() || selectedImage);
+    const hasContent = Boolean(input.value?.trim());
     form.setAttribute('data-has-content', String(hasContent));
     send.disabled = posting || !hasContent;
   }
@@ -145,7 +145,7 @@ async function setupWatchComments(videoId) {
     event.preventDefault();
     if (!signedIn()) return openLogin(guest);
     const value = input.value.trim(), image = selectedImage, uid = composerUid;
-    if (posting || (!value && !image)) return;
+    if (posting || !value) return;
     posting = true;
     updateSend();
     try {

@@ -29,12 +29,15 @@ class InteractionController {
     private final AuthController auth;
     private final MysqlVideoCatalog catalog;
     private final MessageStore inbox;
+    private final OssMedia oss;
 
-    InteractionController(JdbcClient jdbc, AuthController auth, MysqlVideoCatalog catalog, MessageStore inbox) {
+    InteractionController(JdbcClient jdbc, AuthController auth, MysqlVideoCatalog catalog, MessageStore inbox,
+                          OssMedia oss) {
         this.jdbc = jdbc;
         this.auth = auth;
         this.catalog = catalog;
         this.inbox = inbox;
+        this.oss = oss;
     }
 
     @ModelAttribute
@@ -230,33 +233,31 @@ class InteractionController {
                                       @RequestParam(defaultValue = "") String value, HttpServletRequest request) {
         var member = write(request, "评论", "Lv2");
         requireTarget(Target.VIDEO, id);
-        createComment(id, member, value.isBlank() ? "" : content(value, 1000), inbox.imageUpload(file));
+        createComment(id, member, content(value, 1000), inbox.imageUpload(file));
         return ResponseEntity.noContent().build();
     }
 
     private void createComment(String id, AuthController.Member member, String text, MessageStore.Image image) {
-        var keys = new org.springframework.jdbc.support.GeneratedKeyHolder();
+        String path = image == null ? null
+                : oss.putImage("media/comment/" + member.uid() + "/", image.mime(), image.bytes());
         jdbc.sql("""
-                INSERT INTO commenttable (UID,VideoID,Content,ImageMime,ImageBytes)
-                VALUES (:uid,:id,:text,:mime,:image)
-                """).param("uid", member.uid()).param("id", id).param("text", text)
-                .param("mime", image == null ? null : image.mime(), Types.VARCHAR)
-                .param("image", image == null ? null : image.bytes(), Types.BLOB).update(keys);
-        inbox.mentions(member.uid(), "comment", keys.getKey(), text);
+                INSERT INTO commenttable (UID,VideoID,Content)
+                VALUES (:uid,:id,%s)
+                """.formatted(CommentContent.ENCODE)).param("uid", member.uid()).param("id", id).param("text", text)
+                .param("image", path, Types.VARCHAR).param("mentions", inbox.mentionedUsers(member.uid(), text)).update();
     }
 
     @GetMapping("/comments/{id}/image")
     ResponseEntity<byte[]> commentImage(@PathVariable String id) {
         requireTarget(Target.COMMENT, id);
-        var image = jdbc.sql("""
-                SELECT ImageMime,ImageBytes FROM commenttable
-                WHERE CommentID=CAST(:id AS UNSIGNED) AND CommentStatus='active'
-                  AND ImageMime IS NOT NULL AND ImageBytes IS NOT NULL
-                """)
-                .param("id", id).query((rs, row) -> new MessageStore.Image(rs.getString(1), rs.getBytes(2)))
+        String path = jdbc.sql("""
+                SELECT %s FROM commenttable c
+                WHERE CommentID=CAST(:id AS UNSIGNED) AND CommentStatus='active' AND ASCII(c.Content)=30
+                """.formatted(CommentContent.IMAGE)).param("id", id).query(String.class)
                 .optional().orElseThrow(() -> error(NOT_FOUND, "评论图片不存在"));
-        return ResponseEntity.ok().contentType(MediaType.parseMediaType(image.mime()))
-                .header("X-Content-Type-Options", "nosniff").body(image.bytes());
+        var remote = oss.location(path, "comment/");
+        if (remote == null) throw error(NOT_FOUND, "评论图片不存在");
+        return ResponseEntity.status(FOUND).location(remote).build();
     }
 
     @PostMapping("/replies/{kind}/{id}")
@@ -267,12 +268,14 @@ class InteractionController {
         var target = target(kind);
         if (target != Target.COMMENT && target != Target.REPLY) throw error(BAD_REQUEST, "无效的回复对象");
         requireTarget(target, id);
-        var keys = new org.springframework.jdbc.support.GeneratedKeyHolder();
         String text = content(input.value(), 1000);
-        jdbc.sql("INSERT INTO replytable (UID,ReplyTargetID,ReplyTargetType,Content) VALUES (:uid,:id,:type,:text)")
+        jdbc.sql("""
+                INSERT INTO replytable (UID,ReplyTargetID,ReplyTargetType,Content)
+                VALUES (:uid,:id,:type,%s)
+                """.formatted(CommentContent.ENCODE))
                 .param("uid", member.uid()).param("id", id).param("type", target == Target.COMMENT ? 1 : 0)
-                .param("text", text).update(keys);
-        inbox.mentions(member.uid(), "reply", keys.getKey(), text);
+                .param("text", text).param("image", null, Types.VARCHAR)
+                .param("mentions", inbox.mentionedUsers(member.uid(), text)).update();
         return ResponseEntity.noContent().build();
     }
 

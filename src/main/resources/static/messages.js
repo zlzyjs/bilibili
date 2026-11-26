@@ -1,16 +1,13 @@
 (() => {
   const root = el('message-center');
-  const navButton = document.querySelector('[data-interaction=messages]');
   const tabs = { chat: '我的消息', replies: '回复我的', mentions: '@ 我的', likes: '收到的赞',
-    system: '系统通知', settings: '消息设置' };
+    system: '系统通知' };
   let tab = Object.hasOwn(tabs, params.get('tab')) ? params.get('tab') : 'chat';
   let peer = params.get('uid');
-  let folder = params.get('folder') === 'strangers';
   function syncRoute() {
     const route = new URLSearchParams(location.search);
     tab = Object.hasOwn(tabs, route.get('tab')) ? route.get('tab') : 'chat';
     peer = route.get('uid');
-    folder = route.get('folder') === 'strangers';
   }
   const url = (key, extra = {}) => '/messages?' + new URLSearchParams({ tab: key, ...extra });
   const button = (label, action, css = 'mc-button') => {
@@ -102,25 +99,6 @@
     return apiRequest('/api/message-center', resource, { method, body: data, fallback: '消息操作失败，请重试' });
   }
 
-  function badge(host, count) {
-    host.querySelector('.mc-badge')?.remove();
-    if (count > 0) host.append(node('span', 'mc-badge', count > 99 ? '99+' : count));
-  }
-
-  async function refreshBadges() {
-    const uid = currentAccount?.uid;
-    if (!uid) {
-      badge(navButton, 0);
-      return;
-    }
-    try {
-      const counts = await inbox('/unread');
-      if (currentAccount?.uid !== uid) return;
-      badge(navButton, Object.values(counts).reduce((total, value) => total + value, 0));
-      document.querySelectorAll('[data-message-tab]').forEach(item => badge(item, counts[item.dataset.messageTab]));
-    } catch {}
-  }
-
   function avatar(uid) {
     const image = node('img', 'mc-avatar');
     image.alt = '';
@@ -148,18 +126,17 @@
     const main = node('section', 'mc-conversation');
     if (peer) frame.classList.add('mc-thread-open');
     const bar = node('div', 'mc-threads-title');
-    bar.append(folder ? link(url('chat'), '返回最近会话') : node('span', '', '最近会话'));
+    bar.append(node('span', '', '最近会话'));
     list.append(bar, entries);
     frame.append(list, main);
     section.append(frame);
-    const preferences = await inbox('/preferences');
     const threads = [];
     let moreThreads = true;
     let offset = 0;
     let currentName;
     let loadingThreads = false;
     const threadPath = '/threads/' + encodeURIComponent(peer);
-    const threadLink = (uid, name) => link(url('chat', { ...(folder ? { folder: 'strangers' } : {}), uid }), name);
+    const threadLink = (uid, name) => link(url('chat', { uid }), name);
 
     function threadItem(row) {
       const prefs = readChatPrefs(row.uid);
@@ -172,33 +149,21 @@
       const preview = [row.preview || '', '[图片]', '[视频]'][row.type] || '';
       if (preview) words.append(node('small', '', preview));
       item.append(avatar(row.uid), words);
-      if (prefs.mute) {
-        const quiet = node('span', 'mc-quiet');
-        quiet.append(icon('bell-off'));
-        item.append(quiet);
-      } else if (preferences.reminders) badge(item, row.unread);
       return item;
     }
 
     function renderThreads() {
       const scrollTop = entries.scrollTop;
-      const unknown = threads.filter(row => !row.following);
       entries.replaceChildren();
-      const displayed = threads.filter(row => folder ? !row.following : !preferences.foldStrangers || row.following);
+      const displayed = [...threads];
       if (peer && currentName && !displayed.some(row => row.uid === peer)) {
         displayed.unshift({ uid: peer, name: currentName });
       }
       const pinnedRows = displayed.filter(row => readChatPrefs(row.uid).pin);
       const restRows = displayed.filter(row => !readChatPrefs(row.uid).pin);
       entries.append(...pinnedRows.map(threadItem));
-      if (preferences.foldStrangers && !folder && unknown.length) {
-        const group = link(url('chat', { folder: 'strangers' }), '', 'mc-strangers');
-        group.append(icon('mail'), node('span', '', '未关注的人'));
-        if (preferences.reminders) badge(group, unknown.reduce((total, row) => total + row.unread, 0));
-        entries.append(group);
-      }
       entries.append(...restRows.map(threadItem));
-      if (!displayed.length) entries.append(empty(folder ? '暂无未关注人的会话' : '暂无最近会话'));
+      if (!displayed.length) entries.append(empty('暂无最近会话'));
       if (moreThreads) entries.append(button('加载更多会话', async event => {
         event.currentTarget.disabled = true;
         try { await loadThreads(); }
@@ -235,7 +200,7 @@
     }
 
     const heading = node('div', 'mc-chat-title');
-    const back = link(url('chat', folder ? { folder: 'strangers' } : {}), '会话列表', 'mc-chat-back');
+    const back = link(url('chat'), '会话列表', 'mc-chat-back');
     const nameLink = link('/space/' + encodeURIComponent(peer), '');
     heading.append(back, nameLink);
 
@@ -249,13 +214,11 @@
     let prefs = readChatPrefs(peer);
     let blocked = false;
     const pinItem = node('button', 'mc-menu-item');
-    const muteItem = node('button', 'mc-menu-item');
     const blockItem = node('button', 'mc-menu-item');
     const reportItem = node('button', 'mc-menu-item', '举报该用户');
     const pushItem = node('button', 'mc-menu-item');
     function refreshMenuLabels() {
       pinItem.textContent = prefs.pin ? '取消置顶' : '置顶聊天';
-      muteItem.textContent = prefs.mute ? '关闭免打扰' : '开启免打扰';
       blockItem.textContent = blocked ? '移出黑名单' : '加入黑名单';
       pushItem.textContent = prefs.noPush ? '接收推送' : '不接收推送';
     }
@@ -266,7 +229,6 @@
       renderThreads();
     };
     pinItem.onclick = () => toggle('pin', !prefs.pin);
-    muteItem.onclick = () => toggle('mute', !prefs.mute);
     pushItem.onclick = () => {
       if (prefs.noPush) toggle('noPush', false);
       else mcConfirm('确认关闭内容推送吗？', '关闭后，你将不再收到该账号的内容推送，但通知类消息不受影响', () => toggle('noPush', true));
@@ -285,7 +247,7 @@
       else mcConfirm('加入黑名单', '加入黑名单后，将自动解除关注关系和对该用户的合集订阅关系，禁止该用户与我互动或查看我的空间', () => setBlock(true));
     };
     reportItem.onclick = () => reportAccount(peer, currentName);
-    dropdown.append(pinItem, muteItem, blockItem, reportItem, pushItem);
+    dropdown.append(pinItem, blockItem, reportItem, pushItem);
     dropdown.addEventListener('click', () => { dropdown.hidden = true; });
     menuBtn.onclick = event => { event.stopPropagation(); dropdown.hidden = !dropdown.hidden; };
     const closeMenu = event => {
@@ -343,7 +305,11 @@
     let issue = '';
     let canSend = true;
     let busy = false;
-    let newest;
+    let latestIds;
+    let loadedPages = 1;
+    let historyVersion = 0;
+    let loadingOlder = false;
+    let updatingMessage = false;
     let oldest;
     let hasMore;
     let polling = false;
@@ -391,53 +357,87 @@
         else body.textContent = '转发的视频已不可用';
       } else body.textContent = row.text;
       const detail = node('div', 'mc-message-detail');
-      detail.append(node('time', '', formatTime(row.sentAt)), body);
+      entry.dataset.messageId = row.id;
+      const controls = node('div', 'mc-message-controls');
+      controls.append(button('删除', () => changeMessage(row.id, false), 'mc-text-button'));
+      const recall = button('撤回', () => changeMessage(row.id, true), 'mc-text-button mc-recall');
+      recall.hidden = !row.recallable;
+      if (mine) controls.append(recall);
+      detail.append(node('time', '', formatTime(row.sentAt)), body, controls);
       entry.append(avatar(row.sender), detail);
       return entry;
     }
 
     async function loadOlder(event) {
+      if (loadingOlder) return;
+      loadingOlder = true;
+      const version = ++historyVersion;
       event.currentTarget.disabled = true;
       try {
         const previousHeight = history.scrollHeight;
         const olderPage = await inbox(threadPath + '?before=' + oldest);
-        if (!stillCurrent()) return;
+        if (!stillCurrent() || version !== historyVersion) return;
         const ordered = [...olderPage.messages].reverse();
         bubbles.prepend(...ordered.map(bubble));
+        loadedPages++;
+        latestIds = Array.from(bubbles.children, entry => entry.dataset.messageId).reverse().join(',');
         oldest = ordered[0]?.id || oldest;
         hasMore = olderPage.hasMore;
         older.hidden = !hasMore;
         history.scrollTop += history.scrollHeight - previousHeight;
       } catch (error) { status.textContent = error.message; }
-      finally { older.disabled = false; }
+      finally { loadingOlder = false; older.disabled = false; }
     }
 
     async function loadLatest(force = false) {
+      if (loadingOlder && !force) return;
+      const version = ++historyVersion;
       const result = await inbox(threadPath);
-      if (!stillCurrent()) return;
+      const messages = [...result.messages];
+      let more = result.hasMore;
+      for (let page = 1; page < loadedPages && more && messages.length; page++) {
+        if (!stillCurrent() || version !== historyVersion) return;
+        const olderPage = await inbox(threadPath + '?before=' + messages.at(-1).id);
+        messages.push(...olderPage.messages);
+        more = olderPage.hasMore;
+      }
+      if (!stillCurrent() || version !== historyVersion) return;
       currentName = result.name;
       nameLink.textContent = result.name;
       issue = result.issue;
       canSend = result.canSend;
       updateComposer();
-      const latestId = result.messages[0]?.id;
-      if (force || latestId !== newest || (result.messages.length === 0 && bubbles.children.length > 0)) {
-        const ordered = [...result.messages].reverse();
-        const index = ordered.findIndex(row => row.id === newest);
-        if (index < 0 || force) {
-          bubbles.replaceChildren(...ordered.map(bubble));
-          oldest = ordered[0]?.id;
-          hasMore = result.hasMore;
-        } else {
-          bubbles.append(...ordered.slice(index + 1).map(bubble));
-        }
+      const ids = messages.map(row => row.id).join(',');
+      if (force || ids !== latestIds) {
+        const currentTop = history.scrollTop;
+        const showLatest = latestIds === undefined || ids.split(',')[0] !== latestIds.split(',')[0];
+        const ordered = messages.reverse();
+        bubbles.replaceChildren(...ordered.map(bubble));
+        oldest = ordered[0]?.id;
+        hasMore = more;
         older.hidden = !hasMore;
-        newest = latestId;
-        updateNote();
-        history.scrollTop = history.scrollHeight;
-        if (newest) await inbox(threadPath + '/read', 'PUT', { through: newest });
+        latestIds = ids;
+        history.scrollTop = showLatest ? history.scrollHeight : currentTop;
         await loadThreads(true);
-      } else updateNote();
+      } else {
+        const recallable = new Set(messages.filter(row => row.recallable).map(row => row.id));
+        for (const entry of bubbles.children) {
+          const control = entry.querySelector('.mc-recall');
+          if (control) control.hidden = !recallable.has(entry.dataset.messageId);
+        }
+      }
+      updateNote();
+    }
+
+    async function changeMessage(id, recall) {
+      if (updatingMessage || !stillCurrent()) return;
+      updatingMessage = true;
+      status.textContent = '';
+      try {
+        await inbox('/messages/' + encodeURIComponent(id) + (recall ? '/recall' : ''), 'DELETE');
+        await loadLatest(true);
+      } catch (error) { status.textContent = error.message; }
+      finally { updatingMessage = false; }
     }
 
     async function sendMessage(action, sent) {
@@ -566,17 +566,7 @@
           finally { like.disabled = false; }
         }, 'mc-text-button');
         pressInteraction(like, event.liked);
-        actions.append(reply, like, button('删除该通知', async action => {
-          const control = action.currentTarget;
-          control.disabled = true;
-          try {
-            await inbox('/events/' + tab + '/state', 'PUT', { ids: [event.id], dismissed: true });
-            item.remove();
-            offset = Math.max(0, offset - 1);
-            if (!list.children.length && next.hidden) list.append(empty('暂无' + tabs[tab], 'notice'));
-            refreshBadges();
-          } catch (error) { status.textContent = error.message; control.disabled = false; }
-        }, 'mc-text-button'));
+        actions.append(reply, like);
         body.append(form);
       }
       item.append(actor, body, link('/video/' + event.video, event.context || '查看原内容', 'mc-context'));
@@ -592,100 +582,10 @@
         list.append(...events.map(eventRow));
         if (!offset) list.append(empty('暂无' + tabs[tab], 'notice'));
         next.hidden = events.length < 40;
-        const unread = events.filter(row => row.unread).map(row => row.id);
-        if (unread.length) await inbox('/events/' + tab + '/state', 'PUT', { ids: unread, dismissed: false });
-        refreshBadges();
       } catch (error) { status.textContent = error.message; }
       finally { next.disabled = false; }
     }
     await loadNext();
-  }
-
-  async function settings(section, status, stillCurrent) {
-    let preferences = await inbox('/preferences');
-    if (!stillCurrent()) return;
-    const form = node('form', 'mc-settings');
-    form.onsubmit = event => event.preventDefault();
-    section.append(form);
-    let saving = false;
-    async function update(key, value) {
-      if (saving) return;
-      saving = true;
-      form.querySelectorAll('button, input').forEach(control => { control.disabled = true; });
-      try {
-        preferences = await inbox('/preferences', 'PUT', { ...preferences, [key]: value });
-        status.textContent = '设置已保存';
-        refreshBadges();
-      } catch (error) { status.textContent = error.message; }
-      finally { saving = false; render(); }
-    }
-
-    const toggles = [[true, '开启'], [false, '关闭']];
-    const audiences = [['all', '所有人'], ['following', '关注的人'], ['none', '不接收任何消息提醒']];
-    function preference(key, title, description, choices = toggles) {
-      const row = node('fieldset', 'mc-setting');
-      row.append(node('legend', '', title));
-      if (description) row.append(node('p', '', description));
-      const options = node('div', 'mc-options');
-      for (const [value, label] of choices) {
-        const input = node('input');
-        input.type = 'radio';
-        input.name = key;
-        input.checked = preferences[key] === value;
-        input.onchange = () => update(key, value);
-        const choice = node('label');
-        choice.append(input, node('span', '', label));
-        options.append(choice);
-      }
-      row.append(options);
-      return row;
-    }
-
-    function keywords() {
-      const row = node('fieldset', 'mc-setting');
-      row.append(node('legend', '', '消息屏蔽词'), node('p', '', '包含屏蔽词的新消息将被自动拦截'));
-      const words = node('div', 'mc-keywords');
-      for (const word of preferences.keywords) {
-        const tag = button(word + ' ×', () => update('keywords', preferences.keywords.filter(existing => existing !== word)), 'mc-keyword');
-        tag.setAttribute('aria-label', '删除屏蔽词 ' + word);
-        words.append(tag);
-      }
-      const editor = node('div', 'mc-options');
-      const input = node('input', 'mc-keyword-input');
-      input.setAttribute('aria-label', '屏蔽词');
-      input.placeholder = '输入屏蔽词';
-      input.maxLength = 60;
-      const add = () => {
-        const word = input.value.trim();
-        if (word) update('keywords', [...new Set([...preferences.keywords, word])]);
-      };
-      input.onkeydown = event => {
-        if (event.key === 'Enter' && !event.isComposing) {
-          event.preventDefault();
-          add();
-        }
-      };
-      editor.append(input, button('添加屏蔽词', add));
-      row.append(words, editor);
-      return row;
-    }
-
-    function group(...rows) {
-      const card = node('section', 'mc-setting-group');
-      card.append(...rows);
-      return card;
-    }
-    function render() {
-      form.replaceChildren(
-        group(preference('reminders', '消息提醒', '控制消息入口和各分类的未读提醒')),
-        group(preference('smartFilter', '私信智能拦截', '自动拦截未关注账号发来的疑似骚扰或营销内容'), keywords()),
-        group(preference('replyPolicy', '回复我的消息提醒', '选择哪些人的回复会触发提醒', audiences),
-          preference('mentionPolicy', '@ 我的消息提醒', '选择哪些人的提及会触发提醒', audiences),
-          preference('likeAlert', '收到的赞消息提醒')),
-        group(preference('foldStrangers', '收起未关注人消息', '将未关注账号的会话放入单独列表'))
-      );
-    }
-    render();
   }
 
   let loginVersion = 0;
@@ -723,7 +623,6 @@
       } finally {
         if (stillCurrent()) root.querySelector('.mc-chat')?.removeAttribute('aria-busy');
       }
-      refreshBadges();
       return;
     }
     const aside = node('nav', 'mc-sidebar');
@@ -733,8 +632,6 @@
     aside.append(brand);
     for (const [key, label] of Object.entries(tabs)) {
       const item = link(url(key), label);
-      item.dataset.messageTab = key;
-      if (key === 'settings') item.prepend(icon('settings-outline'));
       if (key === tab) item.setAttribute('aria-current', 'page');
       aside.append(item);
     }
@@ -754,10 +651,8 @@
     }
     try {
       if (tab === 'chat') await chat(section, status, stillCurrent);
-      else if (tab === 'settings') await settings(section, status, stillCurrent);
       else await notifications(section, status, stillCurrent);
     } catch (error) { status.textContent = error.message; }
-    refreshBadges();
   }
 
   root.addEventListener('click', event => {
@@ -776,8 +671,6 @@
     renderCenter(true);
   });
   window.addEventListener('accountchange', () => renderCenter());
-  window.refreshMessageBadges = refreshBadges;
   if (path === '/messages') renderCenter();
-  setInterval(() => { if (!document.hidden) refreshBadges(); }, 25000);
 })();
 

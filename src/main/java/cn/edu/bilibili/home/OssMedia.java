@@ -4,7 +4,11 @@ import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSException;
 import com.aliyun.oss.ClientException;
 import com.aliyun.oss.model.ObjectMetadata;
+import com.aliyun.oss.model.PutObjectRequest;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
@@ -50,6 +54,13 @@ class OssMedia {
 
     URI location(String path, String directory) {
         if (path == null || !path.startsWith("oss://")) return null;
+        String object = objectKey(path, directory);
+        requireClient();
+        return URI.create(client.generatePresignedUrl(bucket, object,
+                Date.from(Instant.now().plusSeconds(3600))).toString());
+    }
+
+    private String objectKey(String path, String directory) {
         String prefix = "oss://" + bucket + "/";
         if (!path.startsWith(prefix)) throw new ResponseStatusException(NOT_FOUND, "OSS 媒体路径无效");
         String object = path.substring(prefix.length());
@@ -57,34 +68,81 @@ class OssMedia {
                   (object.startsWith("media/" + directory) && object.length() > 6 + directory.length()))) {
             throw new ResponseStatusException(NOT_FOUND, "OSS 媒体路径无效");
         }
-        if (client == null) throw new ResponseStatusException(SERVICE_UNAVAILABLE, "尚未配置 OSS");
-        return URI.create(client.generatePresignedUrl(bucket, object,
-                Date.from(Instant.now().plusSeconds(3600))).toString());
+        return object;
     }
 
     String putAvatar(String uid, byte[] png) {
-        if (client == null) throw new ResponseStatusException(SERVICE_UNAVAILABLE, "尚未配置 OSS");
+        return putImage("media/avatars/uploads/" + uid + "/", "image/png", png);
+    }
+
+    String putImage(String prefix, String mime, byte[] bytes) {
         String hash;
         try {
-            hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(png));
+            hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         } catch (NoSuchAlgorithmException ex) {
             throw new IllegalStateException(ex);
         }
-        String path = "media/avatars/uploads/" + uid + "/" + hash + ".png";
+        String object = prefix + hash + "." + mime.substring("image/".length());
+        return put(new PutObjectRequest(bucket, object, new ByteArrayInputStream(bytes), metadata(mime, bytes.length)));
+    }
+
+    String reference(String object) {
+        return "oss://" + bucket + "/" + object;
+    }
+
+    String putFile(String object, String mime, Path file) throws IOException {
+        return put(new PutObjectRequest(bucket, object, file.toFile(), metadata(mime, Files.size(file))));
+    }
+
+    private static ObjectMetadata metadata(String mime, long length) {
         var metadata = new ObjectMetadata();
-        metadata.setContentLength(png.length);
-        metadata.setContentType("image/png");
+        metadata.setContentLength(length);
+        metadata.setContentType(mime);
+        return metadata;
+    }
+
+    private String put(PutObjectRequest upload) {
+        requireClient();
         try {
-            client.putObject(bucket, path, new ByteArrayInputStream(png), metadata);
+            client.putObject(upload);
         } catch (OSSException ex) {
             if ("AccessDenied".equals(ex.getErrorCode())) {
-                throw new ResponseStatusException(SERVICE_UNAVAILABLE, "OSS 尚未授予头像目录写权限");
+                throw new ResponseStatusException(SERVICE_UNAVAILABLE, "OSS 尚未授予目标目录写权限", ex);
             }
-            throw new ResponseStatusException(SERVICE_UNAVAILABLE, "OSS 暂时无法保存头像，请稍后重试");
+            throw new ResponseStatusException(SERVICE_UNAVAILABLE, "OSS 暂时无法保存文件，请稍后重试", ex);
         } catch (ClientException ex) {
-            throw new ResponseStatusException(SERVICE_UNAVAILABLE, "OSS 连接失败，请稍后重试");
+            throw new ResponseStatusException(SERVICE_UNAVAILABLE, "OSS 连接失败，请稍后重试", ex);
         }
-        return "oss://" + bucket + "/" + path;
+        return reference(upload.getKey());
+    }
+
+    MessageStore.Image privateImage(String path, int limit) {
+        String object = objectKey(path, "message/");
+        String mime = switch (object.substring(object.lastIndexOf('.') + 1)) {
+            case "png" -> "image/png";
+            case "jpeg" -> "image/jpeg";
+            case "gif" -> "image/gif";
+            default -> throw new ResponseStatusException(NOT_FOUND, "私信图片不可用");
+        };
+        requireClient();
+        try (var stored = client.getObject(bucket, object)) {
+            byte[] bytes = stored.getObjectContent().readNBytes(limit + 1);
+            if (bytes.length == 0 || bytes.length > limit) {
+                throw new ResponseStatusException(NOT_FOUND, "私信图片不可用");
+            }
+            return new MessageStore.Image(mime, bytes);
+        } catch (OSSException ex) {
+            if ("NoSuchKey".equals(ex.getErrorCode())) {
+                throw new ResponseStatusException(NOT_FOUND, "私信图片不存在");
+            }
+            throw new ResponseStatusException(SERVICE_UNAVAILABLE, "OSS 暂时无法读取私信图片", ex);
+        } catch (IOException | ClientException ex) {
+            throw new ResponseStatusException(SERVICE_UNAVAILABLE, "OSS 暂时无法读取私信图片", ex);
+        }
+    }
+
+    private void requireClient() {
+        if (client == null) throw new ResponseStatusException(SERVICE_UNAVAILABLE, "尚未配置 OSS");
     }
 
     @PreDestroy

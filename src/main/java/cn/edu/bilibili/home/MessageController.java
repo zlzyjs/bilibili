@@ -2,7 +2,6 @@ package cn.edu.bilibili.home;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -20,13 +19,11 @@ class MessageController {
     private final MessageStore store;
     private final MessageEvents events;
     private final AuthController auth;
-    private final VideoController videos;
 
-    MessageController(MessageStore store, MessageEvents events, AuthController auth, VideoController videos) {
+    MessageController(MessageStore store, MessageEvents events, AuthController auth) {
         this.store = store;
         this.events = events;
         this.auth = auth;
-        this.videos = videos;
     }
 
     @ExceptionHandler(ResponseStatusException.class)
@@ -57,49 +54,38 @@ class MessageController {
         return store.thread(uid, peer, before);
     }
 
-    @PutMapping("/threads/{peer}/read")
-    @ResponseStatus(NO_CONTENT)
-    void read(@PathVariable String peer, @RequestBody ReadThread input, HttpServletRequest request) {
-        String uid = user(request, true);
-        checkId(peer);
-        checkId(input.through());
-        store.readThread(uid, peer, input.through());
-    }
-
     @GetMapping("/images/{id}")
     ResponseEntity<?> image(@PathVariable String id, HttpServletRequest request) {
         checkId(id);
         var image = store.privateImage(user(request, false), id);
-        if (image.mime() == null) {
-            var source = videos.image(new String(image.bytes(), StandardCharsets.UTF_8), "covers/");
-            var type = source.getHeaders().getContentType();
-            if (type == null || !Set.of("image/jpeg", "image/png", "image/gif", "image/webp").contains(type.toString())) {
-                throw new ResponseStatusException(NOT_FOUND, "图片不可用");
-            }
-            return ResponseEntity.ok().contentType(type).body(source.getBody());
-        }
         return ResponseEntity.ok().contentType(MediaType.parseMediaType(image.mime())).body(image.bytes());
     }
 
-    @GetMapping("/preferences")
-    MessageStore.Preferences preferences(HttpServletRequest request) {
-        return store.preferences(user(request, false));
+    @DeleteMapping("/messages/{id}")
+    @ResponseStatus(NO_CONTENT)
+    void delete(@PathVariable String id, HttpServletRequest request) {
+        String uid = user(request, true);
+        checkId(id);
+        changeMessage(() -> store.deleteForViewer(uid, id));
     }
 
-    @PutMapping("/preferences")
-    MessageStore.Preferences preferences(@RequestBody MessageStore.Preferences input, HttpServletRequest request) {
-        return store.updatePreferences(user(request, true), input);
+    @DeleteMapping("/messages/{id}/recall")
+    @ResponseStatus(NO_CONTENT)
+    void recall(@PathVariable String id, HttpServletRequest request) {
+        String uid = user(request, true);
+        checkId(id);
+        changeMessage(() -> store.recall(uid, id));
     }
 
-    @GetMapping("/unread")
-    Map<String, Integer> unread(HttpServletRequest request) {
-        String uid = user(request, false);
-        var p = store.preferences(uid);
-        if (!p.reminders()) return Map.of();
-        return Map.of("chat", store.unreadChats(uid), "replies", events.unread(uid, "replies", p.replyPolicy()),
-                "mentions", events.unread(uid, "mentions", p.mentionPolicy()),
-                "likes", events.unread(uid, "likes", p.likeAlert() ? "all" : "none"),
-                "system", events.unread(uid, "system", "all"));
+    private void changeMessage(Runnable action) {
+        try {
+            action.run();
+        } catch (org.springframework.dao.DataAccessException ex) {
+            if (ex.getMostSpecificCause() instanceof java.sql.SQLException error && "45000".equals(error.getSQLState())) {
+                throw new ResponseStatusException(CONFLICT, "消息已被举报或超过撤回时限，无法执行此操作");
+            }
+            throw ex;
+        }
     }
 
     @GetMapping("/events/{category}")
@@ -107,18 +93,6 @@ class MessageController {
                                     HttpServletRequest request) {
         checkCategory(category);
         return events.list(user(request, false), category, offset(offset));
-    }
-
-    @PutMapping("/events/{category}/state")
-    @ResponseStatus(NO_CONTENT)
-    void state(@PathVariable String category, @RequestBody EventState input, HttpServletRequest request) {
-        String uid = user(request, true);
-        checkCategory(category);
-        if (input.ids() == null || input.ids().size() > 40 || input.ids().stream().anyMatch(
-                id -> id == null || !id.matches("[0-9:]{1,80}"))) {
-            throw new ResponseStatusException(BAD_REQUEST, "无效的通知编号");
-        }
-        events.updateState(uid, category, input.ids(), input.dismissed());
     }
 
     private String user(HttpServletRequest request, boolean write) {
@@ -141,7 +115,5 @@ class MessageController {
         return offset;
     }
 
-    record ReadThread(String through) {}
-    record EventState(List<String> ids, boolean dismissed) {}
 }
 

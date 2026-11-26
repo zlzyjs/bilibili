@@ -7,76 +7,79 @@ import org.springframework.stereotype.Component;
 @Component
 class MessageSchema {
     private final JdbcClient jdbc;
+    private final OssMedia oss;
 
-    MessageSchema(JdbcClient jdbc) {
+    MessageSchema(JdbcClient jdbc, OssMedia oss) {
         this.jdbc = jdbc;
+        this.oss = oss;
     }
 
     @PostConstruct
     void upgrade() {
-        add("usertable", "MessageNotificationState", "JSON NULL");
-        add("privatemessagetable", "InboxFiltered", "BOOLEAN NOT NULL DEFAULT FALSE");
-        add("privatemessagetable", "InboxImageMime", "VARCHAR(16) NULL");
-        add("privatemessagetable", "InboxImageBytes", "MEDIUMBLOB NULL");
-        add("systemnotificationtable", "MentionKind", "ENUM('comment','reply') NULL");
-        add("systemnotificationtable", "MentionTarget", "BIGINT UNSIGNED NULL");
-        if (!exists("STATISTICS", "INDEX_NAME", "systemnotificationtable", "unique_notification_mention")) {
+        if (column("commenttable", "ImagePath")) {
             jdbc.sql("""
-                    ALTER TABLE systemnotificationtable ADD UNIQUE KEY unique_notification_mention
-                        (ReceiverUID, MentionKind, MentionTarget)
+                    UPDATE commenttable
+                    SET Content=CONCAT(CHAR(30 USING utf8mb4),JSON_OBJECT('text',Content,'image',ImagePath))
+                    WHERE ImagePath IS NOT NULL AND ASCII(Content)<>30
                     """).update();
         }
-        migrate();
-    }
-
-    private void migrate() {
-        if (oldTable("message_image")) {
+        migrateCommentImages();
+        if (column("systemnotificationtable", "MentionKind") && column("systemnotificationtable", "MentionTarget")) {
             jdbc.sql("""
-                    UPDATE privatemessagetable m JOIN message_image i ON i.message_id=m.MessageID
-                    SET m.InboxImageMime=i.mime, m.InboxImageBytes=i.image_bytes
-                    WHERE m.MessageType=1 AND m.InboxImageBytes IS NULL
+                    UPDATE systemnotificationtable
+                    SET NotificationContent=CONCAT(CHAR(30 USING utf8mb4),'mention:',MentionKind,':',MentionTarget)
+                    WHERE MentionKind IS NOT NULL AND MentionTarget IS NOT NULL AND ASCII(NotificationContent)<>30
                     """).update();
         }
-        if (oldTable("message_filtered")) {
-            jdbc.sql("""
-                    UPDATE privatemessagetable m JOIN message_filtered f ON f.message_id=m.MessageID
-                    SET m.InboxFiltered=1 WHERE m.InboxFiltered=0
-                    """).update();
-        }
-        boolean oldMentions = oldTable("message_mention");
-        if (oldMentions) {
-            jdbc.sql("""
-                    INSERT INTO systemnotificationtable(ReceiverUID,NotificationContent,MentionKind,MentionTarget)
-                    SELECT receiver,'@',target_type,target_id FROM message_mention
-                    ON DUPLICATE KEY UPDATE MentionTarget=systemnotificationtable.MentionTarget
-                    """).update();
-        }
-        if (!oldTable("message_event_state")) return;
-        for (String category : new String[]{"system", "replies", "likes", "mentions"}) {
-            if (category.equals("mentions") && !oldMentions) continue;
-            String fields = category.equals("mentions") ? """
-                    CAST(n.NotificationID AS CHAR),s.dismissed) AS flags
-                    FROM message_event_state s JOIN message_mention m
-                      ON m.id=CAST(s.event_id AS UNSIGNED) AND m.receiver=s.uid
-                    JOIN systemnotificationtable n ON n.ReceiverUID=m.receiver
-                      AND CAST(n.MentionKind AS BINARY)=CAST(m.target_type AS BINARY)
-                      AND n.MentionTarget=m.target_id
-                    """ : "s.event_id,s.dismissed) AS flags FROM message_event_state s ";
-            jdbc.sql("""
-                    UPDATE usertable u JOIN (
-                        SELECT s.uid,JSON_OBJECTAGG(
-                    """ + fields + """
-                        WHERE s.category=:category AND s.dismissed=1 GROUP BY s.uid
-                    ) legacy ON legacy.uid=u.UID
-                    SET u.MessageNotificationState=JSON_MERGE_PATCH(JSON_OBJECT(:category,legacy.flags),
-                        COALESCE(u.MessageNotificationState,JSON_OBJECT()))
-                    """).param("category", category).update();
+        migrateMentions(jdbc.sql("""
+                SELECT CAST(ReceiverUID AS CHAR),
+                       SUBSTRING_INDEX(SUBSTRING_INDEX(NotificationContent,':',2),':',-1),
+                       SUBSTRING_INDEX(NotificationContent,':',-1)
+                FROM systemnotificationtable WHERE %s
+                """.formatted(MessageEvents.LEGACY_MENTION)));
+        if (oldTable("message_mention")) {
+            migrateMentions(jdbc.sql("""
+                    SELECT CAST(receiver AS CHAR),target_type,CAST(target_id AS CHAR) FROM message_mention
+                    """));
         }
     }
 
-    private void add(String table, String column, String type) {
-        if (!exists("COLUMNS", "COLUMN_NAME", table, column)) {
-            jdbc.sql("ALTER TABLE " + table + " ADD COLUMN " + column + " " + type).update();
+    private void migrateMentions(JdbcClient.StatementSpec source) {
+        var mentions = source.query((rs, row) -> new LegacyMention(rs.getString(1), rs.getString(2), rs.getString(3))).list();
+        for (var mention : mentions) {
+            boolean comment = "comment".equals(mention.kind());
+            jdbc.sql("""
+                    UPDATE %s c
+                    SET c.Content=CONCAT(CHAR(30 USING utf8mb4),JSON_SET(
+                        CASE WHEN ASCII(c.Content)=30 THEN JSON_EXTRACT(SUBSTRING(c.Content,2),'$')
+                             ELSE JSON_OBJECT('text',c.Content) END,
+                        '$.mentions',JSON_ARRAY_APPEND(COALESCE(
+                            CASE WHEN ASCII(c.Content)=30 THEN JSON_EXTRACT(SUBSTRING(c.Content,2),'$.mentions') END,
+                            JSON_ARRAY()),'$',:uid)))
+                    WHERE c.%s=CAST(:id AS UNSIGNED) AND NOT COALESCE(%s,FALSE)
+                    """.formatted(comment ? "commenttable" : "replytable", comment ? "CommentID" : "ReplyID",
+                            CommentContent.mentions("c"))).param("uid", mention.uid()).param("id", mention.target()).update();
+        }
+    }
+
+    private void migrateCommentImages() {
+        if (!column("commenttable", "ImageBytes") || !column("commenttable", "ImageMime")) return;
+        while (true) {
+            var batch = jdbc.sql("""
+                    SELECT CommentID,UID,ImageMime,ImageBytes,Content FROM commenttable
+                    WHERE ASCII(Content)<>30 AND ImageMime IN ('image/png','image/jpeg','image/gif')
+                      AND OCTET_LENGTH(ImageBytes)>0 ORDER BY CommentID LIMIT 5
+                    """).query((rs, row) -> new LegacyImage(rs.getString(1), rs.getString(2),
+                            rs.getString(3), rs.getBytes(4), rs.getString(5))).list();
+            if (batch.isEmpty()) return;
+            for (var image : batch) {
+                String path = oss.putImage("media/comment/" + image.uid() + "/", image.mime(), image.bytes());
+                jdbc.sql("""
+                        UPDATE commenttable SET Content=%s
+                        WHERE CommentID=CAST(:id AS UNSIGNED) AND ASCII(Content)<>30
+                        """.formatted(CommentContent.ENCODE)).param("image", path).param("text", image.text()).param("mentions", "[]")
+                        .param("id", image.id()).update();
+            }
         }
     }
 
@@ -87,10 +90,14 @@ class MessageSchema {
                 """).param("table", table).query(Boolean.class).single();
     }
 
-    private boolean exists(String metadata, String field, String table, String name) {
-        return jdbc.sql("SELECT EXISTS(SELECT 1 FROM information_schema." + metadata
-                + " WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=:table AND " + field + "=:name)")
-                .param("table", table).param("name", name).query(Boolean.class).single();
+    private boolean column(String table, String name) {
+        return jdbc.sql("""
+                SELECT EXISTS(SELECT 1 FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME=:table AND COLUMN_NAME=:name)
+                """).param("table", table).param("name", name).query(Boolean.class).single();
     }
+
+    private record LegacyImage(String id, String uid, String mime, byte[] bytes, String text) {}
+    private record LegacyMention(String uid, String kind, String target) {}
 }
 
