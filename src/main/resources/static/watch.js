@@ -1,6 +1,10 @@
 ﻿async function loadWatchPage() {
   const player = el('player'), shell = el('player-shell');
   const id = path.split('/')[2];
+  const playlist = new URLSearchParams(location.search).get('playlist');
+  const folderPlaylist = /^folder-(\d+)$/.exec(playlist || '');
+  const playbackUrl = video => '/video/' + encodeURIComponent(video.id)
+    + (playlist === 'collection' || folderPlaylist ? '?playlist=' + encodeURIComponent(playlist) : '');
   const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
   const save = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
   // Each visit gets its own trial budget; previous visits never lock this one.
@@ -462,7 +466,10 @@
     if (video.streamUrl) player.src = video.streamUrl;
     else { el('player-status').hidden = false; el('player-status').textContent = '暂无视频文件'; }
     if (trialExpired()) gate(false);
-    else if (video.streamUrl && preferences.autoStart) { player.muted = preferences.muted; player.play().catch(() => {}); }
+    else if (video.streamUrl && (preferences.autoStart || playlist === 'collection' || folderPlaylist)) {
+      player.muted = preferences.muted;
+      player.play().catch(() => {});
+    }
     api('/videos/' + id + '/engagement').then(stats => { for (const key of ['like','coin','favorite','share']) el(key + '-count').textContent = shortCount(stats[key]); }).catch(() => { document.querySelector('.video-actions').title = '互动数据暂时加载失败'; });
     api('/videos/' + id + '/danmaku').then(rows => {
       danmaku = [...new Map([...rows, ...danmaku].filter(row => !withdrawn.has(row.id)).map(row => [row.id, row])).values()];
@@ -545,9 +552,20 @@
     nextVideo = related[0];
     setupRelatedExpansion(related);
   } catch { el('related-videos').textContent = '暂无推荐视频'; }
-  el('fullscreen-prev').onclick = () => { if (collectionPrevious) location.assign('/video/' + collectionPrevious.id); else notice('没有上一集'); };
-  el('fullscreen-next').onclick = () => { if (collectionNext || nextVideo) location.assign('/video/' + (collectionNext || nextVideo).id); else notice('没有下一集'); };
-  player.addEventListener('ended', () => { if (el('autoplay-next').checked && (collectionNext || nextVideo) && !trialExpired()) location.assign('/video/' + (collectionNext || nextVideo).id); });
+  const orderedPlayback = playlist === 'collection' || Boolean(folderPlaylist);
+  let previous = collectionPrevious;
+  let next = collectionNext || (orderedPlayback ? null : nextVideo);
+  if (folderPlaylist) {
+    const videos = await interaction('/me/folders/' + folderPlaylist[1] + '/videos').catch(() => []);
+    const index = videos.findIndex(video => video.id === id);
+    previous = index > 0 ? videos[index - 1] : null;
+    next = index >= 0 ? videos[index + 1] : null;
+  }
+  el('fullscreen-prev').onclick = () => { if (previous) location.assign(playbackUrl(previous)); else notice('没有上一集'); };
+  el('fullscreen-next').onclick = () => { if (next) location.assign(playbackUrl(next)); else notice('没有下一集'); };
+  player.addEventListener('ended', () => {
+    if (next && !trialExpired() && (orderedPlayback || el('autoplay-next').checked)) location.assign(playbackUrl(next));
+  });
 }
 
 function setupWatchHeatmap(player, { read, save, rows }) {

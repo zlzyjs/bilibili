@@ -237,7 +237,7 @@ body:not(.inner-page) .home-logo{display:none}
 .channel-nav-logo{--nav-brand-width:80px}
 .navbar.channel-nav-stuck{position:fixed;z-index:8;color:var(--ink);background:#fff;box-shadow:0 2px 8px #00000012;animation:channel-nav-enter .22s ease-out}
 .channel-nav-stuck .channel-nav-logo{display:block}
-.channel-nav-stuck .channel-nav-toggle{display:grid;place-items:center}
+.navbar:is(.channel-nav-stuck,.channel-nav-over-cover) .channel-nav-toggle{display:grid;place-items:center}
 .channel-nav-stuck .home-link :is(.home-tv,.home-logo){display:none}
 .channel-nav-stuck .channel-nav-trigger{margin-inline-start:clamp(4px,.55vw,8px)}
 .channel-nav-stuck .search{background:var(--wash);border-color:var(--line)}

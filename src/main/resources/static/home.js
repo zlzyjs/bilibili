@@ -548,10 +548,14 @@ async function init() {
     return;
   }
   if (watching) {
-    setupChannelNavigation(true);
+    setupChannelNavigation({ alwaysPinned: true });
     return Promise.all([loadWatchPage(), loadCategories()]);
   }
-  if (personalSpace) return setupPersonalSpace();
+  if (personalSpace) {
+    setupChannelNavigation({ overCover: true });
+    setupPersonalSpace();
+    return loadCategories();
+  }
   if (authorId) return loadSpace();
   if (search) return loadSearch();
   if (popularPage) {
@@ -562,7 +566,7 @@ async function init() {
     return Promise.all([loadPopular(categoriesRequest), loadCategories(categoriesRequest)]);
   }
   if (discoveryPage) {
-    setupChannelNavigation(true);
+    setupChannelNavigation({ alwaysPinned: true });
     return Promise.all([loadDiscovery(), loadCategories()]);
   }
   const title = category ? '分区视频' : latestPage ? '最新发布' : '推荐视频';
@@ -589,7 +593,7 @@ async function init() {
   return loadCategories();
 }
 
-function setupChannelNavigation(alwaysPinned = false) {
+function setupChannelNavigation({ alwaysPinned = false, overCover = false } = {}) {
   const bar = document.querySelector('.navbar');
   const banner = document.querySelector('.banner');
   const homeLink = bar.querySelector('.home-link');
@@ -615,8 +619,9 @@ function setupChannelNavigation(alwaysPinned = false) {
   homeLink.before(start);
   trigger.append(homeLink, toggle);
   start.append(logo, trigger, panel);
+  bar.classList.toggle('channel-nav-over-cover', overCover);
   const setOpen = (open) => {
-    if (open && !bar.classList.contains('channel-nav-stuck')) return;
+    if (open && !overCover && !bar.classList.contains('channel-nav-stuck')) return;
     panel.inert = !open;
     toggle.setAttribute('aria-expanded', String(open));
     start.classList.toggle('channel-nav-open', open);
@@ -644,6 +649,7 @@ function setupChannelNavigation(alwaysPinned = false) {
     if (!stuck) setOpen(false);
     bar.classList.toggle('channel-nav-stuck', stuck);
   };
+  if (overCover) return;
   if (alwaysPinned) {
     pin(true);
     return;

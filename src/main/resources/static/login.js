@@ -32,11 +32,24 @@ document.addEventListener('keydown', event => {
   if (event.key === 'Escape') accountNav.classList.remove('card-open');
 });
 
-function accountNotice(message) {
+function accountNotice(message, placement, anchor) {
   const notice = el('account-notice');
   clearTimeout(accountNoticeTimer);
+  notice.classList.toggle('coin-success-notice', placement === 'coin-success');
+  notice.classList.toggle('coin-limit-notice', placement === 'coin-limit');
+  notice.classList.toggle('comment-block-notice', placement === 'comment-block');
+  notice.style.removeProperty('--notice-left');
+  notice.style.removeProperty('--notice-top');
   notice.textContent = message;
   notice.hidden = false;
+  if (anchor) {
+    const rect = anchor.getBoundingClientRect();
+    const inset = notice.offsetWidth / 2 + 8;
+    const center = Math.max(inset, Math.min(rect.left + rect.width / 2, document.documentElement.clientWidth - inset));
+    notice.style.setProperty('--notice-left', `${center + window.scrollX}px`);
+    const top = rect.top + window.scrollY - notice.offsetHeight - 12;
+    notice.style.setProperty('--notice-top', `${Math.max(8, top)}px`);
+  }
   accountNoticeTimer = setTimeout(() => notice.hidden = true, 3200);
 }
 

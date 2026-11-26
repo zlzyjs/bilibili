@@ -62,7 +62,7 @@ class VideoController {
         }
         var query = new MysqlVideoCatalog.Query(validId(categoryId), validId(authorId), validId(compilationId), q.strip(), tag.strip(), sort, page * size, size + 1);
         var results = catalog.findVideos(query);
-        var items = results.stream().limit(size).map(this::card).toList();
+        var items = results.stream().limit(size).map(VideoController::card).toList();
         return new VideoPage(items, results.size() > size, includeTotal ? catalog.countVideos(query) : null);
     }
 
@@ -185,9 +185,9 @@ class VideoController {
         find(id);
         if (page < 1 || page > 10000) throw new ResponseStatusException(BAD_REQUEST, "无效的页码");
         if (!sort.equals("hot") && !sort.equals("latest")) throw new ResponseStatusException(BAD_REQUEST, "无效的评论排序");
-        boolean member = auth.currentMember(request) != null;
-        if (!member && sort.equals("latest")) throw new ResponseStatusException(UNAUTHORIZED, "登录后查看最新评论");
-        return catalog.comments(id, sort.equals("latest"), page, member);
+        var member = auth.currentMember(request);
+        if (member == null && sort.equals("latest")) throw new ResponseStatusException(UNAUTHORIZED, "登录后查看最新评论");
+        return catalog.comments(id, sort.equals("latest"), page, member == null ? null : member.uid());
     }
 
     @PostMapping("/videos/{id}/viewers")
@@ -207,7 +207,7 @@ class VideoController {
         var video = find(id);
         if (video.compilation() == null) return new VideoCollection(null, List.of(), 0);
         var videos = catalog.collectionVideos(id);
-        return new VideoCollection(video.compilation(), videos.stream().map(this::card).toList(),
+        return new VideoCollection(video.compilation(), videos.stream().map(VideoController::card).toList(),
                 videos.stream().mapToLong(MysqlVideoCatalog.Video::plays).sum());
     }
 
@@ -297,7 +297,7 @@ class VideoController {
         return id;
     }
 
-    private VideoCard card(MysqlVideoCatalog.Video video) {
+    static VideoCard card(MysqlVideoCatalog.Video video) {
         String base = "/api/videos/" + video.id();
         return new VideoCard(video.id(), video.title(), video.author(), video.authorId(), video.categoryId(), video.category(),
                 video.duration(), video.plays(), video.danmaku(), video.publishedAt(), base + "/cover",

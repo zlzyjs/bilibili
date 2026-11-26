@@ -2,13 +2,15 @@
   const root = el('message-center');
   const tabs = { chat: '我的消息', replies: '回复我的', mentions: '@ 我的', likes: '收到的赞',
     system: '系统通知' };
-  let tab = Object.hasOwn(tabs, params.get('tab')) ? params.get('tab') : 'chat';
-  let peer = params.get('uid');
+  let tab, peer, forwardVideo;
   function syncRoute() {
     const route = new URLSearchParams(location.search);
     tab = Object.hasOwn(tabs, route.get('tab')) ? route.get('tab') : 'chat';
     peer = route.get('uid');
+    const video = route.get('forward');
+    forwardVideo = tab === 'chat' && !peer && /^\d{1,20}$/.test(video) ? video : null;
   }
+  syncRoute();
   const url = (key, extra = {}) => '/messages?' + new URLSearchParams({ tab: key, ...extra });
   const button = (label, action, css = 'mc-button') => {
     const element = node('button', css, label);
@@ -120,15 +122,18 @@
   }
 
   async function chat(section, status, stillCurrent) {
+    const videoToForward = forwardVideo;
     const frame = node('div', 'mc-chat');
     const list = node('div', 'mc-threads');
     const entries = node('div', 'mc-thread-list');
-    const main = node('section', 'mc-conversation');
+    const main = videoToForward ? null : node('section', 'mc-conversation');
+    if (videoToForward) frame.classList.add('mc-forward');
     if (peer) frame.classList.add('mc-thread-open');
     const bar = node('div', 'mc-threads-title');
     bar.append(node('span', '', '最近会话'));
     list.append(bar, entries);
-    frame.append(list, main);
+    frame.append(list);
+    if (main) frame.append(main);
     section.append(frame);
     const threads = [];
     let moreThreads = true;
@@ -137,18 +142,92 @@
     let loadingThreads = false;
     const threadPath = '/threads/' + encodeURIComponent(peer);
     const threadLink = (uid, name) => link(url('chat', { uid }), name);
+    const selected = new Map(), sent = new Set(), failures = new Map();
+    let updateForwardControls;
+    if (videoToForward) {
+      const footer = node('div', 'mc-forward-footer');
+      const count = node('span', 'mc-status');
+      count.setAttribute('aria-live', 'polite');
+      const review = button('转发', confirmForward, 'mc-primary');
+      updateForwardControls = () => {
+        count.textContent = '已选择 ' + selected.size + ' 人';
+        review.disabled = selected.size === 0;
+      };
+      updateForwardControls();
+      footer.append(count, review);
+      list.append(footer);
+    }
+
+    function confirmForward() {
+      if (!selected.size || !stillCurrent()) return;
+      const recipients = [...selected];
+      mcDialog('确认转发', (content, actions, dialogStatus, close) => {
+        content.append(node('p', 'mc-dialog-text', '将视频转发给以下 ' + recipients.length + ' 位用户？'));
+        const names = node('ul', 'mc-forward-recipients');
+        names.append(...recipients.map(([, name]) => node('li', '', name)));
+        content.append(names);
+        const dialog = content.closest('dialog');
+        const closeButton = dialog.querySelector('.mc-dialog-close');
+        const cancel = button('取消', close, 'mc-dialog-cancel');
+        const confirm = button('确认转发', async () => {
+          if (confirm.disabled) return;
+          if (!stillCurrent()) { close(); return; }
+          confirm.disabled = cancel.disabled = closeButton.disabled = true;
+          dialogStatus.textContent = '正在转发…';
+          for (const [uid] of recipients) {
+            if (!stillCurrent()) break;
+            try {
+              await interaction('/videos/' + encodeURIComponent(videoToForward) + '/forward', 'POST', { value: uid });
+              selected.delete(uid);
+              failures.delete(uid);
+              sent.add(uid);
+            } catch (error) {
+              failures.set(uid, error.message);
+            }
+          }
+          close();
+          if (!stillCurrent()) return;
+          if (selected.size) {
+            status.textContent = sent.size ? '已转发给 ' + sent.size + ' 人，部分发送失败' : '发送失败，请查看收件人列表';
+            renderThreads();
+            updateForwardControls();
+            return;
+          }
+          const destination = sent.size === 1 ? { uid: sent.values().next().value } : {};
+          location.replace(url('chat', destination));
+        }, 'mc-dialog-ok');
+        dialog.addEventListener('cancel', event => { if (confirm.disabled) event.preventDefault(); });
+        actions.append(cancel, confirm);
+      });
+    }
 
     function threadItem(row) {
       const prefs = readChatPrefs(row.uid);
-      const item = threadLink(row.uid);
+      const item = videoToForward ? node('label') : threadLink(row.uid);
       item.className = 'mc-thread';
       if (prefs.pin) item.classList.add('is-pinned');
       if (row.uid === peer) item.setAttribute('aria-current', 'page');
       const words = node('div', 'mc-thread-copy');
-      words.append(node('strong', '', row.name || '账号已注销'));
+      const name = row.name || '账号已注销';
+      words.append(node('strong', '', name));
       const preview = [row.preview || '', '[图片]', '[视频]'][row.type] || '';
       if (preview) words.append(node('small', '', preview));
       item.append(avatar(row.uid), words);
+      if (videoToForward) {
+        const checkbox = node('input', 'mc-forward-check');
+        checkbox.type = 'checkbox';
+        checkbox.setAttribute('aria-label', '转发给 ' + name);
+        checkbox.checked = selected.has(row.uid);
+        checkbox.disabled = sent.has(row.uid);
+        checkbox.onchange = () => {
+          if (checkbox.checked) selected.set(row.uid, name);
+          else selected.delete(row.uid);
+          updateForwardControls();
+        };
+        if (sent.has(row.uid)) words.append(node('small', '', '已转发'));
+        if (failures.has(row.uid)) words.append(node('small', 'mc-forward-error', failures.get(row.uid)));
+        item.prepend(checkbox);
+      }
       return item;
     }
 
@@ -163,7 +242,7 @@
       const restRows = displayed.filter(row => !readChatPrefs(row.uid).pin);
       entries.append(...pinnedRows.map(threadItem));
       entries.append(...restRows.map(threadItem));
-      if (!displayed.length) entries.append(empty('暂无最近会话'));
+      if (!displayed.length) entries.append(empty(videoToForward ? '暂无可选择的会话' : '暂无最近会话'));
       if (moreThreads) entries.append(button('加载更多会话', async event => {
         event.currentTarget.disabled = true;
         try { await loadThreads(); }
@@ -189,6 +268,16 @@
       }
     }
 
+    if (videoToForward) {
+      try { await loadThreads(); }
+      catch (error) {
+        if (stillCurrent()) {
+          status.textContent = error.message;
+          entries.append(button('重新加载会话', () => renderCenter(), 'mc-load'));
+        }
+      }
+      return;
+    }
     await loadThreads();
     if (!peer) {
       main.append(empty('快找小伙伴聊天吧 ( ゜- ゜)つロ', 'chat'));
@@ -285,7 +374,7 @@
       emoji.setAttribute('aria-expanded', String(!faces.hidden));
     }, 'mc-tool');
     emoji.setAttribute('aria-expanded', 'false');
-    for (const face of ['😀', '😂', '🥰', '😮', '😢', '👍', '🎉', '❤️']) {
+    for (const face of MESSAGE_EMOJI) {
       faces.append(button(face, () => {
         text.setRangeText(face, text.selectionStart, text.selectionEnd, 'end');
         faces.hidden = true;
@@ -600,7 +689,7 @@
       currentFrame.replaceWith(nextFrame);
       if (nextThreads) nextThreads.scrollTop = threadScroll;
     };
-    if (smooth && tab === 'chat' && currentAccount && currentFrame) {
+    if (smooth && tab === 'chat' && !forwardVideo && currentAccount && currentFrame && !currentFrame.classList.contains('mc-forward')) {
       const status = root.querySelector('.mc-status');
       status.textContent = '';
       const section = node('div');
@@ -639,7 +728,7 @@
     const header = node('div', 'mc-header');
     const status = node('p', 'mc-status');
     status.setAttribute('role', 'status');
-    header.append(node('h1', '', tabs[tab]), status);
+    header.append(node('h1', '', forwardVideo ? '选择转发对象' : tabs[tab]), status);
     const section = node('div', 'mc-content');
     panel.append(header, section);
     root.replaceChildren(aside, panel);

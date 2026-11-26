@@ -157,3 +157,12 @@ html:has(body.message-center-page){scrollbar-gutter:auto}
 }
 
 .mc-message-controls{display:flex;gap:10px}
+.mc-chat.mc-forward{grid-template-columns:minmax(0,1fr)}
+.mc-forward .mc-threads{border-right:0}
+.mc-forward .mc-thread-list{height:auto;flex:1}
+.mc-forward .mc-thread{text-align:left;cursor:pointer}
+.mc-forward .mc-thread:has(.mc-forward-check:checked){background:var(--mc-tint)}
+.mc-forward-check{width:17px;height:17px;flex:none;margin:0 6px 0 0;accent-color:var(--mc-accent)}
+.mc-forward-footer{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex:none;padding:10px 16px;border-top:1px solid #e3e5e7}
+.mc-forward-recipients{max-height:min(200px,35dvh);margin:0 0 14px;padding-inline-start:22px;overflow:auto;color:#61666d;font-size:14px;overflow-wrap:anywhere}
+.mc-thread-copy .mc-forward-error{color:#b42318;white-space:normal}

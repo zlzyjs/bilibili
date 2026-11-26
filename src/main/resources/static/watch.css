@@ -504,10 +504,10 @@ body:has(.watch-layout:not([hidden])) .layout { max-width: 2440px; width: 84%; m
 /* These labels are visible at every desktop player width. */
 .video-actions { gap: clamp(14px, 2.9cqw, 46px); }
 .video-actions #video-report { gap: .6cqw; font-size: clamp(11px, 1.5cqw, 24px); }
-.watch-sidebar-content .danmaku-panel, .watch-sidebar-content > .video-collection {
+.watch-author, .watch-sidebar-content .danmaku-panel, .watch-sidebar-content > .video-collection {
   box-sizing: border-box;
-  width: 96%;
-  margin-inline: auto;
+  width: 100%;
+  margin-inline: 0;
 }
 .danmaku-panel summary { padding: 14px 16px; }
 .danmaku-columns,.danmaku-row { padding-left: 16px; padding-right: 12px; }
@@ -554,7 +554,7 @@ body:has(.watch-layout:not([hidden])) .layout { max-width: 2440px; width: 84%; m
 @container(max-width:600px) { .video-actions { gap: 12px; flex-wrap: wrap; }.video-actions .control-spacer { min-width: 0; } }
 
 /* Sidebar modes share the original list's exact outer edges. */
-.watch-author { width:96%; margin:0 auto 18px; box-sizing:border-box; display:grid; grid-template-columns:48px minmax(0,1fr) auto; grid-template-rows:24px 22px 32px; gap:0 12px; padding:0; min-height:90px; }
+.watch-author { margin-block:0 18px; display:grid; grid-template-columns:48px minmax(0,1fr) auto; grid-template-rows:24px 22px 32px; gap:0 12px; padding:0; min-height:90px; }
 @media (min-width: 801px) {
   .watch-layout:not(.wide-mode) .watch-author { inset-block-start: -10px; margin-bottom: var(--watch-author-gap, 18px); }
 }

@@ -186,18 +186,18 @@ class MessageStore {
         throw new ResponseStatusException(BAD_REQUEST, "请选择有效的 PNG、JPEG 或 GIF 图片");
     }
 
-    String mentionedUsers(String author, String content) {
+    List<String> mentionedUsers(String author, String content) {
         var matcher = MENTION.matcher(content);
         var names = new java.util.HashSet<String>();
         while (matcher.find()) {
             names.add(matcher.group(1) == null ? matcher.group(2) : matcher.group(1));
         }
-        if (names.isEmpty()) return "[]";
+        if (names.isEmpty()) return List.of();
         return jdbc.sql("""
-                SELECT COALESCE(JSON_ARRAYAGG(CAST(UID AS CHAR)),JSON_ARRAY())
+                SELECT CAST(UID AS CHAR)
                 FROM usertable WHERE AccountStatus='active'
                   AND UID<>CAST(:author AS UNSIGNED) AND BINARY Name IN (:names)
-                """).param("author", author).param("names", names).query(String.class).single();
+                """).param("author", author).param("names", names).query(String.class).list();
     }
 
     record Image(String mime, byte[] bytes) {}
