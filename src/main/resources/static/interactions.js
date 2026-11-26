@@ -235,6 +235,7 @@ function setupVideoInteractions(id, author, player, duration, onDanmaku) {
   }
   composer.onsubmit = (event) => {
     event.preventDefault();
+    if (composer.inert) return;
     const uid = currentAccount?.uid;
     if (!uid) return openLogin(send);
     const value = danmaku.value.trim();

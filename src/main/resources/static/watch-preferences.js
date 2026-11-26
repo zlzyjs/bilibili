@@ -7,10 +7,7 @@
     for (const [key,id] of [['scale','dm-scale'],['subtitleSafe','dm-subtitle-safe'],['smart','dm-smart']]) el(id).checked = dm[key];
     for (const key of ['area','opacity','size','speed']) { el('dm-' + key).value = dm[key]; el('dm-' + key + '-value').textContent = key === 'speed' ? ['很慢','较慢','适中','较快','很快'][dm.speed - 1] : dm[key] + '%'; }
     for (const value of ['normal','more','overlap']) el('dm-density-' + value).setAttribute('aria-pressed', String(dm.density === value));
-    el('dm-sync-rate').checked = dm.syncRate; el('dm-font').value = dm.font; el('dm-bold').checked = dm.bold;
-    for (const value of ['heavy','stroke','shadow']) el('dm-outline-' + value).setAttribute('aria-pressed', String(dm.outline === value));
     el('danmaku-overlay').dataset.font = dm.font; el('danmaku-overlay').dataset.bold = String(dm.bold); el('danmaku-overlay').dataset.outline = dm.outline;
-    el('dm-keywords').value = dm.keywords.join('\n');
     const bottom = dm.subtitleSafe ? 26 : dm.smart ? 18 : 8;
     el('danmaku-overlay').setAttribute('style', 'bottom:' + bottom + '%;height:' + Math.min(dm.area * .85, 99 - bottom) + '%;top:1%;opacity:' + dm.opacity/100);
     onDanmakuChange();
@@ -20,17 +17,6 @@
   for (const [key,id] of [['scale','dm-scale'],['subtitleSafe','dm-subtitle-safe'],['smart','dm-smart']]) el(id).onchange = e => { dm[key] = e.target.checked; applyDm(); };
   for (const key of ['area','opacity','size','speed']) el('dm-' + key).oninput = e => { dm[key] = Number(e.target.value); applyDm(); };
   for (const value of ['normal','more','overlap']) el('dm-density-' + value).onclick = () => { dm.density = value; applyDm(); };
-  function advanced() { el('dm-settings-main').hidden = true; el('dm-settings-advanced').hidden = false; }
-  el('dm-advanced-open').onclick = advanced;
-  el('dm-keywords-open').onclick = () => { el('dm-settings-main').hidden = true; el('dm-settings-advanced').hidden = true; el('dm-settings-keywords').hidden = false; };
-  el('dm-keywords-back').onclick = () => { el('dm-settings-main').hidden = false; el('dm-settings-keywords').hidden = true; };
-  el('dm-sync-rate').onchange = e => { dm.syncRate = e.target.checked; applyDm(); };
-  el('dm-font').onchange = e => { dm.font = e.target.value; applyDm(); };
-  el('dm-bold').onchange = e => { dm.bold = e.target.checked; applyDm(); };
-  for (const outline of ['heavy','stroke','shadow']) el('dm-outline-' + outline).onclick = () => { dm.outline = outline; applyDm(); };
-  el('dm-advanced-back').onclick = () => { el('dm-settings-main').hidden = false; el('dm-settings-advanced').hidden = true; };
-  el('dm-keywords-save').onclick = () => { dm.keywords = el('dm-keywords').value.split('\n').map(s => s.trim()).filter(Boolean); applyDm(); el('dm-keywords-back').onclick(); };
-  el('dm-reset').onclick = () => { Object.assign(dm, dmDefaults, { keywords:[] }); applyDm(); };
   applyDm();
   function applyPlayback() {
     el('mode-next').setAttribute('aria-pressed', String(playback.next)); el('mode-pause').setAttribute('aria-pressed', String(!playback.next)); el('autoplay-next').checked = playback.next;

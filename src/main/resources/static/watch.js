@@ -355,12 +355,26 @@
     if (event.key.toLowerCase() === 'f') {
       event.preventDefault();
       full.onclick();
+    } else if (event.key.toLowerCase() === 'd' && !event.repeat && !event.altKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      toggleDanmaku();
     } else if (event.code === 'Space' && activeTag !== 'BUTTON') {
       event.preventDefault();
       play();
     }
   });
-  el('danmaku-toggle').onclick = () => { enabled = !enabled; el('danmaku-toggle').setAttribute('aria-pressed', String(enabled)); el('danmaku-toggle').dataset.enabled = String(enabled); overlay.hidden = !enabled; if (!enabled) clearOnscreenDanmaku(); };
+  const danmakuToggle = el('danmaku-toggle');
+  function toggleDanmaku() {
+    enabled = !enabled;
+    danmakuToggle.setAttribute('aria-pressed', String(enabled));
+    danmakuToggle.dataset.tooltip = enabled ? '关闭弹幕 (d)' : '开启弹幕 (d)';
+    el('danmaku-settings').disabled = !enabled;
+    el('danmaku-guest').disabled = !enabled;
+    el('danmaku-entry').inert = !enabled;
+    overlay.hidden = !enabled;
+    if (!enabled) clearOnscreenDanmaku();
+  }
+  danmakuToggle.onclick = toggleDanmaku;
   const watchPreferences = setupWatchPreferences(player, { read, save, onDanmakuChange: clearOnscreenDanmaku });
   const watchSidebar = setupWatchSidebar({ read, save, notice, getUsers:()=>blocked,
     setUsers: users => { blocked = users; save('bili-blocked-users', [...blocked]); },

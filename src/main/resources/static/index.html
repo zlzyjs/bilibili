@@ -7,8 +7,8 @@
   <title>dilidili · 第二组课程项目</title>
   <link rel="stylesheet" href="/nav-brand.css?v=1">
   <link rel="stylesheet" href="/home.css?v=64">
-  <link rel="stylesheet" href="/watch.css?v=35">
-  <link rel="stylesheet" href="/watch-fullscreen.css?v=3">
+  <link rel="stylesheet" href="/watch.css?v=36">
+  <link rel="stylesheet" href="/watch-fullscreen.css?v=4">
   <link rel="stylesheet" href="/banner-leaves.css?v=1">
   <script src="/banner-leaves.js?v=3" defer></script>
   <link rel="stylesheet" href="/watch-comments.css?v=12">
@@ -19,14 +19,14 @@
   <script src="/personal-space.js?v=7" defer></script>
   <link rel="stylesheet" href="/search.css?v=10">
   <script src="/search.js?v=9" defer></script>
-  <script src="/watch-preferences.js?v=11" defer></script>
+  <script src="/watch-preferences.js?v=12" defer></script>
   <script src="/watch-sidebar.js?v=4" defer></script>
   <script src="/viewer-presence.js?v=1" defer></script>
   <script src="/watch-comments.js?v=12" defer></script>
-  <script src="/watch.js?v=33" defer></script>
+  <script src="/watch.js?v=34" defer></script>
   <script src="/home.js?v=44" defer></script>
   <script src="/login.js?v=12" defer></script>
-  <script src="/interactions.js?v=17" defer></script>
+  <script src="/interactions.js?v=18" defer></script>
   <link rel="stylesheet" href="/messages.css?v=19">
   <script src="/messages.js?v=19" defer></script>
   <link rel="stylesheet" href="/account-center.css?v=3">
@@ -263,13 +263,12 @@
           <div id="danmaku-actions" class="danmaku-actions" role="toolbar" aria-label="弹幕操作" hidden><button id="dm-action-like" aria-label="点赞" data-tooltip="点赞"><svg class="watch-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#like-outline"/></svg><svg class="watch-icon dm-like-filled" aria-hidden="true"><use href="/assets/watch-icons.svg#action-like"/></svg><span id="dm-like-count" class="dm-like-count" hidden></span></button><button id="dm-action-copy" aria-label="复制" data-tooltip="复制"><svg class="watch-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#note"/></svg></button><button id="dm-action-report" aria-label="举报" data-tooltip="举报"><svg class="watch-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#report"/></svg></button></div>
           <span id="control-notice" class="control-notice" role="status" hidden></span>
         </div>
-        <div id="danmaku-compose-home"></div><div id="danmaku-compose" class="danmaku-compose"><span id="online-viewers" aria-live="polite">—人正在看</span><button id="danmaku-toggle" aria-pressed="true" data-tooltip="开启 / 关闭弹幕"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#danmaku"/></svg><svg class="watch-icon dm-badge" aria-hidden="true"><use href="/assets/watch-icons.svg#check"/></svg></button><div id="danmaku-control" class="control-popover"><button id="danmaku-settings" data-tooltip="弹幕设置"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#danmaku"/></svg><svg class="watch-icon dm-badge" aria-hidden="true"><use href="/assets/watch-icons.svg#dm-gear"/></svg></button><div class="hover-panel danmaku-settings-panel"><div id="dm-settings-main"><strong>按类型过滤</strong><div class="dm-filter-types"><button id="dm-filter-scroll"><svg class="dm-type-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#dm-scroll"/></svg><span>滚动</span></button><button id="dm-filter-fixed"><svg class="dm-type-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#dm-fixed"/></svg><span>固定</span></button><button id="dm-filter-color"><svg class="dm-type-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#dm-color"/></svg><span>彩色</span></button></div><div class="dm-checks"><label><input id="dm-scale" type="checkbox"> 弹幕随屏幕缩放</label><label><input id="dm-subtitle-safe" type="checkbox"> 防挡字幕</label><label><input id="dm-smart" type="checkbox" checked> 智能防挡弹幕</label></div><div class="dm-filter-actions"><button id="dm-keywords-open">弹幕观看屏蔽词</button><button data-login="同步屏蔽列表" data-login-only>同步屏蔽列表</button></div>
+        <div id="danmaku-compose-home"></div><div id="danmaku-compose" class="danmaku-compose"><span id="online-viewers" aria-live="polite">—人正在看</span><button id="danmaku-toggle" type="button" aria-label="弹幕" aria-keyshortcuts="D" aria-pressed="true" data-tooltip="关闭弹幕 (d)"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#danmaku"/></svg><svg class="watch-icon dm-badge" aria-hidden="true"><use href="/assets/watch-icons.svg#check"/></svg><svg class="watch-icon dm-badge dm-off-badge" aria-hidden="true"><use href="/assets/watch-icons.svg?v=2#dm-off"/></svg></button><div id="danmaku-control" class="control-popover"><button id="danmaku-settings" type="button" aria-label="弹幕设置"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#danmaku"/></svg><svg class="watch-icon dm-badge" aria-hidden="true"><use href="/assets/watch-icons.svg#dm-gear"/></svg></button><div class="hover-panel danmaku-settings-panel"><strong>按类型过滤</strong><div class="dm-filter-types"><button id="dm-filter-scroll"><svg class="dm-type-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#dm-scroll"/></svg><span>滚动</span></button><button id="dm-filter-fixed"><svg class="dm-type-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#dm-fixed"/></svg><span>固定</span></button><button id="dm-filter-color"><svg class="dm-type-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#dm-color"/></svg><span>彩色</span></button></div><div class="dm-checks"><label><input id="dm-scale" type="checkbox"> 弹幕随屏幕缩放</label><label><input id="dm-subtitle-safe" type="checkbox"> 防挡字幕</label><label><input id="dm-smart" type="checkbox" checked> 智能防挡弹幕</label></div><div class="dm-filter-actions"><button id="dm-keywords-open">弹幕观看屏蔽词</button><button data-login="同步屏蔽列表" data-login-only>同步屏蔽列表</button></div>
 <label class="dm-slider">显示区域<input id="dm-area" type="range" min="25" max="100" step="25" value="100"><output id="dm-area-value">100%</output></label>
 <div class="dm-density"><span>弹幕密度</span><button id="dm-density-normal">正常</button><button id="dm-density-more">较多</button><button id="dm-density-overlap">最多</button></div>
 <label class="dm-slider">不透明度<input id="dm-opacity" type="range" min="10" max="100" value="80"><output id="dm-opacity-value">80%</output></label>
 <label class="dm-slider">弹幕字号<input id="dm-size" type="range" min="50" max="150" value="100"><output id="dm-size-value">100%</output></label>
-<label class="dm-slider">弹幕速度<input id="dm-speed" type="range" min="1" max="5" value="3"><output id="dm-speed-value">适中</output></label><button id="dm-advanced-open" class="panel-next">高级设置 <span>›</span></button></div>
-<div id="dm-settings-advanced" hidden><button id="dm-advanced-back" class="panel-back">‹ 更多弹幕设置</button><label class="dm-sync"><input id="dm-sync-rate" type="checkbox"> 弹幕速度同步播放倍数</label><label class="dm-font-label">弹幕字体</label><div class="dm-font-row"><select id="dm-font" aria-label="弹幕字体"><option value="heiti">黑体</option><option value="songti">宋体</option><option value="yahei">微软雅黑</option></select><label><input id="dm-bold" type="checkbox"> 粗体</label></div><strong class="dm-outline-label">描边类型</strong><div class="preference-segments"><button id="dm-outline-heavy">重墨</button><button id="dm-outline-stroke">描边</button><button id="dm-outline-shadow">45°投影</button></div><button id="dm-reset" class="subtitle-reset">恢复默认设置</button></div><div id="dm-settings-keywords" hidden><button id="dm-keywords-back" class="panel-back">‹ 屏蔽词设置</button><label class="dm-keywords">屏蔽关键词（每行一个）<textarea id="dm-keywords" rows="4" maxlength="1000"></textarea></label><button id="dm-keywords-save" class="panel-login">保存屏蔽词</button></div></div></div><div class="danmaku-input"><button id="danmaku-guest" class="danmaku-login" type="button">请先 <em>登录</em> 或 <em>注册</em></button><form id="danmaku-entry" class="danmaku-entry" hidden autocomplete="off">
+<label class="dm-slider">弹幕速度<input id="dm-speed" type="range" min="1" max="5" value="3"><output id="dm-speed-value">适中</output></label></div></div><div class="danmaku-input"><button id="danmaku-guest" class="danmaku-login" type="button">请先 <em>登录</em> 或 <em>注册</em></button><form id="danmaku-entry" class="danmaku-entry" hidden autocomplete="off">
   <div id="dm-style-control" class="control-popover">
     <button id="dm-style-toggle" type="button" aria-label="弹幕样式" aria-controls="dm-style-panel" aria-expanded="false">A</button>
     <div id="dm-style-panel" class="hover-panel dm-style-panel" inert>
@@ -287,7 +286,7 @@
   </div>
   <input id="danmaku-text" aria-label="弹幕内容" placeholder="发个友善的弹幕见证当下" maxlength="100" autocomplete="off">
   <button id="danmaku-send" type="submit" aria-live="polite">发送</button>
-</form><button id="danmaku-guest-send" type="button" disabled>发送</button></div></div>
+</form><button id="danmaku-guest-send" type="button" disabled>发送</button><span class="danmaku-off-message" role="status">已关闭弹幕</span><button class="danmaku-off-send" type="button" disabled>发送</button></div></div>
         <p id="player-status" class="status" role="status" hidden></p></div>
         <div class="watch-details"><div class="video-actions">
           <button id="video-like" aria-label="点赞"><svg class="action-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#action-like"/></svg><span id="like-count">—</span></button>
