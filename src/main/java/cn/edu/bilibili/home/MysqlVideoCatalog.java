@@ -11,7 +11,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 class MysqlVideoCatalog {
-    private static final String PUBLIC_VIDEOS = """
+    private static final String VIDEO_SELECT = """
             SELECT v.VideoID, v.VideoTitle, v.VideoDescription, u.UID, u.Name, v.CategoryID, c.CategoryName,
                    v.VideoDuration, COALESCE(p.PlayCount, 0) AS Plays, v.UploadTime,
                    v.CoverUrl, v.VideoContent, co.CompilationTitle,
@@ -22,8 +22,11 @@ class MysqlVideoCatalog {
             JOIN videocategorytable c ON c.CategoryID = v.CategoryID
             LEFT JOIN playcounttable p ON p.VideoID = v.VideoID
             LEFT JOIN compilationtable co ON co.CompilationID = v.CompilationID
+            """;
+    private static final String PUBLIC_VIDEO_FILTER = """
             WHERE v.VideoStatus = 'published' AND v.VisibleStatus = 'public'
             """;
+    private static final String PUBLIC_VIDEOS = VIDEO_SELECT + PUBLIC_VIDEO_FILTER;
     private static final String VIDEO_TAGS = """
             FROM videotagtable vt JOIN tagtable t ON t.TagID = vt.TagID
             """;
@@ -36,6 +39,29 @@ class MysqlVideoCatalog {
     List<Category> categories() {
         return jdbc.sql("SELECT CategoryID, CategoryName FROM videocategorytable ORDER BY CategoryID")
                 .query((rs, row) -> new Category(rs.getString(1), rs.getString(2))).list();
+    }
+
+    List<Video> recentlyCoinedVideos(String uid) {
+        return recentPersonalVideos(uid, """
+                SELECT VideoID, MAX(ChangeTime) AS InteractedAt, MAX(CoinRecordID) AS TieBreaker
+                FROM coinrecordtable
+                WHERE UID=CAST(:uid AS UNSIGNED) AND VideoID IS NOT NULL AND CoinChange<0
+                GROUP BY VideoID
+                """);
+    }
+
+    List<Video> recentlyLikedVideos(String uid) {
+        return recentPersonalVideos(uid, """
+                SELECT LikeTargetID AS VideoID, LikeTime AS InteractedAt, LikeTargetID AS TieBreaker
+                FROM liketable
+                WHERE UID=CAST(:uid AS UNSIGNED) AND LikeTargetType=0
+                """);
+    }
+
+    private List<Video> recentPersonalVideos(String uid, String interactions) {
+        return jdbc.sql(VIDEO_SELECT + " JOIN (" + interactions + ") recent ON recent.VideoID=v.VideoID\n"
+                + PUBLIC_VIDEO_FILTER + " ORDER BY recent.InteractedAt DESC, recent.TieBreaker DESC LIMIT 10")
+                .param("uid", uid).query(MysqlVideoCatalog::readVideo).list();
     }
 
     List<Video> findVideos(Query query) {
@@ -349,59 +375,81 @@ class MysqlVideoCatalog {
                 """).param("id", videoId).query(MysqlVideoCatalog::readVideo).list();
     }
 
-    CommentPage comments(String videoId, boolean latest, int page, boolean member) {
-        long total = jdbc.sql("SELECT COUNT(*) FROM commenttable WHERE VideoID=CAST(:id AS UNSIGNED) AND CommentStatus='active'")
-                .param("id", videoId).query(Long.class).single();
+    private static String visibleComment(String alias, String idColumn, int targetType) {
+        return """
+                NOT EXISTS (SELECT 1 FROM relationtable b
+                    WHERE b.UID=CAST(:viewer AS UNSIGNED) AND b.RelationType=1 AND b.TargetUID=%1$s.UID)
+                AND NOT EXISTS (SELECT 1 FROM reporttable p
+                    WHERE p.UID=CAST(:viewer AS UNSIGNED) AND p.TargetType=%3$d AND p.TargetID=%1$s.%2$s)
+                """.formatted(alias, idColumn, targetType).strip();
+    }
+
+    CommentPage comments(String videoId, boolean latest, int page, String viewer) {
+        boolean member = viewer != null;
+        long total = jdbc.sql("SELECT COUNT(*) FROM commenttable c WHERE VideoID=CAST(:id AS UNSIGNED) AND CommentStatus='active' AND "
+                + visibleComment("c", "CommentID", 2)).param("id", videoId).param("viewer", viewer, java.sql.Types.VARCHAR).query(Long.class).single();
         var comments = jdbc.sql("""
-                SELECT c.CommentID, c.UID, u.Name, l.LevelName, %s AS Content, c.CommentTime,
+                SELECT c.CommentID, c.UID, u.Name, l.LevelName, %s AS Content, %s AS Tags, c.CommentTime,
                   (c.ImageUrl IS NOT NULL) AS HasImage,
                   (SELECT COUNT(*) FROM liketable k WHERE k.LikeTargetType=2 AND k.LikeTargetID=c.CommentID) AS Likes
                 FROM commenttable c JOIN usertable u ON u.UID=c.UID
                 LEFT JOIN userleveltable l ON l.LevelID=u.LevelID
-                WHERE c.VideoID=CAST(:id AS UNSIGNED) AND c.CommentStatus='active'
+                WHERE c.VideoID=CAST(:id AS UNSIGNED) AND c.CommentStatus='active' AND %s
                 ORDER BY
-                """.formatted(CommentContent.text("c"))
+                """.formatted(CommentContent.text("c"), CommentContent.tags("c"), visibleComment("c", "CommentID", 2))
                 + (latest ? "" : " Likes DESC, ") + " c.CommentTime DESC, c.CommentID DESC LIMIT :size OFFSET :offset")
-                .param("id", videoId).param("size", member ? 20 : 2).param("offset", member ? (page - 1) * 20 : 0)
+                .param("id", videoId).param("viewer", viewer, java.sql.Types.VARCHAR)
+                .param("size", member ? 20 : 2).param("offset", member ? (page - 1) * 20 : 0)
                 .query((rs, row) -> {
-                    var replies = previewReplies(rs.getString("CommentID"));
+                    var replies = replies(rs.getString("CommentID"), 2, viewer, false);
                     return new CommentPreview(rs.getString("CommentID"), rs.getString("UID"), rs.getString("Name"),
                         rs.getString("LevelName"), rs.getString("Content"), rs.getObject("CommentTime", LocalDateTime.class),
-                        rs.getLong("Likes"), rs.getBoolean("HasImage"), replies.isEmpty() ? 0 : replies.get(0).total(), replies);
+                        rs.getLong("Likes"), rs.getBoolean("HasImage"), replies.isEmpty() ? 0 : replies.get(0).total(), replies,
+                        CommentContent.storedTags(rs.getString("Tags")));
                 }).list();
         return new CommentPage(total, comments);
     }
 
-    private List<ReplyPreview> previewReplies(String commentId) {
-        return replies(commentId, 2);
-    }
-
-    List<ReplyPreview> replies(String commentId, int limit) {
-        return jdbc.sql("""
+    List<ReplyPreview> replies(String commentId, int limit, String viewer, boolean recent) {
+        var rows = jdbc.sql("""
                 WITH RECURSIVE thread AS (
                   SELECT r.*, 1 AS depth FROM replytable r
                   WHERE r.ReplyTargetType=1 AND r.ReplyTargetID=CAST(:id AS UNSIGNED) AND r.ReplyStatus='active'
+                    AND EXISTS (SELECT 1 FROM commenttable c WHERE c.CommentID=r.ReplyTargetID AND %s)
                   UNION ALL
                   SELECT r.*, t.depth+1 FROM replytable r JOIN thread t
                     ON r.ReplyTargetType=0 AND r.ReplyTargetID=t.ReplyID
                   WHERE r.ReplyStatus='active' AND t.depth<30
                 )
-                SELECT t.ReplyID, t.UID, u.Name, l.LevelName, %s AS Content, t.ReplyTime,
+                SELECT t.ReplyID, t.UID, u.Name, l.LevelName, %s AS Content, %s AS Tags, t.ReplyTime,
+                  recipient.UID AS ReplyToUserID, recipient.Name AS ReplyToName,
                   (SELECT COUNT(*) FROM liketable k WHERE k.LikeTargetType=3 AND k.LikeTargetID=t.ReplyID) AS Likes,
                   COUNT(*) OVER() AS Total FROM thread t JOIN usertable u ON u.UID=t.UID
                 LEFT JOIN userleveltable l ON l.LevelID=u.LevelID
-                ORDER BY t.ReplyTime, t.ReplyID LIMIT :limit
-                """.formatted(CommentContent.text("t"))).param("id", commentId).param("limit", limit)
+                LEFT JOIN replytable parent ON t.ReplyTargetType=0 AND parent.ReplyID=t.ReplyTargetID
+                LEFT JOIN usertable recipient ON recipient.UID=parent.UID
+                WHERE %s
+                ORDER BY %s LIMIT :limit
+                """.formatted(visibleComment("c", "CommentID", 2), CommentContent.text("t"), CommentContent.tags("t"),
+                        visibleComment("t", "ReplyID", 3), recent ? "t.ReplyTime DESC, t.ReplyID DESC" : "t.ReplyTime, t.ReplyID"))
+                .param("id", commentId).param("viewer", viewer, java.sql.Types.VARCHAR).param("limit", limit)
                 .query((rs, row) -> new ReplyPreview(rs.getString("ReplyID"),
                     rs.getString("UID"), rs.getString("Name"), rs.getString("LevelName"), rs.getString("Content"),
-                    rs.getObject("ReplyTime", LocalDateTime.class), rs.getLong("Likes"), rs.getLong("Total"))).list();
+                    rs.getObject("ReplyTime", LocalDateTime.class), rs.getLong("Likes"), rs.getLong("Total"),
+                    CommentContent.storedTags(rs.getString("Tags")), rs.getString("ReplyToUserID"), rs.getString("ReplyToName"))).list();
+        if (!recent) return rows;
+        var chronological = new java.util.ArrayList<>(rows);
+        java.util.Collections.reverse(chronological);
+        return chronological;
     }
 
     record CommentPage(long total, List<CommentPreview> items) {}
     record CommentPreview(String id, String userId, String author, String level, String content,
-                          LocalDateTime sentAt, long likes, boolean hasImage, long replyCount, List<ReplyPreview> replies) {}
+                          LocalDateTime sentAt, long likes, boolean hasImage, long replyCount, List<ReplyPreview> replies,
+                          List<CommentContent.Tag> tags) {}
     record ReplyPreview(String id, String userId, String author, String level, String content,
-                        LocalDateTime sentAt, long likes, long total) {}
+                        LocalDateTime sentAt, long likes, long total, List<CommentContent.Tag> tags,
+                        String replyToUserId, String replyToName) {}
 
     Engagement engagement(String id) {
         return jdbc.sql("""

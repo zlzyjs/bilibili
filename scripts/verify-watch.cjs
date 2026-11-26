@@ -20,19 +20,20 @@ class Element {
   querySelectorAll() { return []; }
   getBoundingClientRect() { return {left:100,top:100,width:500,height:281,bottom:125}; }
 }
-async function setup(storage = new Map(), collection = {title:null,items:[]}, accolades = {}) {
+async function setup(storage = new Map(), collection = {title:null,items:[]}, accolades = {}, playlist = {}) {
   const elements = new Map(); const el = id => { if (!elements.has(id)) elements.set(id,new Element()); return elements.get(id); };
   const p = el('player'); Object.assign(p,{ currentTime:0, duration:100, readyState:4, paused:true, ended:false, seeking:false, pause(){this.paused=true;this.emit('pause');}, async play(){this.paused=false;this.emit('play');} });
   el('login-dialog').open = false;
   let now = 0, tick, prompts = 0, copied = '', postDanmaku, resizeDanmaku;
-  const documentEvents={}, windowEvents={}, interactionCalls=[];
+  const documentEvents={}, windowEvents={}, interactionCalls=[], navigations=[];
   const context = { setupWatchComments(){},setupWatchScroll(){},setupRelatedExpansion(){},startViewerPresence(){}, el, path:'/video/10001', duration:n=>`${Math.floor(n/60)}`.padStart(2,'0')+':'+`${n%60}`.padStart(2,'0'), shortCount:String,
     localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)}, performance:{now:()=>now},
     setInterval:fn=>(tick=fn,1),clearInterval(){},setTimeout(){return 1;},clearTimeout(){},
     ResizeObserver:class { constructor(callback) { resizeDanmaku = callback; } observe() {} },
     window:{addEventListener(event,fn){(windowEvents[event] ||= []).push(fn);}}, navigator:{clipboard:{writeText:async text=>{copied=text;}}}, document:{ documentElement:{clientWidth:1200}, body:new Element(), title:'', activeElement:{tagName:'BODY'}, addEventListener(event,fn){(documentEvents[event] ||= []).push(fn);},querySelector:()=>new Element() },
-    openLogin:()=>{prompts++;el('login-dialog').open=true;},location:{assign(){}},
-    interaction:async (...args)=>{ interactionCalls.push(args); },
+    openLogin:()=>{prompts++;el('login-dialog').open=true;},URLSearchParams,
+    location:{search:playlist.search,assign(href){navigations.push(href);}},
+    interaction:async (...args)=>{ interactionCalls.push(args); return playlist.videos; },
     setupVideoInteractions:(_id,_author,_player,_duration,callback)=>{ postDanmaku=callback; },
     node:(tag,cls,text)=>Object.assign(new Element(),{className:cls,textContent:text}),
     link:(href,label,className)=>Object.assign(new Element(),{href,className,textContent:label}),
@@ -42,7 +43,7 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
     ]:url.startsWith('/authors/')?{followers:10}:url.startsWith('/videos?')?{items:[]}: {video:{id:'10001',title:'Test',authorId:'1',streamUrl:'/test.mp4',plays:1,danmaku:3},tags:[],...accolades}
   };
   vm.createContext(context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch-sidebar.js','utf8'),context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch-preferences.js','utf8'),context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch.js','utf8'),context);await context.loadWatchPage();
-  return {el,p,storage,postDanmaku,resizeDanmaku,interactionCalls,keydown:event=>(documentEvents.keydown||[]).forEach(fn=>fn(event)),pageEvent:(name,event={})=>(windowEvents[name]||[]).forEach(fn=>fn(event)),copied:()=>copied,fullscreen:flag=>{context.document.fullscreenElement=flag?el('player-shell'):null;(documentEvents.fullscreenchange||[]).forEach(fn=>fn());}, advance(ms,move=true){now+=ms;if(move&&!p.paused)p.currentTime+=ms/1000;tick();},prompts:()=>prompts};
+  return {el,p,storage,postDanmaku,resizeDanmaku,interactionCalls,navigations,keydown:event=>(documentEvents.keydown||[]).forEach(fn=>fn(event)),pageEvent:(name,event={})=>(windowEvents[name]||[]).forEach(fn=>fn(event)),copied:()=>copied,fullscreen:flag=>{context.document.fullscreenElement=flag?el('player-shell'):null;(documentEvents.fullscreenchange||[]).forEach(fn=>fn());}, advance(ms,move=true){now+=ms;if(move&&!p.paused)p.currentTime+=ms/1000;tick();},prompts:()=>prompts};
 }
 (async()=>{
   const createTracks = vm.runInNewContext(fs.readFileSync('src/main/resources/static/watch.js', 'utf8') + '\nsetupDanmakuTracks;');
@@ -318,6 +319,18 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   assert.equal(member.p.paused, true);
   assert.equal(member.prompts(), 1);
   assert.equal(member.el('trial-ended').hidden, false);
+  const folderPlaylist = await setup(new Map(), undefined, {}, {
+    search: '?playlist=folder-42', videos: [{id:'10001'}, {id:'10003'}],
+  });
+  folderPlaylist.p.emit('ended');
+  assert.deepEqual(folderPlaylist.navigations, ['/video/10003?playlist=folder-42']);
+  assert.ok(folderPlaylist.interactionCalls.some(([path]) => path === '/me/folders/42/videos'));
+  const lastFolderVideo = await setup(new Map(), undefined, {}, {
+    search: '?playlist=folder-42', videos: [{id:'10001'}],
+  });
+  lastFolderVideo.p.emit('ended');
+  assert.deepEqual(lastFolderVideo.navigations, []);
+  console.log('PASS: favorite-folder playback advances within the folder and stops at the end');
   member.pageEvent('accountchange', { detail: { uid: '10001' } });
   assert.equal(member.el('trial-ended').hidden, true);
   await member.el('play-toggle').onclick();

@@ -423,7 +423,8 @@ function setupPeopleList(button, id, kind, title) {
   }));
 }
 
-function videoCoinInteraction(id, applyLike) {
+function videoCoinInteraction(id, uid, remaining, applyCoins, applyLike, showCoinLimit) {
+  const resource = '/videos/' + encodeURIComponent(id);
   interactionPanel('为视频投币', (body, status, close) => {
     const dialog = body.closest('dialog');
     dialog.classList.add('video-coin-dialog');
@@ -437,7 +438,7 @@ function videoCoinInteraction(id, applyLike) {
     const choices = node('fieldset', 'video-coin-choices');
     choices.setAttribute('aria-label', '投币数量');
     let amount = 1, submitting = false;
-    for (const value of [1, 2]) {
+    for (let value = 1; value <= remaining; value++) {
       const option = node('label', 'video-coin-choice');
       const radio = node('input');
       radio.type = 'radio';
@@ -477,21 +478,36 @@ function videoCoinInteraction(id, applyLike) {
     form.onsubmit = async event => {
       event.preventDefault();
       if (submitting) return;
-      const uid = currentAccount?.uid;
-      if (!uid) { status.textContent = '请先登录'; return; }
+      if (currentAccount?.uid !== uid) { close(); return; }
       const shouldLike = alsoLike.checked;
       submitting = choices.disabled = alsoLike.disabled = closeButton.disabled = submit.disabled = true;
       status.textContent = '';
       let result;
       try {
-        result = await interaction('/videos/' + encodeURIComponent(id) + '/coins', 'POST', { value: amount });
+        result = await interaction(resource + '/coins', 'POST', { value: amount });
       } catch (error) {
+        const state = await interaction(resource + '/state').catch(() => null);
+        if (currentAccount?.uid !== uid) { close(); return; }
+        if (state) {
+          const available = applyCoins(state.coinsGiven);
+          if (available === 0) {
+            close();
+            showCoinLimit();
+            return;
+          }
+          if (available < remaining) {
+            close();
+            videoCoinInteraction(id, uid, available, applyCoins, applyLike, showCoinLimit);
+            return;
+          }
+        }
         status.textContent = error.message;
         submitting = choices.disabled = alsoLike.disabled = closeButton.disabled = submit.disabled = false;
         return;
       }
       el('coin-count').textContent = shortCount(result.count);
-      let feedback = '投币成功';
+      if (currentAccount?.uid === uid) applyCoins(result.coinsGiven);
+      let feedback = '投币成功，感谢您的支持';
       if (shouldLike && currentAccount?.uid === uid) {
         try {
           const like = await interaction('/likes/video/' + encodeURIComponent(id), 'PUT', { enabled: true });
@@ -501,52 +517,220 @@ function videoCoinInteraction(id, applyLike) {
         }
       }
       close();
-      accountNotice(feedback);
+      accountNotice(feedback, 'coin-success');
     };
+  });
+}
+
+function videoFavoriteInteraction(resource, uid, applyFavorite) {
+  interactionPanel('添加到收藏夹', async (body, status, close) => {
+    const dialog = body.closest('dialog');
+    dialog.classList.add('video-favorite-dialog');
+    const closeButton = dialog.querySelector('.interaction-close');
+    closeButton.textContent = '×';
+    closeButton.setAttribute('aria-label', '关闭收藏窗口');
+    const list = node('fieldset', 'favorite-folders');
+    list.setAttribute('aria-label', '收藏夹列表');
+    const newButton = node('button', 'favorite-new', '新建收藏夹');
+    const editor = node('form', 'favorite-editor');
+    editor.hidden = true;
+    const hint = node('div', 'favorite-editor-hint', '点击弹窗内其他区域或ESC键，取消新建收藏夹');
+    const hideHint = node('button', '', '×');
+    hideHint.type = 'button';
+    hideHint.setAttribute('aria-label', '关闭新建提示');
+    hint.append(hideHint);
+    const error = node('p', 'favorite-editor-error');
+    error.id = 'favorite-name-error';
+    error.setAttribute('role', 'alert');
+    error.hidden = true;
+    const input = node('input');
+    input.placeholder = '最多可输入20个字';
+    input.setAttribute('aria-label', '收藏夹名称');
+    input.setAttribute('aria-describedby', error.id);
+    const create = node('button', '', '新建');
+    create.type = 'submit';
+    const inputRow = node('div', 'favorite-editor-row');
+    inputRow.append(input, create);
+    editor.append(hint, error, inputRow);
+    const footer = node('div', 'favorite-dialog-footer');
+    const confirm = node('button', 'login-primary favorite-confirm', '确定');
+    footer.append(confirm);
+    body.append(list, newButton, editor, footer);
+
+    const choices = new Map();
+    let loading = true, saving = false, editing = false;
+    const changes = () => Array.from(choices, ([id, { box, selected }]) => ({ id, enabled: box.checked, selected }))
+      .filter(({ enabled, selected }) => enabled !== selected).map(({ id, enabled }) => ({ id, enabled }));
+    const updateControls = () => {
+      list.disabled = loading || saving || editing;
+      newButton.disabled = loading || saving;
+      confirm.disabled = list.disabled || changes().length === 0;
+      closeButton.disabled = saving;
+      input.disabled = create.disabled = saving;
+    };
+    const addFolder = (folder, prepend) => {
+      const row = node('label', 'favorite-folder');
+      const box = node('input', 'report-check');
+      box.type = 'checkbox';
+      box.checked = folder.selected;
+      box.disabled = !folder.selected && folder.capacity != null && folder.count >= folder.capacity;
+      const name = node('span', 'favorite-folder-name', folder.name);
+      name.title = folder.name;
+      if (folder.privateFolder) name.append(node('i', 'favorite-folder-privacy', ' [私密]'));
+      const count = node('span', 'favorite-folder-count');
+      const renderCount = () => {
+        const total = folder.count + Number(box.checked) - Number(folder.selected);
+        count.textContent = folder.capacity == null ? String(total) : total + '/' + folder.capacity;
+      };
+      box.onchange = () => {
+        renderCount();
+        updateControls();
+      };
+      renderCount();
+      choices.set(folder.id, { box, selected: folder.selected });
+      row.append(box, name, count);
+      if (prepend) list.prepend(row);
+      else list.append(row);
+    };
+    const clearError = () => {
+      error.hidden = true;
+      error.textContent = '';
+      input.removeAttribute('aria-invalid');
+    };
+    const showError = message => {
+      error.hidden = false;
+      error.textContent = message;
+      input.setAttribute('aria-invalid', 'true');
+      input.focus();
+    };
+    const endEditing = () => {
+      editing = false;
+      editor.hidden = true;
+      newButton.hidden = false;
+      input.value = '';
+      clearError();
+      updateControls();
+      newButton.focus();
+    };
+    newButton.onclick = () => {
+      editing = true;
+      newButton.hidden = true;
+      editor.hidden = false;
+      hint.hidden = false;
+      status.textContent = '';
+      updateControls();
+      input.focus();
+    };
+    hideHint.onclick = () => { hint.hidden = true; input.focus(); };
+    const limitName = () => {
+      const characters = Array.from(input.value);
+      if (characters.length > 20) input.value = characters.slice(0, 20).join('');
+    };
+    input.oninput = event => { if (!event.isComposing) limitName(); clearError(); };
+    input.oncompositionend = limitName;
+    dialog.addEventListener('click', event => {
+      if (editing && !saving && !editor.contains(event.target) && !newButton.contains(event.target)) endEditing();
+    }, { capture: true });
+    dialog.addEventListener('cancel', event => {
+      if (!saving && !editing) return;
+      event.preventDefault();
+      if (!saving) endEditing();
+    });
+    editor.onsubmit = async event => {
+      event.preventDefault();
+      if (!editing || saving) return;
+      if (currentAccount?.uid !== uid) { close(); return; }
+      const name = input.value.trim();
+      if (!name) { showError('请填写收藏夹名称'); return; }
+      saving = true;
+      clearError();
+      updateControls();
+      try {
+        const result = await interaction(resource, 'POST', { name });
+        if (currentAccount?.uid !== uid) { close(); return; }
+        addFolder(result.folder, true);
+        list.scrollTop = 0;
+        applyFavorite(result.state);
+        saving = false;
+        endEditing();
+      } catch (err) {
+        saving = false;
+        updateControls();
+        showError(err.message);
+      }
+    };
+    confirm.onclick = async () => {
+      if (confirm.disabled) return;
+      if (currentAccount?.uid !== uid) { close(); return; }
+      const pending = changes();
+      saving = true;
+      status.textContent = '';
+      updateControls();
+      try {
+        const state = await interaction(resource, 'PUT', { changes: pending });
+        if (currentAccount?.uid === uid) {
+          applyFavorite(state);
+        }
+        close();
+      } catch (err) {
+        status.textContent = err.message;
+      } finally {
+        saving = false;
+        updateControls();
+      }
+    };
+    updateControls();
+    const folders = await interaction(resource);
+    if (!dialog.open || currentAccount?.uid !== uid) { close(); return; }
+    folders.forEach(folder => addFolder(folder, false));
+    loading = false;
+    updateControls();
   });
 }
 
 function setupVideoInteractions(id, author, player, duration, onDanmaku, authorName) {
   const root = el('video-page');
   const resource = '/videos/' + id;
-  const like = el('video-like'), favorite = el('video-favorite'), subscribe = el('video-subscribe');
+  const like = el('video-like'), coin = el('video-coin'), favorite = el('video-favorite'), subscribe = el('video-subscribe');
+  let coinViewer, coinsGiven = 0;
+  const applyCoins = total => {
+    const uid = currentAccount?.uid;
+    coinsGiven = coinViewer === uid ? Math.max(coinsGiven, total) : total;
+    coinViewer = uid;
+    pressInteraction(coin, coinsGiven > 0);
+    return Math.max(0, Math.floor(2 - coinsGiven));
+  };
+  const showCoinLimit = () => accountNotice('对本稿件的投币枚数已用完', 'coin-limit', coin);
   if (root) setupAuthorInteractions(author, root, followers => { el('watch-followers').textContent = shortCount(followers); });
   const renderLikeCount = count => { el('like-count').textContent = shortCount(count); };
   bindLike(like, 'video', id, renderLikeCount, false, enabled => showVideoLikeCelebration(like, enabled));
-  memberAction(favorite, () => interactionPanel('收藏视频', async (body, status) => {
-    const folders = await interaction(resource + '/folders');
-    if (!folders.length) { status.textContent = '当前账号没有可用的收藏夹'; return; }
-    folders.forEach(folder => {
-      const row = node('label', 'interaction-option');
-      const checkbox = node('input');
-      checkbox.type = 'checkbox';
-      checkbox.checked = folder.selected;
-      checkbox.onchange = async () => {
-        checkbox.disabled = true;
-        status.textContent = '';
-        try {
-          const result = await interaction(resource + '/folders/' + folder.id, 'PUT', { enabled: checkbox.checked });
-          pressInteraction(favorite, result.enabled);
-          el('favorite-count').textContent = shortCount(result.count);
-        } catch (error) {
-          checkbox.checked = !checkbox.checked;
-          status.textContent = error.message;
-        } finally { checkbox.disabled = false; }
-      };
-      row.append(checkbox, node('span', '', folder.name));
-      body.append(row);
-    });
+  let favoriteRevision = 0;
+  memberAction(favorite, () => videoFavoriteInteraction(resource + '/folders', currentAccount.uid, result => {
+    favoriteRevision++;
+    pressInteraction(favorite, result.enabled);
+    el('favorite-count').textContent = shortCount(result.count);
   }));
-  memberAction(el('video-coin'), () => videoCoinInteraction(id, result => {
+  const applyCoinLike = result => {
     const wasLiked = like.getAttribute('aria-pressed') === 'true';
     pressInteraction(like, result.enabled);
     renderLikeCount(result.count);
     if (result.enabled && !wasLiked) showVideoLikeCelebration(like, true);
-  }));
-  memberAction(el('video-share'), () => textInteraction('转发视频', '接收方 UID', 20, async value => {
-    const result = await interaction(resource + '/forward', 'POST', { value });
-    el('share-count').textContent = shortCount(result.count);
-  }, false));
+  };
+  memberAction(coin, async () => {
+    const uid = currentAccount.uid;
+    if (coinViewer === uid && coinsGiven > 1) return showCoinLimit();
+    const state = await interaction(resource + '/state');
+    if (currentAccount?.uid !== uid) return;
+    const remaining = applyCoins(state.coinsGiven);
+    if (remaining === 0) return showCoinLimit();
+    videoCoinInteraction(id, uid, remaining, applyCoins, applyCoinLike, showCoinLimit);
+  });
+  memberAction(el('video-share'), () => location.assign('/messages?' + new URLSearchParams({ forward: id })));
+  window.addEventListener('pageshow', event => {
+    if (event.persisted) {
+      api(resource + '/engagement').then(stats => { el('share-count').textContent = shortCount(stats.share); }).catch(() => {});
+    }
+  });
   memberAction(el('video-report'), () => videoReportInteraction(id, author, authorName));
   const renderSubscription = (on) => {
     pressInteraction(subscribe, on);
@@ -633,6 +817,7 @@ function setupVideoInteractions(id, author, player, duration, onDanmaku, authorN
 
   async function refresh() {
     const uid = currentAccount?.uid;
+    if (coinViewer !== uid) applyCoins(0);
     if (pending && pending.uid !== uid) finishSend();
     guestPrompt.hidden = guestSend.hidden = Boolean(uid);
     composer.hidden = !uid;
@@ -643,10 +828,12 @@ function setupVideoInteractions(id, author, player, duration, onDanmaku, authorN
       progressReady = false;
       played = !player.paused;
     }
+    const revision = favoriteRevision;
     const [state, csrf] = await Promise.all([interaction(resource + '/state'), uid ? authApi('csrf') : undefined]);
     if (currentAccount?.uid !== uid) return;
+    applyCoins(state.coinsGiven);
     if (!like.disabled) pressInteraction(like, state.liked);
-    pressInteraction(favorite, state.favorited);
+    if (revision === favoriteRevision) pressInteraction(favorite, state.favorited);
     renderSubscription(state.subscribed);
     if (!uid || progressReady) return;
     progressToken = csrf.token;
