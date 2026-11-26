@@ -354,13 +354,13 @@ class MysqlVideoCatalog {
                 .param("id", videoId).query(Long.class).single();
         var comments = jdbc.sql("""
                 SELECT c.CommentID, c.UID, u.Name, l.LevelName, %s AS Content, c.CommentTime,
-                  (%s IS NOT NULL) AS HasImage,
+                  (c.ImageUrl IS NOT NULL) AS HasImage,
                   (SELECT COUNT(*) FROM liketable k WHERE k.LikeTargetType=2 AND k.LikeTargetID=c.CommentID) AS Likes
                 FROM commenttable c JOIN usertable u ON u.UID=c.UID
                 LEFT JOIN userleveltable l ON l.LevelID=u.LevelID
                 WHERE c.VideoID=CAST(:id AS UNSIGNED) AND c.CommentStatus='active'
                 ORDER BY
-                """.formatted(CommentContent.text("c"), CommentContent.IMAGE)
+                """.formatted(CommentContent.text("c"))
                 + (latest ? "" : " Likes DESC, ") + " c.CommentTime DESC, c.CommentID DESC LIMIT :size OFFSET :offset")
                 .param("id", videoId).param("size", member ? 20 : 2).param("offset", member ? (page - 1) * 20 : 0)
                 .query((rs, row) -> {

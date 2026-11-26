@@ -7,13 +7,13 @@ final class CommentContent {
                  THEN JSON_UNQUOTE(JSON_EXTRACT(SUBSTRING(%1$s.Content,2),'$.text'))
                  ELSE %1$s.Content END
             """.strip();
-    static final String IMAGE = """
+    static final String LEGACY_IMAGE = """
             CASE WHEN ASCII(c.Content)=30
                  THEN NULLIF(JSON_UNQUOTE(JSON_EXTRACT(SUBSTRING(c.Content,2),'$.image')),'null') END
             """.strip();
     static final String ENCODE = """
-            CASE WHEN :image IS NULL AND :mentions='[]' THEN :text
-                 ELSE CONCAT(CHAR(30 USING utf8mb4),JSON_OBJECT('text',:text,'image',:image,'mentions',CAST(:mentions AS JSON)))
+            CASE WHEN :mentions='[]' THEN :text
+                 ELSE CONCAT(CHAR(30 USING utf8mb4),JSON_OBJECT('text',:text,'mentions',CAST(:mentions AS JSON)))
             END
             """.strip();
 

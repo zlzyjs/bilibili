@@ -45,8 +45,13 @@ async function setupWatchComments(videoId) {
       await interaction('/replies/' + kind + '/' + entry.id, 'POST', { value });
       await reload();
     }));
-    const report = action('举报', 'comment-options', () => reportInteraction(kind, entry.id));
-    actions.append(like, replyButton, report);
+    const own = signedIn() && currentAccount.uid === entry.userId;
+    const options = own ? action('删除', 'comment-delete', async () => {
+      if (!window.confirm(reply ? '确定删除这条回复？' : '确定删除这条评论？')) return;
+      await interaction((reply ? '/replies/' : '/comments/') + encodeURIComponent(entry.id), 'DELETE');
+      await load(sort);
+    }) : action('举报', 'comment-options', () => reportInteraction(kind, entry.id));
+    actions.append(like, replyButton, options);
     content.hidden = !entry.content;
     body.append(byline, content);
     if (!reply && entry.hasImage) {

@@ -82,9 +82,11 @@ function duration(seconds) {
 async function apiRequest(prefix, path, options = {}) {
   const { method = 'GET', body, keepalive = false, csrfToken, fallback } = options;
   const opt = { method, cache: 'no-store', keepalive };
-  if (body !== undefined) {
+  if (method === 'DELETE' || body !== undefined) {
     const token = csrfToken || (await authApi('csrf')).token;
     opt.headers = { 'X-CSRF-Token': token };
+  }
+  if (body !== undefined) {
     if (body instanceof FormData) {
       opt.body = body;
     } else {

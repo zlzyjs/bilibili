@@ -36,7 +36,7 @@ OSS 媒体路径使用 `oss://bilibili-media/media/videos/分区名视频/文件
 
 Lv2 用户可以在 `/studio/upload` 提交 MP4 视频（最多 256 MB，时长不超过 10 小时）。封面可从视频画面生成，也可以上传不超过 5 MB 的 JPG 或 PNG。服务端在临时目录校验视频和处理封面，随后上传到 OSS 的 `media/videos/studio/` 和 `media/covers/studio/`。稿件走现有视频审核流程，提交后可在「稿件管理 → 进行中」查看。已有本地稿件仍可从 `BILI_MEDIA_ROOT` 读取。
 
-新评论图片和私信图片分别上传到 OSS 的 `media/comment/` 和 `media/message/`。纯文字评论直接保存正文，图文评论在 `commenttable.Content` 中保存正文和图片地址。评论正文必填。私信图片仍用 `MessageType=1`，OSS 地址存入 `MessageContent`，经会话访问权限校验后由后端读取。后端的 RAM 身份需要对相应前缀拥有 `oss:PutObject` 和 `oss:GetObject`，Bucket 保持私有。
+新评论图片和私信图片分别上传到 OSS 的 `media/comment/` 和 `media/message/`。评论正文必填，图片地址保存在可空的 `commenttable.ImageUrl`，类型与 `videotable.VideoContent` 一致。新版启动时会迁移旧图片地址。私信图片仍用 `MessageType=1`，OSS 地址存入 `MessageContent`，经会话访问权限校验后由后端读取。后端的 RAM 身份需要对相应前缀拥有 `oss:PutObject` 和 `oss:GetObject`，Bucket 保持私有。
 
 首页分区直接读取分区表；尚无视频的分区保留入口。用户搜索支持昵称关键词、粉丝与等级排序、分页；可用“小满”“星河”“晚风”展示多条匹配，用“的”展示分页。公开视频按数据库中的标签、合集、上传者与互动记录展示。
 
