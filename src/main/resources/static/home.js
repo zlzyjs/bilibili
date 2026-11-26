@@ -84,8 +84,13 @@ async function apiRequest(prefix, path, options = {}) {
   const opt = { method, cache: 'no-store', keepalive };
   if (body !== undefined) {
     const token = csrfToken || (await authApi('csrf')).token;
-    opt.headers = { 'Content-Type': 'application/json', 'X-CSRF-Token': token };
-    opt.body = JSON.stringify(body);
+    opt.headers = { 'X-CSRF-Token': token };
+    if (body instanceof FormData) {
+      opt.body = body;
+    } else {
+      opt.headers['Content-Type'] = 'application/json';
+      opt.body = JSON.stringify(body);
+    }
   }
   const response = await fetch(prefix + path, opt);
   if (response.status === 204) return;
@@ -155,7 +160,7 @@ function pageUrl(changes) {
   return path + '?' + next;
 }
 
-async function loadPopular() {
+async function loadPopular(categoriesRequest) {
   const mustWatch = path === '/popular/must-watch';
   const tabs = node('nav', 'popular-tabs');
   tabs.setAttribute('aria-label', '热门栏目');
@@ -180,7 +185,7 @@ async function loadPopular() {
     const filters = node('nav', 'popular-filters');
     filters.setAttribute('aria-label', '排行榜分区');
     grid.before(filters);
-    api('/categories').then((categories) => {
+    categoriesRequest.then((categories) => {
       for (const { id, name } of [{ id: '', name: '全部' }, ...categories]) {
         const item = link(id ? path + '?categoryId=' + encodeURIComponent(id) : path, name);
         if (id === categoryId) item.setAttribute('aria-current', 'page');
@@ -266,6 +271,7 @@ function popularCard({ video, score, position, reason }) {
   meta.append(author, stats);
   if (reason) {
     const label = node('span', 'popular-label popular-reason');
+    label.title = reason;
     label.append(icon('popular-medal'), node('span', '', reason));
     meta.append(label);
   }
@@ -517,6 +523,7 @@ async function init() {
     return;
   }
   document.body.classList.toggle('discovery-page', discoveryPage);
+  document.body.classList.toggle('watch-page', watching);
   document.body.classList.toggle('channel-page', Boolean(category));
   document.body.classList.toggle('search-page', search);
   document.body.classList.toggle('author-page', Boolean(authorId));
@@ -538,14 +545,19 @@ async function init() {
     document.title = name + ' - dilidili';
     return;
   }
-  if (watching) return loadWatchPage();
+  if (watching) {
+    setupChannelNavigation(true);
+    return Promise.all([loadWatchPage(), loadCategories()]);
+  }
   if (personalSpace) return setupPersonalSpace();
   if (authorId) return loadSpace();
   if (search) return loadSearch();
   if (popularPage) {
     document.querySelector('.channels').hidden = true;
     el('feed-toolbar').hidden = true;
-    return loadPopular();
+    setupChannelNavigation();
+    const categoriesRequest = api('/categories');
+    return Promise.all([loadPopular(categoriesRequest), loadCategories(categoriesRequest)]);
   }
   if (discoveryPage) {
     setupChannelNavigation(true);
@@ -715,10 +727,10 @@ function setupHomeChannelBar(categories) {
   new ResizeObserver(measure).observe(options);
 }
 
-async function loadCategories() {
+async function loadCategories(categoriesRequest = api('/categories')) {
   const menu = el('channel-nav-list');
   try {
-    const categories = await api('/categories');
+    const categories = await categoriesRequest;
     el('categories').replaceChildren(link('/', '首页'), ...categories.map((item) => {
       const a = link('/channel/' + item.id, item.name, item.id === category ? 'active' : '');
       if (item.id === category) {

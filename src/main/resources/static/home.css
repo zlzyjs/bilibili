@@ -56,7 +56,7 @@ svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke
 .nav-item{min-width:32px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:12px}
 .navbar .upload{display:flex;align-items:center;justify-content:center;gap:5px;background:var(--pink);height:36px;min-width:92px;padding:0 10px;border-radius:8px;color:white}
 .upload:hover{background:#fc8bab}
-.layout{--home-columns:5;width:calc(100% - var(--page-gutter) * 2);max-width:1980px;margin:0 auto}
+.layout{--home-columns:5;--home-column-gap:var(--gap);width:calc(100% - var(--page-gutter) * 2);max-width:1980px;margin:0 auto}
 .channels{display:flex;align-items:center;gap:20px;padding:20px 0}
 .channel-icons{display:flex;gap:15px;align-items:center;flex:none}
 .channel-icons a{display:grid;place-items:center;gap:5px;font-size:13px;padding:0}
@@ -117,8 +117,8 @@ svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke
 .secondary{border:1px solid var(--line);border-radius:7px;padding:8px 14px;background:white}
 .home-more{display:block;margin:24px auto 0}
 .channel-links a[aria-current="page"]{color:var(--blue)}
-.discovery-page .masthead{position:sticky;top:0;z-index:8}
-.discovery-page .navbar.channel-nav-stuck{animation:none}
+:is(.discovery-page,.watch-page) .masthead{position:sticky;top:0;z-index:8}
+:is(.discovery-page,.watch-page) .navbar.channel-nav-stuck{animation:none}
 .discovery-page main.layout{width:min(900px,calc(100% - var(--page-gutter) * 2));padding-top:28px}
 .discovery-page .feed-toolbar{margin:0 0 8px}
 .discovery-page .feed-toolbar h1{margin:0;font-size:20px;font-weight:600}
@@ -174,8 +174,15 @@ body.popular-page main.layout{width:min(1286px,calc(100% - var(--page-gutter) * 
 .popular-rules-panel h2{margin:0 28px 12px 0;font-size:18px}
 .popular-rules-panel p{margin:0 0 12px;color:#61666d;line-height:1.7}
 .popular-rules-close{position:absolute;top:16px;right:16px;width:28px;height:28px;color:#61666d;font-size:22px;line-height:1}
-.popular-page .layout .popular-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(26px,2.8vw,44px) 12px}
-.popular-card{display:grid;grid-template-columns:minmax(0,32%) minmax(0,1fr);gap:10px;align-items:stretch;min-height:114px}
+.popular-page .layout .popular-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(26px,2.8vw,44px) var(--home-column-gap)}
+.popular-card{
+  --popular-cover-share:32.3%;
+  display:grid;
+  grid-template-columns:min(var(--popular-cover-share),206px) minmax(0,1fr);
+  gap:10px;
+  align-items:stretch;
+  min-height:114px;
+}
 .popular-card .popular-cover{width:100%;align-self:start;border-radius:3px}
 .popular-card-content{display:flex;flex-direction:column;justify-content:space-between;gap:6px;min-width:0}
 .popular-card-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;overflow-wrap:anywhere;margin:0;font-size:14px;font-weight:700;line-height:1.45}
@@ -188,8 +195,8 @@ body.popular-page main.layout{width:min(1286px,calc(100% - var(--page-gutter) * 
 .popular-card-stats svg,.popular-label svg{width:16px;height:16px;flex:none}
 .popular-label{display:inline-flex;align-items:center;max-width:100%;border-radius:2px;color:#ff7f24}
 .popular-heat{padding:1px 4px;background:#fff0e3;font-size:11px;line-height:16px;font-variant-numeric:tabular-nums}
-.popular-reason{gap:7px;margin-top:2px;padding:4px 8px;background:#fdf3eb;line-height:16px}
-.popular-reason span{min-width:0;overflow-wrap:anywhere}
+.popular-reason{gap:7px;padding:4px 8px;background:#fdf3eb;line-height:16px}
+.popular-reason span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .popular-rank{position:absolute;top:0;left:0;min-width:30px;padding:3px 8px;border-radius:0 0 11px 0;background:#778398;color:#fff;font-weight:750;font-style:italic}
 .popular-rank-1{background:linear-gradient(135deg,#f2cb55,#d69331)}
 .popular-rank-2{background:linear-gradient(135deg,#a9cede,#7890bf)}
@@ -200,7 +207,7 @@ body.popular-page main.layout{width:min(1286px,calc(100% - var(--page-gutter) * 
   .popular-tabs a{gap:6px;padding:14px 0;font-size:14px}
   .popular-tab-icon{width:29px;height:29px}
   .popular-tab-icon svg{width:17px;height:17px}
-  .popular-card{grid-template-columns:minmax(0,40%) minmax(0,1fr)}
+  .popular-card{--popular-cover-share:40%}
   .popular-info{margin:16px 0 20px;font-size:13px}
 }
 footer{text-align:center;color:var(--muted);font-size:12px;padding:30px 0}
@@ -428,8 +435,8 @@ body:not(.inner-page) .home-logo{display:none}
 
 /* Desktop browse grid. Search, spaces and the player have their own column rules. */
 @media(min-width:701px){
-  body:not(.inner-page) .layout{--home-columns:4;max-width:1980px}
-  body:not(.inner-page) .featured,body:not(.inner-page) .video-grid{column-gap:16px}
+  body:not(.inner-page) .layout{--home-columns:4;--home-column-gap:16px;max-width:1980px}
+  body:not(.inner-page) .featured,body:not(.inner-page) .video-grid{column-gap:var(--home-column-gap)}
   body:not(.inner-page) .card-title{font-size:15px;font-weight:500;line-height:22px;min-height:44px;max-height:44px}
   body:not(.inner-page) .featured .card-title{height:44px}
   body:not(.inner-page) .card-byline{font-size:13px;line-height:17px}
@@ -456,8 +463,7 @@ body:not(.inner-page) .home-logo{display:none}
   body:not(.inner-page) .categories a{font-size:14px}
 }
 @media(min-width:1400px){
-  body:not(.inner-page) .layout{--home-columns:5}
-  body:not(.inner-page) .featured,body:not(.inner-page) .video-grid{column-gap:20px}
+  body:not(.inner-page) .layout{--home-columns:5;--home-column-gap:var(--gap)}
   .channel-page .featured{row-gap:63px;margin-bottom:63px}
   .channel-page .video-grid{row-gap:63px}
 }
