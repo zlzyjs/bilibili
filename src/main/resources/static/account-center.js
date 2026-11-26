@@ -138,10 +138,7 @@ function setupAccountCenter() {
       exp.append(item);
     });
     daily.append(exp);
-    const medals = node('div', 'home-mp');
-    const medalIcon = node('span', 'home-mp-icon');
-    medals.append(medalIcon, node('span', 'h-reward-info', '成就勋章'), node('p', 'h-none-msg', '暂无成就勋章'));
-    section.append(info, daily, medals);
+    section.append(info, daily);
   }
 
   function field(label, id, control, help) {
