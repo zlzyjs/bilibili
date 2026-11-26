@@ -4,11 +4,33 @@ const loginForm = el('login-form');
 const registerForm = el('register-form');
 const registerResult = el('register-result');
 const passwordToggles = loginDialog.querySelectorAll('.password-toggle');
+const accountNav = document.getElementById('nav-account');
 let popupTimer;
 let loginTrigger;
 let currentAccount = null;
 let accountNoticeTimer;
+let cardTimer;
 let registrationSubmitted = false;
+
+function openAccountCard() {
+  clearTimeout(cardTimer);
+  accountNav.classList.add('card-open');
+}
+
+function closeAccountCard() {
+  clearTimeout(cardTimer);
+  cardTimer = setTimeout(() => accountNav.classList.remove('card-open'), 200);
+}
+
+accountNav.addEventListener('mouseenter', openAccountCard);
+accountNav.addEventListener('mouseleave', closeAccountCard);
+accountNav.addEventListener('focusin', openAccountCard);
+accountNav.addEventListener('focusout', event => {
+  if (!accountNav.contains(event.relatedTarget)) closeAccountCard();
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') accountNav.classList.remove('card-open');
+});
 
 function accountNotice(message) {
   const notice = el('account-notice');
@@ -18,13 +40,27 @@ function accountNotice(message) {
   accountNoticeTimer = setTimeout(() => notice.hidden = true, 3200);
 }
 
+function renderCardLevel(value) {
+  const level = Math.max(0, Math.min(2, parseInt(String(value).replace(/\D/g, ''), 10) || 0));
+  const badge = el('card-level');
+  badge.src = '/assets/lv' + level + '.svg';
+  badge.alt = 'LV' + level;
+  const next = el('card-level-to');
+  next.hidden = level === 2;
+  if (level < 2) {
+    next.src = '/assets/lv' + (level + 1) + '.svg';
+    next.alt = 'LV' + (level + 1);
+  }
+  return level;
+}
+
 function renderAccount(account) {
   currentAccount = account;
   el('nav-login').hidden = Boolean(account);
   el('nav-account').hidden = !account;
   if (account) {
     el('card-name').textContent = account.name;
-    el('card-level').textContent = account.level;
+    renderCardLevel(account.level);
     el('nav-account-space').title = account.name + '的个人空间';
     const avatar = el('nav-account-image');
     avatar.onerror = () => { avatar.onerror = null; avatar.src = '/assets/guest-avatar.gif'; };
@@ -39,7 +75,7 @@ async function loadAccountCard(uid) {
     const summary = await authApi('me/summary');
     if (!summary || String(summary.uid) !== String(uid)) return;
     el('card-name').textContent = summary.name;
-    el('card-level').textContent = summary.level;
+    const level = renderCardLevel(summary.level);
     el('card-coins').textContent = Math.round(Number(summary.coins) || 0);
     el('card-bcoins').textContent = Math.round(Number(summary.bcoins) || 0);
     el('card-following').textContent = summary.following;
@@ -59,7 +95,7 @@ async function loadAccountCard(uid) {
       el('card-level-next').textContent = '完成转正答题即可升级';
     } else {
       bar.style.width = Math.min(100, Math.round(exp / next * 100)) + '%';
-      el('card-level-next').textContent = `当前成长${exp}，距离升级还需${Math.max(0, next - exp)}`;
+      el('card-level-next').textContent = `当前成长${exp}，距离升级Lv${level + 1}还需${Math.max(0, next - exp)}`;
     }
   } catch {
     if (String(currentAccount?.uid) !== String(uid)) return;
@@ -120,7 +156,7 @@ function showLoginPopup(button) {
   const left = Math.max(12, Math.min(rect.left + rect.width / 2 - loginPopup.offsetWidth / 2,
     document.documentElement.clientWidth - loginPopup.offsetWidth - 12));
   loginPopup.style.left = left + window.scrollX + 'px';
-  loginPopup.style.top = rect.bottom + window.scrollY + 14 + 'px';
+  loginPopup.style.top = rect.bottom + window.scrollY + 20 + 'px';
 }
 
 function openLogin(button = loginTrigger) {

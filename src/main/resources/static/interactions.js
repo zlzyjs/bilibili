@@ -557,12 +557,16 @@ function recordSearchHistory() {
   record();
 }
 
-function panelFooter(label, action) {
+function panelFooter(...items) {
   const foot = node('div', 'dd-foot');
-  const button = node('button', 'dd-foot-link', label);
-  button.type = 'button';
-  button.onclick = action;
-  foot.append(button);
+  for (const [label, action] of items) {
+    const button = node('button', 'dd-foot-link' + (label === '播放全部' ? ' dd-foot-play' : ''));
+    button.type = 'button';
+    if (label === '播放全部') button.append(icon('play'), node('span', '', label));
+    else button.textContent = label;
+    button.onclick = action;
+    foot.append(button);
+  }
   return foot;
 }
 
@@ -633,11 +637,24 @@ function setupFavoriteDropdown(button) {
     const side = node('aside', 'dd-fav-folders');
     const list = node('ul', 'dd-video-list');
     let active = folders[0]?.id;
+    let playing = favorites.find(v => v.folderId === active) || favorites[0];
     const renderVideos = () => {
       const rows = active ? favorites.filter(v => v.folderId === active) : favorites;
-      if (rows.length) list.replaceChildren(...rows.slice(0, NAV_DROPDOWN_LIMIT).map(v => videoRow(v)));
+      playing = rows[0];
+      if (rows.length) list.replaceChildren(...rows.map(v => videoRow(v)));
       else list.replaceChildren(node('li', 'nav-dropdown-empty', '暂无收藏'));
+      list.scrollTop = 0;
     };
+    list.addEventListener('wheel', event => {
+      const row = list.querySelector('.dd-video');
+      if (!row || list.scrollHeight <= list.clientHeight) return;
+      event.preventDefault();
+      const height = row.getBoundingClientRect().height + (parseFloat(getComputedStyle(list).rowGap) || 0);
+      const current = Math.round(list.scrollTop / height);
+      const last = Math.max(0, list.querySelectorAll('.dd-video').length - 5);
+      const next = Math.max(0, Math.min(last, current + Math.sign(event.deltaY)));
+      list.scrollTo({ top: next * height, behavior: 'smooth' });
+    }, { passive: false });
     const buttons = folders.map(folder => {
       const item = node('button', 'dd-fav-folder' + (folder.id === active ? ' active' : ''));
       item.type = 'button';
@@ -652,18 +669,46 @@ function setupFavoriteDropdown(button) {
     });
     renderVideos();
     const main = node('div', 'dd-fav-main');
-    main.append(list, panelFooter('查看全部收藏', () => location.assign('/me?tab=favorites')));
+    main.append(list, panelFooter(
+      ['查看全部', () => location.assign('/me?tab=favorites')],
+      ['播放全部', () => { if (playing) location.assign('/video/' + encodeURIComponent(playing.id)); }]
+    ));
     return folders.length ? [side, main] : [main];
   });
+}
+
+function historyDay(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' }).format(date);
 }
 
 function setupHistoryDropdown(button) {
   navDropdown(button, 'dd-history', async () => {
     const rows = await interaction('/history');
-    const list = node('ul', 'dd-video-list');
-    if (rows.length) list.append(...rows.slice(0, NAV_DROPDOWN_LIMIT).map(historyVideoRow));
-    else list.append(node('li', 'nav-dropdown-empty', '暂无内容'));
-    return [list, panelFooter('查看全部历史', () => openHistoryPanel())];
+    const panel = node('div', 'dd-history-page');
+    const all = node('button', 'dd-all-btn', '查看全部历史');
+    all.type = 'button';
+    all.onclick = openHistoryPanel;
+    if (rows.length) {
+      const today = historyDay(Date.now());
+      const lists = [[], []];
+      for (const row of rows.slice(0, NAV_DROPDOWN_LIMIT)) {
+        lists[historyDay(row.viewedAt) === today ? 0 : 1].push(row);
+      }
+      for (const [index, items] of lists.entries()) {
+        if (!items.length) continue;
+        const group = node('div', 'dd-group');
+        group.append(node('h4', 'dd-group-title', index ? '更早' : '今天'));
+        const list = node('ul', 'dd-video-list');
+        list.append(...items.map(historyVideoRow));
+        group.append(list);
+        panel.append(group);
+      }
+    } else {
+      panel.append(node('p', 'nav-dropdown-empty dd-history-empty', '暂无观看记录'));
+    }
+    panel.append(all);
+    return [panel];
   });
 }
 

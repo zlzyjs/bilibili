@@ -3,9 +3,15 @@
   const navButton = document.querySelector('[data-interaction=messages]');
   const tabs = { chat: '我的消息', replies: '回复我的', mentions: '@ 我的', likes: '收到的赞',
     system: '系统通知', settings: '消息设置' };
-  const tab = Object.hasOwn(tabs, params.get('tab')) ? params.get('tab') : 'chat';
-  const peer = params.get('uid');
-  const folder = params.get('folder') === 'strangers';
+  let tab = Object.hasOwn(tabs, params.get('tab')) ? params.get('tab') : 'chat';
+  let peer = params.get('uid');
+  let folder = params.get('folder') === 'strangers';
+  function syncRoute() {
+    const route = new URLSearchParams(location.search);
+    tab = Object.hasOwn(tabs, route.get('tab')) ? route.get('tab') : 'chat';
+    peer = route.get('uid');
+    folder = route.get('folder') === 'strangers';
+  }
   const url = (key, extra = {}) => '/messages?' + new URLSearchParams({ tab: key, ...extra });
   const button = (label, action, css = 'mc-button') => {
     const element = node('button', css, label);
@@ -123,9 +129,15 @@
     return image;
   }
 
-  function empty(text) {
+  function empty(text, picture) {
     const state = node('div', 'mc-empty');
-    state.append(icon('mail'), node('p', '', text));
+    if (picture) {
+      const art = node('img', picture === 'chat' ? 'mc-empty-art' : 'mc-notice-empty-art');
+      art.alt = '';
+      art.src = picture === 'chat' ? '/assets/mc-placeholder.png' : '/assets/mc-notice-empty.png';
+      state.append(art);
+    } else state.append(icon('mail'));
+    state.append(node('p', '', text));
     return state;
   }
 
@@ -169,6 +181,7 @@
     }
 
     function renderThreads() {
+      const scrollTop = entries.scrollTop;
       const unknown = threads.filter(row => !row.following);
       entries.replaceChildren();
       const displayed = threads.filter(row => folder ? !row.following : !preferences.foldStrangers || row.following);
@@ -191,6 +204,7 @@
         try { await loadThreads(); }
         catch (error) { status.textContent = error.message; renderThreads(); }
       }, 'mc-load'));
+      entries.scrollTop = scrollTop;
     }
 
     async function loadThreads(reset = false) {
@@ -212,7 +226,7 @@
 
     await loadThreads();
     if (!peer) {
-      main.append(empty('选择一个会话，或从作者页发起私信'));
+      main.append(empty('快找小伙伴聊天吧 ( ゜- ゜)つロ', 'chat'));
       const timer = setInterval(() => {
         if (!stillCurrent()) return clearInterval(timer);
         if (!document.hidden && offset <= 50) loadThreads(true).catch(() => {});
@@ -491,6 +505,7 @@
   }
 
   async function notifications(section, status, stillCurrent) {
+    section.classList.add('mc-notification-content');
     const list = node('div', tab === 'system' ? 'mc-system-list' : 'mc-event-list');
     const next = button('加载更多', loadNext, 'mc-load');
     let offset = 0;
@@ -558,7 +573,7 @@
             await inbox('/events/' + tab + '/state', 'PUT', { ids: [event.id], dismissed: true });
             item.remove();
             offset = Math.max(0, offset - 1);
-            if (!list.children.length && next.hidden) list.append(empty('暂无' + tabs[tab]));
+            if (!list.children.length && next.hidden) list.append(empty('暂无' + tabs[tab], 'notice'));
             refreshBadges();
           } catch (error) { status.textContent = error.message; control.disabled = false; }
         }, 'mc-text-button'));
@@ -575,7 +590,7 @@
         if (!stillCurrent()) return;
         offset += events.length;
         list.append(...events.map(eventRow));
-        if (!offset) list.append(empty('暂无' + tabs[tab]));
+        if (!offset) list.append(empty('暂无' + tabs[tab], 'notice'));
         next.hidden = events.length < 40;
         const unread = events.filter(row => row.unread).map(row => row.id);
         if (unread.length) await inbox('/events/' + tab + '/state', 'PUT', { ids: unread, dismissed: false });
@@ -674,10 +689,43 @@
   }
 
   let loginVersion = 0;
-  async function renderCenter() {
+  async function renderCenter(smooth = false) {
     if (path !== '/messages') return;
     const version = ++loginVersion;
     const stillCurrent = () => version === loginVersion;
+    const currentFrame = root.querySelector('.mc-chat');
+    const threadScroll = currentFrame?.querySelector('.mc-thread-list')?.scrollTop || 0;
+    const replaceFrame = nextFrame => {
+      const nextThreads = nextFrame.querySelector('.mc-thread-list');
+      currentFrame.replaceWith(nextFrame);
+      if (nextThreads) nextThreads.scrollTop = threadScroll;
+    };
+    if (smooth && tab === 'chat' && currentAccount && currentFrame) {
+      const status = root.querySelector('.mc-status');
+      status.textContent = '';
+      const section = node('div');
+      currentFrame.setAttribute('aria-busy', 'true');
+      try {
+        await chat(section, status, stillCurrent);
+        if (stillCurrent()) replaceFrame(section.querySelector('.mc-chat'));
+      } catch (error) {
+        if (stillCurrent()) {
+          status.textContent = error.message;
+          const nextFrame = section.querySelector('.mc-chat');
+          if (nextFrame) {
+            const conversation = nextFrame.querySelector('.mc-conversation');
+            const failure = empty('消息加载失败，请重试');
+            failure.append(button('重试', () => renderCenter(true), 'mc-primary mc-retry'));
+            conversation.replaceChildren(failure);
+            replaceFrame(nextFrame);
+          }
+        }
+      } finally {
+        if (stillCurrent()) root.querySelector('.mc-chat')?.removeAttribute('aria-busy');
+      }
+      refreshBadges();
+      return;
+    }
     const aside = node('nav', 'mc-sidebar');
     aside.setAttribute('aria-label', '消息类型');
     const brand = node('div', 'mc-brand');
@@ -686,6 +734,7 @@
     for (const [key, label] of Object.entries(tabs)) {
       const item = link(url(key), label);
       item.dataset.messageTab = key;
+      if (key === 'settings') item.prepend(icon('settings-outline'));
       if (key === tab) item.setAttribute('aria-current', 'page');
       aside.append(item);
     }
@@ -698,7 +747,7 @@
     panel.append(header, section);
     root.replaceChildren(aside, panel);
     if (!currentAccount) {
-      const signedOut = empty('登录后查看你的消息');
+      const signedOut = empty('登录后查看你的消息', 'notice');
       signedOut.append(button('登录', event => openLogin(event.currentTarget), 'mc-primary'));
       section.append(signedOut);
       return;
@@ -711,6 +760,21 @@
     refreshBadges();
   }
 
+  root.addEventListener('click', event => {
+    const anchor = event.target.closest('a[href]');
+    if (!anchor || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    const target = new URL(anchor.href, location.href);
+    if (target.origin !== location.origin || target.pathname !== '/messages' || tab !== 'chat') return;
+    if (new URLSearchParams(target.search).get('tab') !== 'chat') return;
+    event.preventDefault();
+    if (target.href !== location.href) history.pushState(null, '', target.href);
+    syncRoute();
+    renderCenter(true);
+  });
+  window.addEventListener('popstate', () => {
+    syncRoute();
+    renderCenter(true);
+  });
   window.addEventListener('accountchange', () => renderCenter());
   window.refreshMessageBadges = refreshBadges;
   if (path === '/messages') renderCenter();
