@@ -16,6 +16,12 @@
     element.onclick = action;
     return element;
   };
+  let openMenu;
+  function closeMessageMenu() {
+    if (openMenu) openMenu.hidden = true;
+    openMenu = undefined;
+  }
+  addEventListener('click', closeMessageMenu);
 
   function readChatPrefs(uid) {
     try { return JSON.parse(localStorage.getItem('mc:chat:' + uid)) || {}; } catch { return {}; }
@@ -263,6 +269,7 @@
       .then(result => { blocked = result.blocked; refreshMenuLabels(); })
       .catch(() => {});
     const history = node('div', 'mc-history');
+    history.addEventListener('scroll', closeMessageMenu, { passive: true });
     const older = button('加载更早消息', loadOlder, 'mc-load');
     const bubbles = node('div', 'mc-bubbles');
     const note = node('p', 'mc-chat-note');
@@ -302,6 +309,16 @@
     actions.append(count, send);
     form.append(toolbar, text, actions);
     main.append(heading, history, form);
+    const toast = node('p', 'mc-toast');
+    toast.hidden = true;
+    main.append(toast);
+    let toastTimer;
+    function notice(message) {
+      clearTimeout(toastTimer);
+      toast.textContent = message;
+      toast.hidden = false;
+      toastTimer = setTimeout(() => { toast.hidden = true; }, 3000);
+    }
     let issue = '';
     let canSend = true;
     let busy = false;
@@ -356,15 +373,27 @@
         if (row.videoId) body.append(videoCard(row));
         else body.textContent = '转发的视频已不可用';
       } else body.textContent = row.text;
+      const menu = node('div', 'mc-msg-menu');
+      menu.hidden = true;
+      if (!mine) menu.append(button('举报', () => reportInteraction('message', row.id, () => loadLatest(true).catch(() => {})), 'mc-msg-action'));
+      menu.append(button('删除', () => changeMessage(row.id, false), 'mc-msg-action'));
+      if (mine) menu.append(button('撤回', () => changeMessage(row.id, true), 'mc-msg-action'));
+      body.append(menu);
+      body.oncontextmenu = event => {
+        event.preventDefault();
+        closeMessageMenu();
+        menu.hidden = false;
+        openMenu = menu;
+        const box = body.getBoundingClientRect();
+        const below = box.bottom + menu.offsetHeight + 4 <= innerHeight;
+        menu.style.top = Math.max(4, below ? box.bottom + 4 : box.top - menu.offsetHeight - 4) + 'px';
+        menu.style.left = mine ? Math.min(box.left, innerWidth - menu.offsetWidth - 8) + 'px' : 'auto';
+        menu.style.right = mine ? 'auto' : Math.min(innerWidth - box.right, innerWidth - menu.offsetWidth - 8) + 'px';
+      };
       const detail = node('div', 'mc-message-detail');
       entry.dataset.messageId = row.id;
-      const controls = node('div', 'mc-message-controls');
-      controls.append(button('删除', () => changeMessage(row.id, false), 'mc-text-button'));
-      const recall = button('撤回', () => changeMessage(row.id, true), 'mc-text-button mc-recall');
-      recall.hidden = !row.recallable;
-      if (mine) controls.append(recall);
-      detail.append(node('time', '', formatTime(row.sentAt)), body, controls);
-      entry.append(avatar(row.sender), detail);
+      detail.append(body);
+      entry.append(node('time', '', formatTime(row.sentAt)), avatar(row.sender), detail);
       return entry;
     }
 
@@ -419,12 +448,6 @@
         latestIds = ids;
         history.scrollTop = showLatest ? history.scrollHeight : currentTop;
         await loadThreads(true);
-      } else {
-        const recallable = new Set(messages.filter(row => row.recallable).map(row => row.id));
-        for (const entry of bubbles.children) {
-          const control = entry.querySelector('.mc-recall');
-          if (control) control.hidden = !recallable.has(entry.dataset.messageId);
-        }
       }
       updateNote();
     }
@@ -436,8 +459,11 @@
       try {
         await inbox('/messages/' + encodeURIComponent(id) + (recall ? '/recall' : ''), 'DELETE');
         await loadLatest(true);
-      } catch (error) { status.textContent = error.message; }
-      finally { updatingMessage = false; }
+        if (recall) notice('撤回成功');
+      } catch (error) {
+        if (recall) notice(error.message);
+        else status.textContent = error.message;
+      } finally { updatingMessage = false; }
     }
 
     async function sendMessage(action, sent) {

@@ -68,7 +68,7 @@ function textInteraction(title, label, max, submit, multiline = true) {
   }, document.fullscreenElement || document.body);
 }
 
-function reportInteraction(kind, id) {
+function reportInteraction(kind, id, done) {
   interactionPanel('举报', async (body, status, close) => {
     const reasons = await interaction('/reports/' + kind + '/reasons');
     if (!reasons.length) { status.textContent = '当前没有可选的举报原因'; return; }
@@ -85,6 +85,7 @@ function reportInteraction(kind, id) {
       await interaction('/reports/' + kind + '/' + id, 'POST', { reason: reason.value, description: description.value });
       close();
       accountNotice('举报已提交');
+      done?.();
     });
   }, document.fullscreenElement || document.body);
 }
