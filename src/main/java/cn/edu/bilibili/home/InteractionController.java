@@ -241,8 +241,8 @@ class InteractionController {
         String path = image == null ? null
                 : oss.putImage("media/comment/" + member.uid() + "/", image.mime(), image.bytes());
         jdbc.sql("""
-                INSERT INTO commenttable (UID,VideoID,Content)
-                VALUES (:uid,:id,%s)
+                INSERT INTO commenttable (UID,VideoID,Content,ImageUrl)
+                VALUES (:uid,:id,%s,:image)
                 """.formatted(CommentContent.ENCODE)).param("uid", member.uid()).param("id", id).param("text", text)
                 .param("image", path, Types.VARCHAR).param("mentions", inbox.mentionedUsers(member.uid(), text)).update();
     }
@@ -251,9 +251,9 @@ class InteractionController {
     ResponseEntity<byte[]> commentImage(@PathVariable String id) {
         requireTarget(Target.COMMENT, id);
         String path = jdbc.sql("""
-                SELECT %s FROM commenttable c
-                WHERE CommentID=CAST(:id AS UNSIGNED) AND CommentStatus='active' AND ASCII(c.Content)=30
-                """.formatted(CommentContent.IMAGE)).param("id", id).query(String.class)
+                SELECT ImageUrl FROM commenttable
+                WHERE CommentID=CAST(:id AS UNSIGNED) AND CommentStatus='active' AND ImageUrl IS NOT NULL
+                """).param("id", id).query(String.class)
                 .optional().orElseThrow(() -> error(NOT_FOUND, "评论图片不存在"));
         var remote = oss.location(path, "comment/");
         if (remote == null) throw error(NOT_FOUND, "评论图片不存在");
@@ -274,8 +274,26 @@ class InteractionController {
                 VALUES (:uid,:id,:type,%s)
                 """.formatted(CommentContent.ENCODE))
                 .param("uid", member.uid()).param("id", id).param("type", target == Target.COMMENT ? 1 : 0)
-                .param("text", text).param("image", null, Types.VARCHAR)
+                .param("text", text)
                 .param("mentions", inbox.mentionedUsers(member.uid(), text)).update();
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{kind:comments|replies}/{id}")
+    ResponseEntity<Void> removeCommentOrReply(@PathVariable String kind, @PathVariable String id,
+                                               HttpServletRequest request) {
+        var member = write(request);
+        requireId(id);
+        String update = kind.equals("comments") ? """
+                UPDATE commenttable SET CommentStatus='removed'
+                WHERE CommentID=CAST(:id AS UNSIGNED) AND UID=CAST(:uid AS UNSIGNED) AND CommentStatus='active'
+                """ : """
+                UPDATE replytable SET ReplyStatus='removed'
+                WHERE ReplyID=CAST(:id AS UNSIGNED) AND UID=CAST(:uid AS UNSIGNED) AND ReplyStatus='active'
+                """;
+        if (jdbc.sql(update).param("id", id).param("uid", member.uid()).update() == 0) {
+            throw error(NOT_FOUND, "内容不存在或无权删除");
+        }
         return ResponseEntity.noContent().build();
     }
 
@@ -558,9 +576,14 @@ class InteractionController {
         return member;
     }
 
-    private AuthController.Member write(HttpServletRequest request, String permission, String minimum) {
+    private AuthController.Member write(HttpServletRequest request) {
         var member = read(request);
         if (!auth.validCsrf(request)) throw error(FORBIDDEN, "页面会话已失效，请重试");
+        return member;
+    }
+
+    private AuthController.Member write(HttpServletRequest request, String permission, String minimum) {
+        var member = write(request);
         if (!hasPermission(member.uid(), permission)) throw error(FORBIDDEN, minimum + " 及以上账号才可使用" + permission + "功能");
         return member;
     }

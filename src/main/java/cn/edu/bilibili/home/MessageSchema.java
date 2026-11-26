@@ -6,6 +6,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 class MessageSchema {
+    // Matches videotable.VideoContent, including its character set and collation.
+    private static final String IMAGE_URL_TYPE = "VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL";
     private final JdbcClient jdbc;
     private final OssMedia oss;
 
@@ -16,13 +18,6 @@ class MessageSchema {
 
     @PostConstruct
     void upgrade() {
-        if (column("commenttable", "ImagePath")) {
-            jdbc.sql("""
-                    UPDATE commenttable
-                    SET Content=CONCAT(CHAR(30 USING utf8mb4),JSON_OBJECT('text',Content,'image',ImagePath))
-                    WHERE ImagePath IS NOT NULL AND ASCII(Content)<>30
-                    """).update();
-        }
         migrateCommentImages();
         if (column("systemnotificationtable", "MentionKind") && column("systemnotificationtable", "MentionTarget")) {
             jdbc.sql("""
@@ -63,24 +58,48 @@ class MessageSchema {
     }
 
     private void migrateCommentImages() {
+        ensureCommentImageUrl();
+        if (column("commenttable", "ImagePath")) {
+            jdbc.sql("UPDATE commenttable SET ImageUrl=ImagePath WHERE ImageUrl IS NULL AND ImagePath IS NOT NULL").update();
+        }
+        jdbc.sql("""
+                UPDATE commenttable c SET c.ImageUrl=%1$s
+                WHERE c.ImageUrl IS NULL AND %1$s IS NOT NULL
+                """.formatted(CommentContent.LEGACY_IMAGE)).update();
+        jdbc.sql("""
+                UPDATE commenttable c
+                SET c.Content=CONCAT(CHAR(30 USING utf8mb4),JSON_REMOVE(SUBSTRING(c.Content,2),'$.image'))
+                WHERE c.ImageUrl IS NOT NULL AND BINARY c.ImageUrl=BINARY (%s)
+                """.formatted(CommentContent.LEGACY_IMAGE)).update();
         if (!column("commenttable", "ImageBytes") || !column("commenttable", "ImageMime")) return;
         while (true) {
             var batch = jdbc.sql("""
-                    SELECT CommentID,UID,ImageMime,ImageBytes,Content FROM commenttable
-                    WHERE ASCII(Content)<>30 AND ImageMime IN ('image/png','image/jpeg','image/gif')
+                    SELECT CommentID,UID,ImageMime,ImageBytes FROM commenttable
+                    WHERE ImageUrl IS NULL AND ImageMime IN ('image/png','image/jpeg','image/gif')
                       AND OCTET_LENGTH(ImageBytes)>0 ORDER BY CommentID LIMIT 5
                     """).query((rs, row) -> new LegacyImage(rs.getString(1), rs.getString(2),
-                            rs.getString(3), rs.getBytes(4), rs.getString(5))).list();
+                            rs.getString(3), rs.getBytes(4))).list();
             if (batch.isEmpty()) return;
             for (var image : batch) {
                 String path = oss.putImage("media/comment/" + image.uid() + "/", image.mime(), image.bytes());
                 jdbc.sql("""
-                        UPDATE commenttable SET Content=%s
-                        WHERE CommentID=CAST(:id AS UNSIGNED) AND ASCII(Content)<>30
-                        """.formatted(CommentContent.ENCODE)).param("image", path).param("text", image.text()).param("mentions", "[]")
+                        UPDATE commenttable SET ImageUrl=:image
+                        WHERE CommentID=CAST(:id AS UNSIGNED) AND ImageUrl IS NULL
+                        """).param("image", path)
                         .param("id", image.id()).update();
             }
         }
+    }
+
+    private void ensureCommentImageUrl() {
+        String current = jdbc.sql("""
+                SELECT COLUMN_NAME FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='commenttable' AND LOWER(COLUMN_NAME)='imageurl'
+                """).query(String.class).optional().orElse(null);
+        if ("ImageUrl".equals(current)) return;
+        String ddl = current != null ? "CHANGE COLUMN imageurl ImageUrl "
+                : column("commenttable", "ImagePath") ? "CHANGE COLUMN ImagePath ImageUrl " : "ADD COLUMN ImageUrl ";
+        jdbc.sql("ALTER TABLE commenttable " + ddl + IMAGE_URL_TYPE).update();
     }
 
     private boolean oldTable(String table) {
@@ -97,7 +116,7 @@ class MessageSchema {
                 """).param("table", table).param("name", name).query(Boolean.class).single();
     }
 
-    private record LegacyImage(String id, String uid, String mime, byte[] bytes, String text) {}
+    private record LegacyImage(String id, String uid, String mime, byte[] bytes) {}
     private record LegacyMention(String uid, String kind, String target) {}
 }
 
