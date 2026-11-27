@@ -523,7 +523,20 @@ async function setupWatchComments(videoId) {
 
 function setupRelatedExpansion(videos) {
   const first=videos.slice(0,20),extra=videos.slice(20);
-  el('related-videos').replaceChildren(...first.map(card));el('related-extra').replaceChildren(...extra.map(card));
+  function relatedCard(video) {
+    const entry = card(video);
+    const stats = node('div', 'related-stats');
+    for (const [symbol, label, count] of [['play', '播放', video.plays], ['list', '弹幕', video.danmaku]]) {
+      const total = shortCount(count);
+      const stat = node('span');
+      stat.append(icon(symbol), total);
+      stat.setAttribute('aria-label', label + ' ' + total);
+      stats.append(stat);
+    }
+    entry.append(stats);
+    return entry;
+  }
+  el('related-videos').replaceChildren(...first.map(relatedCard));el('related-extra').replaceChildren(...extra.map(relatedCard));
   el('related-extra').hidden=true;el('related-collapse').hidden=true;
   el('related-expand').hidden=extra.length===0;
   el('related-expand').onclick=()=>{el('related-extra').hidden=false;el('related-expand').hidden=true;el('related-collapse').hidden=false;};

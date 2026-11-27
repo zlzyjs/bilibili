@@ -4,6 +4,8 @@ const vm = require('node:vm');
 class Element {
   style = { setProperty(key,value) { this[key] = value; } };
   constructor() { this.hidden = false; this.value = 0; this.children = []; this.dataset = {}; this.listeners = {}; this.attributes = {}; this.classes=new Set(); this.classList = { add:v=>this.classes.add(v), remove:v=>this.classes.delete(v), contains:v=>this.classes.has(v), toggle:(v,force)=>{const next=force===undefined?!this.classes.has(v):force;next?this.classes.add(v):this.classes.delete(v);return next;} }; }
+  show() { this.open = true; }
+  close() { this.open = false; this.emit('close'); }
   after() {}
   contains() { return false; }
   append(...items) { this.children.push(...items); for (const item of items) if (item instanceof Element) item.parent = this; }
@@ -27,25 +29,91 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   let now = 0, tick, prompts = 0, copied = '', postDanmaku, resizeDanmaku;
   const documentEvents={}, windowEvents={}, interactionCalls=[], navigations=[];
   const context = { setupWatchComments(){},setupWatchScroll(){},setupRelatedExpansion(){},startViewerPresence(){}, el, path:'/video/10001', duration:n=>`${Math.floor(n/60)}`.padStart(2,'0')+':'+`${n%60}`.padStart(2,'0'), shortCount:String,
+    currentAccount:playlist.account,
     localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)}, performance:{now:()=>now},
     setInterval:fn=>(tick=fn,1),clearInterval(){},setTimeout(){return 1;},clearTimeout(){},
     ResizeObserver:class { constructor(callback) { resizeDanmaku = callback; } observe() {} },
     window:{addEventListener(event,fn){(windowEvents[event] ||= []).push(fn);}}, navigator:{clipboard:{writeText:async text=>{copied=text;}}}, document:{ documentElement:{clientWidth:1200}, body:new Element(), title:'', activeElement:{tagName:'BODY'}, addEventListener(event,fn){(documentEvents[event] ||= []).push(fn);},querySelector:()=>new Element() },
     openLogin:()=>{prompts++;el('login-dialog').open=true;},URLSearchParams,
     location:{search:playlist.search,assign(href){navigations.push(href);}},
-    interaction:async (...args)=>{ interactionCalls.push(args); return playlist.videos; },
+    interaction:async (...args)=>{ interactionCalls.push(args); return args[0] === '/me/space' ? playlist.space : playlist.videos; },
+    apiRequest:async (_,endpoint,request)=>{
+      interactionCalls.push([endpoint,request.method,request.body]);
+      if (endpoint.endsWith('/danmaku/reports')) return ['3'];
+      if (endpoint.endsWith('/reasons')) return [{id:'10015',name:'色情低俗'}, {id:'10016',name:'引战不友善言论'}];
+    },
     setupVideoInteractions:(_id,_author,_player,_duration,callback)=>{ postDanmaku=callback; },
     node:(tag,cls,text)=>Object.assign(new Element(),{className:cls,textContent:text}),
     link:(href,label,className)=>Object.assign(new Element(),{href,className,textContent:label}),
     icon:name=>Object.assign(new Element(),{name}),card:()=>new Element(),attachCover:(img,url)=>{img.src=url;},
-    api:async url=> url.endsWith('/collection')?collection:url.endsWith('/engagement')?{like:3,coin:4,favorite:5,share:6}:url.endsWith('/danmaku')?[
+    api:async url=> url.endsWith('/collection')?collection:url.endsWith('/engagement')?{like:3,coin:4,favorite:5,share:6}:url.endsWith('/danmaku')?(playlist.danmakuRows ?? [
       {id:'1',userId:'7',content:'A',timestamp:2,sentAt:'2026-11-12T12:00:00'}, {id:'2',userId:'7',content:'B',timestamp:3,sentAt:'2026-11-12T12:01:00'}, {id:'3',userId:'8',content:'C',timestamp:4,sentAt:'2026-11-12T12:02:00'}
-    ]:url.startsWith('/authors/')?{followers:10}:url.startsWith('/videos?')?{items:[]}: {video:{id:'10001',title:'Test',authorId:'1',streamUrl:'/test.mp4',plays:1,danmaku:3},tags:[],...accolades}
+    ]):url.startsWith('/authors/')?{followers:10}:url.startsWith('/videos?')?{items:playlist.related ?? []}: {video:{id:'10001',title:'Test',authorId:'1',streamUrl:'/test.mp4',plays:1,danmaku:3},tags:[],...accolades}
   };
   vm.createContext(context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch-sidebar.js','utf8'),context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch-preferences.js','utf8'),context);vm.runInContext(fs.readFileSync('src/main/resources/static/watch.js','utf8'),context);await context.loadWatchPage();
+  if (playlist.report) {
+    const interactions = fs.readFileSync('src/main/resources/static/interactions.js', 'utf8');
+    context.document.querySelector = () => el('danmaku-panel').children.find(child => child.open);
+    vm.runInContext(interactions.slice(0, interactions.indexOf('\nsetupNav();')), context);
+  }
   return {el,p,storage,postDanmaku,resizeDanmaku,interactionCalls,navigations,keydown:event=>(documentEvents.keydown||[]).forEach(fn=>fn(event)),pageEvent:(name,event={})=>(windowEvents[name]||[]).forEach(fn=>fn(event)),copied:()=>copied,fullscreen:flag=>{context.document.fullscreenElement=flag?el('player-shell'):null;(documentEvents.fullscreenchange||[]).forEach(fn=>fn());}, advance(ms,move=true){now+=ms;if(move&&!p.paused)p.currentTime+=ms/1000;tick();},prompts:()=>prompts};
 }
 (async()=>{
+  const mine = await setup();
+  const menuClick = {preventDefault(){}, stopPropagation(){}};
+  const mineOption = mine.el('sidebar-view-mine');
+  const mineList = mine.el('danmaku-list');
+  mineOption.onclick(menuClick);
+  assert.equal(mine.prompts(), 1);
+  assert.equal(mineList.children.length, 3);
+  mine.pageEvent('accountchange', {detail:{uid:7}});
+  mineOption.onclick(menuClick);
+  assert.equal(mine.el('danmaku-sidebar-title').textContent, '我的弹幕');
+  assert.deepEqual(mineList.children.map(row => row.children.slice(1).map(cell => cell.textContent)), [
+    ['A', '11-12 12:00', '撤回'], ['B', '11-12 12:01', '撤回']
+  ]);
+  const mineWithdraw = mineList.children[0].children[3];
+  await Promise.all([mineWithdraw.onclick(), mineWithdraw.onclick()]);
+  assert.deepEqual(mine.interactionCalls.filter(([, method]) => method === 'DELETE'), [['/danmaku/1', 'DELETE']]);
+  assert.deepEqual(mineList.children.map(row => row.children[1].textContent), ['B']);
+  mine.pageEvent('accountchange', {detail:{uid:8}});
+  assert.deepEqual(mineList.children.map(row => row.children[1].textContent), ['C']);
+  mine.pageEvent('accountchange', {detail:null});
+  assert.equal(mine.el('danmaku-sidebar-title').textContent, '弹幕列表');
+  assert.deepEqual(mineList.children.map(row => row.children[1].textContent), ['B', 'C']);
+  console.log('PASS: my danmaku login gate, ownership, withdrawal and account changes');
+
+  const history = await setup(new Map(), undefined, {}, {danmakuRows: [
+    {id:'1',userId:'7',content:'Old',timestamp:2,sentAt:'2024-02-29T12:00:00'},
+    {id:'2',userId:'7',content:'Selected day',timestamp:3,sentAt:'2024-03-05T23:59:59'},
+    {id:'3',userId:'8',content:'New',timestamp:4,sentAt:'2024-03-07T12:02:00'}
+  ]});
+  const historyToggle = history.el('danmaku-history-toggle');
+  const historyCalendar = history.el('danmaku-history-calendar');
+  const historyDay = day => history.el('danmaku-history-days').children.find(button => button.textContent === String(day));
+  const historyContents = () => history.el('danmaku-list').children.map(row => row.children[1].textContent);
+  historyToggle.onclick();
+  assert.equal(history.prompts(), 1);
+  assert.equal(historyCalendar.hidden, true);
+  history.pageEvent('accountchange', {detail:{uid:'42'}});
+  historyToggle.onclick();
+  assert.equal(historyCalendar.hidden, false);
+  assert.equal(historyDay(6).disabled, true);
+  history.el('danmaku-history-previous').onclick();
+  assert.equal(historyDay(29).disabled, false);
+  history.el('danmaku-history-next').onclick();
+  historyDay(5).onclick();
+  assert.deepEqual(historyContents(), ['Selected day', 'Old']);
+  assert.equal(historyCalendar.hidden, true);
+  assert.equal(history.el('danmaku-content-heading').textContent, '弹幕内容（3月5日）');
+  historyToggle.onclick();
+  history.el('danmaku-history-reset').onclick();
+  assert.deepEqual(historyContents(), ['Old', 'Selected day', 'New']);
+  historyToggle.onclick();
+  historyDay(5).onclick();
+  history.pageEvent('accountchange', {detail:null});
+  assert.deepEqual(historyContents(), ['Old', 'Selected day', 'New']);
+  console.log('PASS: history login gate, month navigation, inclusive cutoff and reset');
   const createTracks = vm.runInNewContext(fs.readFileSync('src/main/resources/static/watch.js', 'utf8') + '\nsetupDanmakuTracks;');
   const overlay = Object.assign(new Element(), {clientHeight:84});
   const tracks = createTracks(overlay);
@@ -119,7 +187,7 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   const withdraw = styled.el('dm-action-withdraw');
   assert.equal(withdraw.hidden, false);
   await withdraw.onclick();
-  assert.deepEqual(styled.interactionCalls, [['/danmaku/20', 'DELETE']]);
+  assert.deepEqual(styled.interactionCalls.filter(([, method]) => method === 'DELETE'), [['/danmaku/20', 'DELETE']]);
   assert.equal(styled.el('danmaku-actions').hidden, true);
   assert.equal(styled.el('control-notice').textContent, '撤回成功');
   assert.ok(styled.el('control-notice').classList.contains('control-notice-compact'));
@@ -131,7 +199,7 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   otherLine.emit('mouseenter');
   assert.equal(withdraw.hidden, true);
   await withdraw.onclick();
-  assert.equal(styled.interactionCalls.length, 1);
+  assert.equal(styled.interactionCalls.filter(([, method]) => method === 'DELETE').length, 1);
   console.log('PASS: styled own fixed danmaku, own-only withdrawal and removal from list and timeline');
   const t=await setup();
   const seek = t.el('seek'), seekBar = t.el('seek-bar');
@@ -222,6 +290,7 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   t.el('loop-toggle').onchange({target:{checked:true}});assert.equal(t.p.loop,true);
   const collectionPage = await setup(new Map(), {title:'Test collection',plays:30,items:[{id:'10001',title:'First',duration:60,plays:20,danmaku:3,coverUrl:'/first.jpg'},{id:'10002',title:'Second',duration:90,plays:10,danmaku:2,coverUrl:'/second.jpg'}]});
   assert.equal(collectionPage.el('video-collection').hidden,false);assert.equal(collectionPage.el('collection-position').textContent,'(1/2)');
+  assert.equal(collectionPage.el('related-heading').hidden, true);
   const collectionList = collectionPage.el('collection-list');
   const [activeEpisode, otherEpisode] = collectionList.children;
   assert.equal(collectionList.children.length, 2);
@@ -246,6 +315,54 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   assert.equal(collectionExpand.getAttribute('aria-label'), '展开合集列表');
   assert.equal(collectionList.children.length, 2);
   assert.equal(t.el('video-collection').hidden, true);
+  assert.equal(t.el('related-heading').hidden, false);
+  const reports = await setup(new Map(), {
+    title:'Test collection', ownerId:'9', plays:30, items:[{id:'10001',title:'First',duration:60}]
+  }, {}, {report:true});
+  for (const uid of ['1', '9', '6']) {
+    reports.pageEvent('accountchange', {detail:{uid}});
+    assert.equal(reports.el('video-subscribe').hidden, uid !== '6');
+  }
+  const list = reports.el('danmaku-list');
+  const report = list.children[0].children[3];
+  report.emit('mouseenter');
+  assert.equal(reports.el('sender-tooltip').textContent, '举报该弹幕');
+  report.onclick();
+  await new Promise(setImmediate);
+  const dialog = reports.el('danmaku-panel').children.find(child => child.open);
+  const form = dialog.children.find(child => child.className === 'danmaku-report-form');
+  const [choices, options, , footer] = form.children;
+  assert.equal(choices.children.length, 2);
+  assert.equal(choices.children[0].children[0].children[0].textContent, '色情低俗');
+  assert.equal(footer.children[1].disabled, true);
+  const radio = choices.children[0].children[0].children[1];
+  radio.checked = true;
+  radio.onchange();
+  assert.equal(choices.children[0].children[1].className, 'danmaku-report-details');
+  assert.equal(footer.children[1].disabled, false);
+  assert.equal(options.children[0].children[0].checked, true);
+  options.children[0].children[0].checked = false;
+  choices.children[0].children[1].children[1].value = '补充描述';
+  await form.onsubmit({preventDefault(){}});
+  const submissions = () => reports.interactionCalls.filter(([, method]) => method === 'POST');
+  assert.equal(submissions()[0][0], '/reports/danmaku/1');
+  assert.equal(submissions()[0][2].reason, '10015');
+  assert.equal(submissions()[0][2].description, '补充描述');
+  assert.equal(reports.el('danmaku-report-feedback').textContent, '举报已受理');
+  assert.equal(list.children.length, 3);
+  report.emit('mouseenter');
+  assert.equal(reports.el('sender-tooltip').textContent, '举报该弹幕的发送者');
+  report.onclick();
+  list.children[2].children[3].onclick();
+  assert.equal(reports.el('danmaku-report-feedback').textContent, '已举报');
+  assert.equal(submissions().length, 1);
+  list.children[0].children[4].onclick();
+  assert.equal(list.children[0].children[2].textContent, '已屏蔽');
+  assert.equal(list.children[1].children[2].textContent, '已屏蔽');
+  reports.pageEvent('accountchange', {detail:null});
+  assert.equal(reports.el('video-subscribe').hidden, false);
+  assert.equal(list.children[0].children.length, 4);
+  console.log('PASS: collection ownership, database report reasons, report confirmation and duplicate feedback, blocked rows');
   t.el('dm-area').oninput({target:{value:50}});assert.ok(t.el('danmaku-overlay').attributes.style.includes('height:42.5%'));
   t.el('dm-opacity').oninput({target:{value:40}});assert.ok(t.el('danmaku-overlay').attributes.style.includes('opacity:0.4'));
   t.el('ratio-4').onclick();assert.equal(t.p.dataset.ratio,'4');
@@ -319,18 +436,82 @@ async function setup(storage = new Map(), collection = {title:null,items:[]}, ac
   assert.equal(member.p.paused, true);
   assert.equal(member.prompts(), 1);
   assert.equal(member.el('trial-ended').hidden, false);
-  const folderPlaylist = await setup(new Map(), undefined, {}, {
-    search: '?playlist=folder-42', videos: [{id:'10001'}, {id:'10003'}],
-  });
+  const folderOptions = {
+    search: '?playlist=folder-42', account: {uid:'9',name:'Folder owner'},
+    space: {folders:[{id:'41',name:'Other folder'},{id:'42',name:'Selected folder'}]},
+    videos: [{id:'10001',title:'First',duration:60,plays:3}, {id:'10003',title:'Second',duration:65,plays:10}]
+  };
+  const standalone = await setup(new Map(), undefined, {}, {related:[{id:'10005'}]});
+  const autoplay = standalone.el('autoplay-next');
+  autoplay.onchange({target:{checked:false}});
+  standalone.p.emit('ended');
+  assert.deepEqual(standalone.navigations, []);
+  autoplay.onchange({target:{checked:true}});
+  standalone.p.emit('ended');
+  assert.deepEqual(standalone.navigations, ['/video/10005']);
+  const folderPlaylist = await setup(new Map(), {
+    title:'Regular collection', items:[{id:'10001'},{id:'10002'}]
+  }, {}, folderOptions);
+  assert.equal(folderPlaylist.el('collection-title').textContent, 'Selected folder');
+  assert.equal(folderPlaylist.el('collection-position').textContent, '1/2');
+  assert.equal(folderPlaylist.el('collection-plays').textContent, '创建者：Folder owner');
+  assert.equal(folderPlaylist.el('folder-more').href, '/me?tab=favorites&folder=42');
+  assert.equal(folderPlaylist.el('folder-playback-modes').hidden, false);
+  assert.equal(folderPlaylist.el('video-subscribe').hidden, true);
+  assert.equal(folderPlaylist.el('related-heading').hidden, true);
+  const folderExpand = folderPlaylist.el('collection-expand');
+  assert.equal(folderExpand.getAttribute('aria-expanded'), 'true');
+  folderExpand.onclick();
+  assert.equal(folderExpand.getAttribute('aria-expanded'), 'false');
+  assert.equal(folderPlaylist.el('collection-meta').hidden, true);
+  assert.equal(folderPlaylist.el('collection-list').hidden, true);
+  assert.equal(folderPlaylist.el('danmaku-panel').inert, false);
+  folderExpand.onclick();
+  assert.equal(folderPlaylist.el('collection-list').hidden, false);
+  assert.deepEqual(folderPlaylist.el('collection-list').children.map(row => row.href), [
+    '/video/10001?playlist=folder-42', '/video/10003?playlist=folder-42'
+  ]);
   folderPlaylist.p.emit('ended');
   assert.deepEqual(folderPlaylist.navigations, ['/video/10003?playlist=folder-42']);
   assert.ok(folderPlaylist.interactionCalls.some(([path]) => path === '/me/folders/42/videos'));
   const lastFolderVideo = await setup(new Map(), undefined, {}, {
-    search: '?playlist=folder-42', videos: [{id:'10001'}],
+    ...folderOptions, videos: [folderOptions.videos[1], folderOptions.videos[0]],
   });
   lastFolderVideo.p.emit('ended');
-  assert.deepEqual(lastFolderVideo.navigations, []);
-  console.log('PASS: favorite-folder playback advances within the folder and stops at the end');
+  assert.deepEqual(lastFolderVideo.navigations, ['/video/10003?playlist=folder-42']);
+  const reverse = await setup(new Map(), undefined, {}, {
+    ...folderOptions, videos: [{id:'10004'}, ...folderOptions.videos],
+  });
+  const orderControl = reverse.el('folder-playback-sequence');
+  orderControl.onclick();
+  assert.equal(orderControl.dataset.tooltip, '倒序播放');
+  assert.deepEqual(reverse.navigations, ['/video/10003?playlist=folder-42']);
+  reverse.p.emit('ended');
+  assert.equal(reverse.navigations.at(-1), '/video/10004?playlist=folder-42');
+  orderControl.onclick();
+  assert.equal(orderControl.dataset.tooltip, '顺序播放');
+  assert.equal(reverse.navigations.length, 3);
+  assert.equal(reverse.navigations.at(-1), '/video/10004?playlist=folder-42');
+  reverse.p.emit('ended');
+  assert.equal(reverse.navigations.at(-1), '/video/10003?playlist=folder-42');
+  const cycleControl = lastFolderVideo.el('folder-playback-loop');
+  cycleControl.onclick();
+  assert.equal(cycleControl.dataset.tooltip, '随机播放');
+  assert.equal(lastFolderVideo.navigations.length, 2);
+  assert.equal(lastFolderVideo.navigations.at(-1), '/video/10003?playlist=folder-42');
+  cycleControl.onclick();
+  assert.equal(cycleControl.dataset.tooltip, '列表循环');
+  assert.equal(lastFolderVideo.navigations.length, 2);
+  lastFolderVideo.p.currentTime = 20;
+  lastFolderVideo.p.pause();
+  lastFolderVideo.el('folder-playback-sequence').onclick();
+  assert.equal(lastFolderVideo.p.currentTime, 0);
+  assert.equal(lastFolderVideo.p.paused, false);
+  assert.equal(lastFolderVideo.navigations.length, 2);
+  folderPlaylist.pageEvent('accountchange', {detail:null});
+  assert.equal(folderPlaylist.el('collection-title').textContent, 'Regular collection');
+  assert.equal(folderPlaylist.el('folder-playback-modes').hidden, true);
+  console.log('PASS: sidebar queue precedence, folder links, collapse, reverse order, loop, immediate shuffle and sign-out fallback');
   member.pageEvent('accountchange', { detail: { uid: '10001' } });
   assert.equal(member.el('trial-ended').hidden, true);
   await member.el('play-toggle').onclick();

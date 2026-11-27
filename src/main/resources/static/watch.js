@@ -3,20 +3,26 @@
   const id = path.split('/')[2];
   const playlist = new URLSearchParams(location.search).get('playlist');
   const folderPlaylist = /^folder-(\d+)$/.exec(playlist || '');
+  let activePlaylist = '';
   const playbackUrl = video => '/video/' + encodeURIComponent(video.id)
-    + (playlist === 'collection' || folderPlaylist ? '?playlist=' + encodeURIComponent(playlist) : '');
+    + (activePlaylist ? '?playlist=' + encodeURIComponent(activePlaylist) : '');
   const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
   const save = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
   // Each visit gets its own trial budget; previous visits never lock this one.
   let watched = 0;
   let signedIn = typeof currentAccount !== 'undefined' && Boolean(currentAccount);
   let viewerId = signedIn ? currentAccount.uid : null;
+  let viewerName = signedIn ? currentAccount.name : '';
+  let videoAuthor, collectionOwner;
+  let reportedDanmaku = new Set(), reportFeedbackTimer;
+  let justBlockedRow;
   const ownsDanmaku = row => viewerId != null && String(row.userId) === String(viewerId);
   const fixedDanmakuSeconds = 5;
   const trialExpired = () => !signedIn && watched >= 30;
   let blocked = new Set(read('bili-blocked-users', []));
   let danmaku = [], enabled = true, lastTick = performance.now(), lastVideoTime = 0, nextVideo = null, noticeTimer;
-  const shown = new Set(), withdrawn = new Set();
+  let historyDate = '', historicalRows = null;
+  const shown = new Set(), withdrawn = new Set(), pendingWithdrawals = new Set();
   let danmakuCountLabel;
   const seek = el('seek'), seekBar = el('seek-bar');
   const seekPreview = el('seek-preview'), seekPreviewTime = el('seek-preview-time');
@@ -152,13 +158,15 @@
     if (!signedIn || typeof danmakuReportInteraction !== 'function') return openLogin(el('dm-action-report'));
     const target = activeDanmaku;
     hideDanmakuActions();
-    danmakuReportInteraction(shell, target, () => watchSidebar.shieldDanmaku(target));
+    reportDanmaku(shell, target);
   };
   const withdrawButton = el('dm-action-withdraw');
-  withdrawButton.onclick = async () => {
-    if (withdrawButton.disabled || !activeDanmaku || !ownsDanmaku(activeDanmaku)) return;
-    const target = activeDanmaku.id;
-    withdrawButton.disabled = true;
+  withdrawButton.onclick = () => withdrawDanmaku(activeDanmaku, withdrawButton);
+  async function withdrawDanmaku(row, button) {
+    if (!row || !ownsDanmaku(row) || pendingWithdrawals.has(row.id) || withdrawn.has(row.id)) return;
+    const target = row.id;
+    pendingWithdrawals.add(target);
+    button.disabled = true;
     try {
       await interaction('/danmaku/' + encodeURIComponent(target), 'DELETE');
       withdrawn.add(target);
@@ -175,27 +183,87 @@
     } catch (error) {
       notice(error.message);
     } finally {
-      withdrawButton.disabled = false;
+      pendingWithdrawals.delete(target);
+      button.disabled = false;
     }
-  };
+  }
   el('dm-action-copy').onclick = async () => {
     if (!activeDanmaku) return;
     try { await navigator.clipboard.writeText(activeDanmaku.content); notice('弹幕已复制'); }
     catch { notice('复制失败，请检查浏览器剪贴板权限'); }
   };
-  function showSenderTooltip(button, blocked) {
-    const tip = el('sender-tooltip'), rect = button.getBoundingClientRect();
-    tip.textContent = blocked ? '取消屏蔽该弹幕的发送者' : '屏蔽该弹幕的发送者';
+  function showDanmakuTip(tip, anchor, message) {
+    const rect = anchor.getBoundingClientRect();
+    tip.textContent = message;
     tip.hidden = false;
-    tip.setAttribute('style', 'left:' + Math.max(145, Math.min(rect.left + rect.width / 2, document.documentElement.clientWidth - 145)) + 'px;top:' + (rect.top - 8) + 'px');
+    const edge = tip.offsetWidth / 2 + 4;
+    tip.setAttribute('style', 'left:' + Math.max(edge, Math.min(rect.left + rect.width / 2, document.documentElement.clientWidth - edge)) + 'px;top:' + (rect.top - 6) + 'px');
+  }
+  function bindDanmakuTip(button, label) {
+    button.type = 'button';
+    const tip = el('sender-tooltip');
+    const show = () => {
+      const message = label();
+      button.setAttribute('aria-label', message);
+      showDanmakuTip(tip, button, message);
+    };
+    const hide = () => { tip.hidden = true; };
+    button.addEventListener('mouseenter', show);
+    button.addEventListener('focus', show);
+    button.addEventListener('mouseleave', hide);
+    button.addEventListener('blur', hide);
+  }
+  function reportDanmaku(container, target, button) {
+    const uid = viewerId;
+    const complete = (message, shield) => {
+      if (viewerId !== uid) return;
+      reportedDanmaku.add(String(target.id));
+      if (button) {
+        const feedback = el('danmaku-report-feedback');
+        el('sender-tooltip').hidden = true;
+        button.setAttribute('aria-label', '举报该弹幕的发送者');
+        showDanmakuTip(feedback, button, message);
+        clearTimeout(reportFeedbackTimer);
+        reportFeedbackTimer = setTimeout(() => { feedback.hidden = true; }, 2000);
+      } else {
+        notice(message);
+      }
+      if (shield) watchSidebar.shieldDanmaku(target);
+    };
+    if (reportedDanmaku.has(String(target.id))) complete('已举报', false);
+    else danmakuReportInteraction(container, target, complete, Boolean(button));
+  }
+  function syncSubscriptionButton() {
+    el('video-subscribe').hidden = el('video-collection').dataset.queue === 'folder' || (viewerId != null
+      && [videoAuthor, collectionOwner].some(owner => owner != null && String(owner) === String(viewerId)));
+  }
+  async function loadReportedDanmaku() {
+    if (!signedIn || typeof interaction !== 'function') return;
+    const reports = reportedDanmaku;
+    try {
+      const ids = await interaction('/videos/' + encodeURIComponent(id) + '/danmaku/reports');
+      for (const reported of ids) reports.add(String(reported));
+    } catch { /* The submission endpoint still checks for duplicates. */ }
   }
   function gate(prompt = true) {
     hideDanmakuActions(); player.pause(); el('trial-ended').hidden = false; el('trial-tip').hidden = true;
     if (prompt && !el('login-dialog').open) openLogin(el('play-toggle'));
   }
   window.addEventListener('accountchange', (event) => {
+    if (viewerId !== (event.detail?.uid ?? null)) {
+      reportedDanmaku = new Set();
+      el('danmaku-report-feedback').hidden = true;
+      for (const dialog of document.querySelectorAll?.('.danmaku-report[open]') || []) dialog.close();
+    }
     signedIn = Boolean(event.detail);
-    viewerId = event.detail?.uid;
+    viewerId = event.detail?.uid ?? null;
+    viewerName = event.detail?.name ?? '';
+    if (!signedIn) {
+      watchSidebar.leaveOwnView();
+      resetDanmakuHistory();
+    }
+    loadReportedDanmaku();
+    syncSubscriptionButton();
     hideDanmakuActions();
     for (const line of overlay.children) line.classList.toggle('own-danmaku', ownsDanmaku(line.dataset));
     renderDanmaku();
@@ -262,7 +330,7 @@
     tracks.expireFixed(time);
     if (activeLine) return;
     let placed = 0;
-    for (const d of danmaku) {
+    for (const d of historicalRows ?? danmaku) {
       if (placed >= watchPreferences.limit()) break;
       const mode = modeOf(d);
       const lifetime = mode === 'scroll' ? 0.6 : fixedDanmakuSeconds;
@@ -411,29 +479,85 @@
   const watchPreferences = setupWatchPreferences(player, { read, save, onDanmakuChange: clearOnscreenDanmaku });
   const watchSidebar = setupWatchSidebar({ read, save, notice, getUsers:()=>blocked,
     setUsers: users => { blocked = users; save('bili-blocked-users', [...blocked]); },
-    onChange: () => { clearOnscreenDanmaku(); renderDanmaku(); }
+    onChange: () => { clearOnscreenDanmaku(); renderDanmaku(); },
+    isSignedIn: () => signedIn,
+    onViewChange() {
+      el('danmaku-list').scrollTop = 0;
+      renderDanmaku();
+    }
+  });
+  const resetDanmakuHistory = setupDanmakuHistory({
+    isSignedIn: () => signedIn,
+    rows: () => danmaku,
+    onSelect(date) {
+      historyDate = date;
+      el('danmaku-list').scrollTop = 0;
+      clearOnscreenDanmaku();
+      shown.clear();
+      renderDanmaku();
+      showTimedDanmaku();
+    }
   });
   function renderDanmaku() {
-    el('danmaku-list').replaceChildren(...danmaku.map(d => {
-      const isBlocked = watchSidebar.isBlocked(d.userId), row = node('div', 'danmaku-row' + (isBlocked ? ' blocked' : ''));
+    historicalRows = historyDate ? danmaku
+      .filter(row => row.sentAt && row.sentAt.slice(0, 10) <= historyDate)
+      .sort((a, b) => b.sentAt.localeCompare(a.sentAt)) : null;
+    const ownView = watchSidebar.isOwnView();
+    const rows = ownView ? danmaku.filter(ownsDanmaku) : (historicalRows ?? danmaku);
+    el('danmaku-content-heading').textContent = historyDate && !ownView
+      ? '弹幕内容（' + Number(historyDate.slice(5, 7)) + '月' + Number(historyDate.slice(8, 10)) + '日）'
+      : '弹幕内容';
+    el('danmaku-list').replaceChildren(...rows.map(d => {
+      const isBlocked = !ownView && watchSidebar.isBlocked(d.userId);
+      const row = node('div', 'danmaku-row' + (isBlocked ? ' blocked' : ''));
+      if (isBlocked && d.id === justBlockedRow) {
+        row.classList.add('just-blocked');
+        row.addEventListener('mouseleave', () => {
+          row.classList.remove('just-blocked');
+          if (justBlockedRow === d.id) justBlockedRow = undefined;
+        }, { once: true });
+      }
       const date = node('span', 'danmaku-date', isBlocked ? '已屏蔽' : d.sentAt?.replace('T', ' ').slice(5, 16));
       const content = node('span', '', d.content);
       content.title = d.content;
       row.append(node('span', '', clock(d.timestamp)), content, date);
-      if (!ownsDanmaku(d)) {
-        const button = node('button', '', isBlocked ? '取消屏蔽' : '屏蔽用户');
-        button.setAttribute('aria-label', isBlocked ? '取消屏蔽该弹幕的发送者' : '屏蔽该弹幕的发送者');
-        button.addEventListener('mouseenter', () => showSenderTooltip(button, isBlocked)); button.addEventListener('focus', () => showSenderTooltip(button, isBlocked));
-        button.addEventListener('mouseleave', () => el('sender-tooltip').hidden = true); button.addEventListener('blur', () => el('sender-tooltip').hidden = true);
-        button.onclick = () => { el('sender-tooltip').hidden = true; watchSidebar.setUserBlocked(d.userId, !isBlocked); };
+      if (ownView) {
+        const button = node('button', '', '撤回');
+        button.type = 'button';
+        button.onclick = () => withdrawDanmaku(d, button);
+        row.append(button);
+      } else if (!ownsDanmaku(d)) {
+        const button = node('button', 'danmaku-block-user', isBlocked ? '取消屏蔽' : '屏蔽用户');
+        const blockLabel = isBlocked ? '取消屏蔽该弹幕的发送者' : '屏蔽该弹幕的发送者';
+        button.setAttribute('aria-label', blockLabel);
+        bindDanmakuTip(button, () => blockLabel);
+        button.onclick = () => {
+          el('sender-tooltip').hidden = true;
+          justBlockedRow = isBlocked ? undefined : d.id;
+          watchSidebar.setUserBlocked(d.userId, !isBlocked);
+        };
+        if (signedIn && typeof danmakuReportInteraction === 'function') {
+          const report = node('button', 'danmaku-report-user', '举报');
+          const reportLabel = () => reportedDanmaku.has(String(d.id)) ? '举报该弹幕的发送者' : '举报该弹幕';
+          report.setAttribute('aria-label', reportLabel());
+          bindDanmakuTip(report, reportLabel);
+          report.onclick = () => {
+            el('sender-tooltip').hidden = true;
+            reportDanmaku(el('danmaku-panel'), d, report);
+          };
+          row.append(report);
+        }
         row.append(button);
       }
       return row;
     }));
-    if (!danmaku.length) el('danmaku-list').append(node('p', 'status', '暂无弹幕'));
+    if (!rows.length) el('danmaku-list').append(node('p', 'status', ownView ? '你还没有在此视频发送弹幕' : '暂无弹幕'));
   }
   try {
     const { video, description, tags, mustWatch, bestSiteRank } = await api('/videos/' + encodeURIComponent(id));
+    videoAuthor = video.authorId;
+    syncSubscriptionButton();
+    loadReportedDanmaku();
     startViewerPresence(id);
     document.title = video.title + ' - dilidili'; el('video-title').textContent = video.title;
     const metaStat = (name, count) => {
@@ -485,34 +609,108 @@
         const mode = modeOf(row);
         const time = player.currentTime;
         const end = row.timestamp + (mode === 'scroll' ? 1 : fixedDanmakuSeconds);
-        if (enabled && !player.seeking && time >= row.timestamp && time < end
+        if ((!historicalRows || historicalRows.includes(row)) && enabled && !player.seeking && time >= row.timestamp && time < end
             && watchSidebar.allowed(row) && watchPreferences.allows(mode, row.color)
             && displayDanmaku(row, mode)) shown.add(row.id);
       }, video.author);
     }
   } catch (error) { el('video-title').textContent = error.message === '404' ? '视频不存在或已下架' : '视频加载失败'; el('player-status').hidden = false; el('player-status').textContent = '请返回首页选择其他视频'; }
-  let collectionNext = null, collectionPrevious = null;
-  try {
-    const collection = await api('/videos/' + id + '/collection');
-    if (collection?.title && collection.items.length) {
-      const index = collection.items.findIndex(v => String(v.id) === id);
-      el('collection-title').textContent = collection.title;
-      el('collection-position').textContent = '(' + (index + 1) + '/' + collection.items.length + ')';
-      el('collection-plays').textContent = shortCount(collection.plays) + '播放';
-      const collectionList = el('collection-list'), expand = el('collection-expand');
-      collectionList.replaceChildren(...collection.items.map(v => {
-        const current = String(v.id) === id;
-        const item = link('/video/' + encodeURIComponent(v.id), null, 'collection-item' + (current ? ' current' : ''));
-        if (current) item.setAttribute('aria-current', 'true');
-        item.title = v.title;
-        const cover = node('div', 'card-cover');
-        const image = node('img');
-        image.alt = '';
-        image.loading = 'lazy';
-        cover.append(image);
-        attachCover(image, v.coverUrl, v.category);
-        const details = node('div', 'collection-item-details');
-        const stats = node('div', 'collection-item-stats');
+  const collection = await api('/videos/' + id + '/collection').catch(() => null);
+  const queuePanel = el('video-collection'), queueList = el('collection-list');
+  const queueMeta = el('collection-meta');
+  const expand = el('collection-expand'), danmakuPanel = el('danmaku-panel');
+  let queue = [], queueIndex = -1, queueRequest = 0;
+  let reverseFolder = read('bili-folder-reverse', false) === true;
+  let shuffleFolder = read('bili-folder-shuffle', false) === true;
+  function renderFolderControls() {
+    const order = el('folder-playback-sequence');
+    const cycle = el('folder-playback-loop');
+    order.dataset.tooltip = reverseFolder ? '倒序播放' : '顺序播放';
+    cycle.dataset.tooltip = shuffleFolder ? '随机播放' : '列表循环';
+    order.setAttribute('aria-label', order.dataset.tooltip);
+    cycle.setAttribute('aria-label', cycle.dataset.tooltip);
+    order.setAttribute('aria-pressed', String(reverseFolder));
+    cycle.setAttribute('aria-pressed', String(shuffleFolder));
+    el('folder-playback-order-icon').setAttribute('d', reverseFolder
+      ? 'M10 6h11M10 12h11M10 18h11M5 18V6m-3 3 3-3 3 3'
+      : 'M10 6h11M10 12h11M10 18h11M5 6v12m-3-3 3 3 3-3');
+    el('folder-playback-cycle-icon').setAttribute('d', shuffleFolder
+      ? 'M3 6h3c6 0 6 12 12 12h3m-3-3 3 3-3 3M3 18h3c6 0 6-12 12-12h3m-3-3 3 3-3 3'
+      : 'M3 11a5 5 0 0 1 5-5h12m-3-3 3 3-3 3m4 4a5 5 0 0 1-5 5H4m3-3-3 3 3 3');
+  }
+  el('folder-playback-sequence').onclick = () => {
+    reverseFolder = !reverseFolder;
+    save('bili-folder-reverse', reverseFolder);
+    renderFolderControls();
+    if (!trialExpired() && queuePanel.dataset.queue === 'folder') {
+      playQueueVideo(reverseFolder ? queue.at(-1) : queue[0]);
+    }
+  };
+  el('folder-playback-loop').onclick = () => {
+    shuffleFolder = !shuffleFolder;
+    save('bili-folder-shuffle', shuffleFolder);
+    renderFolderControls();
+    if (shuffleFolder && !trialExpired() && queuePanel.dataset.queue === 'folder') playAdjacentVideo(1);
+  };
+
+  function setFolderExpanded(expanded) {
+    expand.setAttribute('aria-expanded', String(expanded));
+    expand.setAttribute('aria-label', expanded ? '收起收藏夹' : '展开收藏夹');
+    queueMeta.hidden = !expanded;
+    queueList.hidden = !expanded;
+  }
+
+  function renderQueue(folder, items) {
+    queue = items;
+    queueIndex = queue.findIndex(v => String(v.id) === id);
+    const available = queueIndex >= 0;
+    const isFolder = Boolean(folder);
+    activePlaylist = isFolder ? playlist : available && playlist === 'collection' ? playlist : '';
+    queuePanel.dataset.queue = isFolder ? 'folder' : 'collection';
+    queuePanel.hidden = !available;
+    el('related-heading').hidden = available;
+    collectionOwner = isFolder ? null : collection?.ownerId;
+    syncSubscriptionButton();
+    el('folder-playback-modes').hidden = !isFolder;
+    el('folder-more').hidden = !isFolder;
+    expand.setAttribute('aria-expanded', 'false');
+    expand.setAttribute('aria-controls', isFolder ? 'collection-meta collection-list' : 'collection-list');
+    queueMeta.hidden = false;
+    queueList.hidden = false;
+    queueList.dataset.expanded = 'false';
+    danmakuPanel.inert = false;
+    if (!available) {
+      queueList.replaceChildren();
+      el('fullscreen-collection-list').replaceChildren();
+      return;
+    }
+    const label = isFolder ? '收藏夹' : '合集列表';
+    expand.setAttribute('aria-label', '展开' + label);
+    el('collection-title').textContent = isFolder ? folder.name : collection.title;
+    const position = (queueIndex + 1) + '/' + queue.length;
+    el('collection-position').textContent = isFolder ? position : '(' + position + ')';
+    el('collection-plays').textContent = isFolder ? (viewerName ? '创建者：' + viewerName : '') : shortCount(collection.plays) + '播放';
+    if (isFolder) {
+      el('folder-more').href = '/me?tab=favorites&folder=' + encodeURIComponent(folderPlaylist[1]);
+      renderFolderControls();
+      setFolderExpanded(true);
+    }
+    queueList.replaceChildren(...queue.map(v => {
+      const current = String(v.id) === id;
+      const item = link(playbackUrl(v), null, 'collection-item' + (current ? ' current' : ''));
+      if (current) item.setAttribute('aria-current', 'true');
+      item.title = v.title;
+      const cover = node('div', 'card-cover');
+      const image = node('img');
+      image.alt = '';
+      image.loading = 'lazy';
+      cover.append(image);
+      attachCover(image, v.coverUrl || '/api/videos/' + encodeURIComponent(v.id) + '/cover', v.category);
+      const details = node('div', 'collection-item-details');
+      const stats = node('div', 'collection-item-stats');
+      if (isFolder) {
+        stats.append(node('span', '', shortCount(v.plays) + '播放'));
+      } else {
         for (const [symbol, label, count] of [['play', '播放', v.plays], ['list', '弹幕', v.danmaku]]) {
           const stat = node('span');
           const total = shortCount(count);
@@ -520,30 +718,48 @@
           stat.setAttribute('aria-label', label + ' ' + total);
           stats.append(stat);
         }
-        details.append(node('span', 'collection-item-title', v.title), stats);
-        item.append(cover, details, node('time', 'collection-item-duration', clock(v.duration)));
-        return item;
-      }));
-      el('fullscreen-collection-list').replaceChildren(...collection.items.map(v => {
-        const item = link('/video/' + encodeURIComponent(v.id), v.title, 'fullscreen-episode' + (String(v.id) === id ? ' current' : ''));
-        return item;
-      }));
-      el('video-collection').hidden = false;
-      const activeEpisode = collectionList.children[index];
-      const danmakuPanel = el('danmaku-panel');
-      let compactScrollTop = 0;
-      expand.onclick = () => {
-        const expanded = expand.getAttribute('aria-expanded') !== 'true';
-        if (expanded) compactScrollTop = collectionList.scrollTop;
-        expand.setAttribute('aria-expanded', String(expanded));
-        expand.setAttribute('aria-label', expanded ? '收起合集列表' : '展开合集列表');
-        danmakuPanel.inert = expanded;
-        collectionList.dataset.expanded = String(expanded);
-        collectionList.scrollTop = expanded ? activeEpisode?.offsetTop ?? 0 : compactScrollTop;
-      };
-      collectionNext = collection.items[index + 1] || null; collectionPrevious = collection.items[index - 1] || null;
-    } else el('video-collection').hidden = true;
-  } catch { el('video-collection').hidden = true; }
+      }
+      details.append(node('span', 'collection-item-title', v.title), stats);
+      item.append(cover, details, node('time', 'collection-item-duration', clock(v.duration)));
+      return item;
+    }));
+    el('fullscreen-collection-list').replaceChildren(...queue.map(v =>
+      link(playbackUrl(v), v.title, 'fullscreen-episode' + (String(v.id) === id ? ' current' : ''))
+    ));
+    const activeEpisode = queueList.children[queueIndex];
+    queueList.scrollTop = isFolder ? activeEpisode?.offsetTop ?? 0 : 0;
+    if (isFolder) {
+      expand.onclick = () => setFolderExpanded(expand.getAttribute('aria-expanded') !== 'true');
+      return;
+    }
+    let compactScrollTop = 0;
+    expand.onclick = () => {
+      const expanded = expand.getAttribute('aria-expanded') !== 'true';
+      if (expanded) compactScrollTop = queueList.scrollTop;
+      expand.setAttribute('aria-expanded', String(expanded));
+      expand.setAttribute('aria-label', (expanded ? '收起' : '展开') + label);
+      danmakuPanel.inert = expanded;
+      queueList.dataset.expanded = String(expanded);
+      queueList.scrollTop = expanded ? activeEpisode?.offsetTop ?? 0 : compactScrollTop;
+    };
+  }
+
+  const collectionItems = collection?.title ? (collection.items ?? []) : [];
+  async function refreshQueue() {
+    const request = ++queueRequest;
+    renderQueue(null, collectionItems);
+    if (!folderPlaylist || !signedIn) return;
+    try {
+      const [space, videos] = await Promise.all([
+        interaction('/me/space'), interaction('/me/folders/' + folderPlaylist[1] + '/videos')
+      ]);
+      if (request !== queueRequest) return;
+      const folder = space.folders.find(item => String(item.id) === folderPlaylist[1]);
+      if (folder && videos.some(video => String(video.id) === id)) renderQueue(folder, videos);
+    } catch { /* Keep the video's regular sidebar if the folder is unavailable. */ }
+  }
+  if (folderPlaylist) window.addEventListener('accountchange', refreshQueue);
+  await refreshQueue();
   setupWatchComments(id);
   restoreFloatingPlayer = setupWatchScroll(player, shell);
   try {
@@ -552,19 +768,31 @@
     nextVideo = related[0];
     setupRelatedExpansion(related);
   } catch { el('related-videos').textContent = '暂无推荐视频'; }
-  const orderedPlayback = playlist === 'collection' || Boolean(folderPlaylist);
-  let previous = collectionPrevious;
-  let next = collectionNext || (orderedPlayback ? null : nextVideo);
-  if (folderPlaylist) {
-    const videos = await interaction('/me/folders/' + folderPlaylist[1] + '/videos').catch(() => []);
-    const index = videos.findIndex(video => video.id === id);
-    previous = index > 0 ? videos[index - 1] : null;
-    next = index >= 0 ? videos[index + 1] : null;
+  function adjacentVideo(step) {
+    if (queueIndex < 0) return step > 0 ? nextVideo : null;
+    if (queuePanel.dataset.queue !== 'folder') return queue[queueIndex + step];
+    if (shuffleFolder && queue.length > 1) {
+      const index = Math.floor(Math.random() * (queue.length - 1));
+      return queue[index < queueIndex ? index : index + 1];
+    }
+    const offset = reverseFolder ? -step : step;
+    return queue[(queueIndex + offset + queue.length) % queue.length];
   }
-  el('fullscreen-prev').onclick = () => { if (previous) location.assign(playbackUrl(previous)); else notice('没有上一集'); };
-  el('fullscreen-next').onclick = () => { if (next) location.assign(playbackUrl(next)); else notice('没有下一集'); };
+  function playAdjacentVideo(step) {
+    return playQueueVideo(adjacentVideo(step));
+  }
+  function playQueueVideo(target) {
+    if (!target) return false;
+    if (String(target.id) === id) {
+      player.currentTime = 0;
+      player.play().catch(() => {});
+    } else location.assign(playbackUrl(target));
+    return true;
+  }
+  el('fullscreen-prev').onclick = () => { if (!playAdjacentVideo(-1)) notice('没有上一集'); };
+  el('fullscreen-next').onclick = () => { if (!playAdjacentVideo(1)) notice('没有下一集'); };
   player.addEventListener('ended', () => {
-    if (next && !trialExpired() && (orderedPlayback || el('autoplay-next').checked)) location.assign(playbackUrl(next));
+    if (!trialExpired() && (queueIndex >= 0 || el('autoplay-next').checked)) playAdjacentVideo(1);
   });
 }
 

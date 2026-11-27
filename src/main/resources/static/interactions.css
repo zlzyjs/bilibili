@@ -282,9 +282,22 @@
   height: 24px;
   padding: 0;
   color: #dadce1;
-  font-size: 23px;
-  line-height: 1;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
+.danmaku-report-close::before,
+.danmaku-report-close::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 25%;
+  width: 50%;
+  height: 1px;
+  background: currentColor;
+  transform: rotate(45deg);
+}
+.danmaku-report-close::after { transform: rotate(-45deg); }
 .danmaku-report-form { display: flex; flex-direction: column; min-height: 0; gap: 10px; }
 .danmaku-report-choices {
   box-sizing: border-box;
@@ -360,6 +373,43 @@
   .danmaku-report-reason { min-height: 30px; }
   .danmaku-report-details textarea { height: 65px; }
 }
+.danmaku-report-sidebar {
+  inset: 58px 0 auto;
+  width: min(308px, calc(100% - 24px));
+  max-height: 80vh;
+  padding: 20px 20px 16px;
+  border: 0;
+  border-radius: 4px;
+  box-shadow: 0 3px 14px #18191c16;
+  background: #fff;
+  color: #18191c;
+  color-scheme: light;
+  font-size: 14px;
+}
+.danmaku-report-sidebar .danmaku-report-title { margin-bottom: 14px; font-size: 16px; font-weight: 500; }
+.danmaku-report-sidebar .danmaku-report-close { color: #61666d; }
+.danmaku-report-sidebar .danmaku-report-form { gap: 12px; }
+.danmaku-report-sidebar .danmaku-report-choices { background: #f4f5f6; }
+.danmaku-report-sidebar .danmaku-report-row:has(input:checked) { background: transparent; }
+.danmaku-report-sidebar .danmaku-report-reason { min-height: 49px; padding-inline: 16px; }
+.danmaku-report-sidebar .report-radio { margin: 0; }
+.danmaku-report-sidebar .danmaku-report-details { gap: 8px; padding: 0 16px 23px; color: #9499a0; }
+.danmaku-report-sidebar .danmaku-report-details textarea {
+  height: 120px;
+  padding: 10px 13px;
+  background: #eff0f1;
+  color: #18191c;
+  font-size: 14px;
+  line-height: 20px;
+}
+.danmaku-report-sidebar textarea::placeholder,
+.danmaku-report-sidebar .danmaku-report-check { color: #9499a0; }
+.danmaku-report-sidebar .danmaku-report-options { gap: 5px; }
+.danmaku-report-sidebar .danmaku-report-footer button { cursor: pointer; }
+.danmaku-report-sidebar .danmaku-report-cancel { border: 1px solid #dfe1e3; color: #61666d; background: #fff; }
+.danmaku-report-sidebar .danmaku-report-send { border: 0; color: #fff; background: #00afd9; }
+.danmaku-report-sidebar .danmaku-report-send:disabled { color: #fff; background: #7cd4ed; }
+.danmaku-report-sidebar .danmaku-report-status { color: #c52850; }
 .video-coin-dialog {
   --report-accent: #00aeec;
   box-sizing: border-box;

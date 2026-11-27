@@ -220,13 +220,13 @@ class VideoController {
     @GetMapping("/videos/{id}/collection")
     VideoCollection collection(@PathVariable String id) {
         var video = find(id);
-        if (video.compilation() == null) return new VideoCollection(null, List.of(), 0);
+        if (video.compilation() == null) return new VideoCollection(null, List.of(), 0, null);
         var videos = catalog.collectionVideos(id);
         return new VideoCollection(video.compilation(), videos.stream().map(VideoController::card).toList(),
-                videos.stream().mapToLong(MysqlVideoCatalog.Video::plays).sum());
+                videos.stream().mapToLong(MysqlVideoCatalog.Video::plays).sum(), video.compilationOwner());
     }
 
-    record VideoCollection(String title, List<VideoCard> items, long plays) {}
+    record VideoCollection(String title, List<VideoCard> items, long plays, String ownerId) {}
 
     @GetMapping("/videos/{id}/engagement")
     MysqlVideoCatalog.Engagement engagement(@PathVariable String id) {

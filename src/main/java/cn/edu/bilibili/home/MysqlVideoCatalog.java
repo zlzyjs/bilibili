@@ -14,7 +14,7 @@ class MysqlVideoCatalog {
     private static final String VIDEO_SELECT = """
             SELECT v.VideoID, v.VideoTitle, v.VideoDescription, u.UID, u.Name, v.CategoryID, c.CategoryName,
                    v.VideoDuration, COALESCE(p.PlayCount, 0) AS Plays, v.UploadTime,
-                   v.CoverUrl, v.VideoContent, co.CompilationTitle,
+                   v.CoverUrl, v.VideoContent, co.CompilationTitle, co.UID AS CompilationOwner,
                    (SELECT COUNT(*) FROM danmakutable d
                      WHERE d.VideoID = v.VideoID AND d.DanmakuStatus = 'active') AS Danmaku
             FROM videotable v
@@ -505,7 +505,7 @@ class MysqlVideoCatalog {
                 rs.getString("Name"), rs.getString("UID"), rs.getString("CategoryID"), rs.getString("CategoryName"),
                 rs.getInt("VideoDuration"), rs.getLong("Plays"), rs.getLong("Danmaku"),
                 rs.getObject("UploadTime", LocalDateTime.class), rs.getString("CoverUrl"),
-                rs.getString("VideoContent"), rs.getString("CompilationTitle"));
+                rs.getString("VideoContent"), rs.getString("CompilationTitle"), rs.getString("CompilationOwner"));
     }
 
     static LocalDate today() {
@@ -523,6 +523,6 @@ class MysqlVideoCatalog {
     record Compilation(String id, String title, long videos) {}
     record Video(String id, String title, String description, String author, String authorId, String categoryId,
                  String category, int duration, long plays, long danmaku, LocalDateTime publishedAt,
-                 String coverPath, String videoPath, String compilation) {}
+                 String coverPath, String videoPath, String compilation, String compilationOwner) {}
     record Query(String categoryId, String authorId, String compilationId, String keyword, String tag, Sort sort, int offset, int limit) {}
 }
