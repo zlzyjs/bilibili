@@ -385,6 +385,10 @@ class MysqlVideoCatalog {
     }
 
     CommentPage comments(String videoId, boolean latest, int page, String viewer) {
+        return comments(videoId, latest, page, viewer, null);
+    }
+
+    CommentPage comments(String videoId, boolean latest, int page, String viewer, String focus) {
         boolean member = viewer != null;
         long total = jdbc.sql("SELECT COUNT(*) FROM commenttable c WHERE VideoID=CAST(:id AS UNSIGNED) AND CommentStatus='active' AND "
                 + visibleComment("c", "CommentID", 2)).param("id", videoId).param("viewer", viewer, java.sql.Types.VARCHAR).query(Long.class).single();
@@ -395,19 +399,38 @@ class MysqlVideoCatalog {
                 FROM commenttable c JOIN usertable u ON u.UID=c.UID
                 LEFT JOIN userleveltable l ON l.LevelID=u.LevelID
                 WHERE c.VideoID=CAST(:id AS UNSIGNED) AND c.CommentStatus='active' AND %s
+                AND (:focus IS NULL OR c.CommentID=CAST(:focus AS UNSIGNED))
                 ORDER BY
                 """.formatted(CommentContent.text("c"), CommentContent.tags("c"), visibleComment("c", "CommentID", 2))
                 + (latest ? "" : " Likes DESC, ") + " c.CommentTime DESC, c.CommentID DESC LIMIT :size OFFSET :offset")
                 .param("id", videoId).param("viewer", viewer, java.sql.Types.VARCHAR)
+                .param("focus", focus, java.sql.Types.VARCHAR)
                 .param("size", member ? 20 : 2).param("offset", member ? (page - 1) * 20 : 0)
                 .query((rs, row) -> {
-                    var replies = replies(rs.getString("CommentID"), 2, viewer, false);
+                    var replies = replies(rs.getString("CommentID"), focus == null ? 2 : Integer.MAX_VALUE, viewer, false);
                     return new CommentPreview(rs.getString("CommentID"), rs.getString("UID"), rs.getString("Name"),
                         rs.getString("LevelName"), rs.getString("Content"), rs.getObject("CommentTime", LocalDateTime.class),
                         rs.getLong("Likes"), rs.getBoolean("HasImage"), replies.isEmpty() ? 0 : replies.get(0).total(), replies,
                         CommentContent.storedTags(rs.getString("Tags")));
                 }).list();
         return new CommentPage(total, comments);
+    }
+
+    CommentPage focusedComment(String videoId, String kind, String target, String viewer) {
+        String root = target;
+        if (kind.equals("reply")) {
+            root = jdbc.sql("""
+                WITH RECURSIVE chain AS (
+                  SELECT ReplyID,ReplyTargetType,ReplyTargetID,1 AS depth FROM replytable
+                  WHERE ReplyID=CAST(:target AS UNSIGNED) AND ReplyStatus='active'
+                  UNION ALL
+                  SELECT r.ReplyID,r.ReplyTargetType,r.ReplyTargetID,c.depth+1
+                  FROM replytable r JOIN chain c ON c.ReplyTargetType=0 AND c.ReplyTargetID=r.ReplyID
+                  WHERE r.ReplyStatus='active' AND c.depth<30
+                ) SELECT CAST(ReplyTargetID AS CHAR) FROM chain WHERE ReplyTargetType=1
+                """).param("target", target).query(String.class).optional().orElse("0");
+        }
+        return comments(videoId, false, 1, viewer, root);
     }
 
     List<ReplyPreview> replies(String commentId, int limit, String viewer, boolean recent) {

@@ -765,7 +765,11 @@
         actions.append(reply, like);
         body.append(form);
       }
-      item.append(actor, body, link('/video/' + event.video, event.context || '查看原内容', 'mc-context'));
+      const destination = new URL('/video/' + event.video, location.origin);
+      if (['comment', 'reply'].includes(event.contextKind) && event.contextTarget) {
+        destination.searchParams.set(event.contextKind, event.contextTarget);
+      }
+      item.append(actor, body, link(destination.pathname + destination.search, event.context || '查看原内容', 'mc-context'));
       return item;
     }
 

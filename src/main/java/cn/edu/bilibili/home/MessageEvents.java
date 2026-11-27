@@ -87,14 +87,18 @@ class MessageEvents {
         return jdbc.sql(events(category) + """
                 SELECT e.*, EXISTS(SELECT 1 FROM liketable l WHERE l.UID=CAST(:uid AS UNSIGNED)
                                AND l.LikeTargetID=e.target AND l.LikeTargetType=IF(e.kind='comment',2,3)) AS liked
+                , %s AS contextKind, %s AS contextTarget
                 FROM events e ORDER BY e.sentAt DESC,e.id DESC LIMIT 40 OFFSET :offset
-                """).param("uid", uid).param("offset", offset)
+                """.formatted(category.equals("replies") ? "(SELECT IF(r.ReplyTargetType=1,'comment','reply') FROM replytable r WHERE r.ReplyID=e.target)" : "e.kind",
+                        category.equals("replies") ? "(SELECT r.ReplyTargetID FROM replytable r WHERE r.ReplyID=e.target)" : "e.target"))
+                .param("uid", uid).param("offset", offset)
                 .query((rs, row) -> new Event(rs.getString("id"), rs.getString("actor"), rs.getString("name"),
                         rs.getString("kind"), rs.getString("target"), rs.getString("body"), rs.getString("context"),
-                        rs.getObject("sentAt", LocalDateTime.class), rs.getString("video"), rs.getBoolean("liked"))).list();
+                        rs.getObject("sentAt", LocalDateTime.class), rs.getString("video"), rs.getBoolean("liked"),
+                        rs.getString("contextKind"), rs.getString("contextTarget"))).list();
     }
 
     record Event(String id, String actor, String name, String kind, String target, String body, String context,
-                 LocalDateTime sentAt, String video, boolean liked) {}
+                 LocalDateTime sentAt, String video, boolean liked, String contextKind, String contextTarget) {}
 }
 

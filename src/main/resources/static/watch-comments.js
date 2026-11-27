@@ -224,7 +224,7 @@ async function setupWatchComments(videoId) {
     });
   }
 
-  function renderEntry(entry, reply = false, refreshThread) {
+  function renderEntry(entry, reply = false, refreshThread, expanded = false) {
     const kind = reply ? 'reply' : 'comment';
     const article = node('article', reply ? 'comment-reply' : 'comment-entry');
     article.dataset.commentAuthor = entry.userId;
@@ -269,7 +269,7 @@ async function setupWatchComments(videoId) {
         previews.replaceChildren(...rows.map(row => renderEntry(row, true, refreshThread)));
       };
       refreshThread = () => expand(true);
-      const visibleReplies = (entry.replies || []).slice(0, 2);
+      const visibleReplies = expanded ? (entry.replies || []) : (entry.replies || []).slice(0, 2);
       visibleReplies.forEach(row => previews.append(renderEntry(row, true, refreshThread)));
       if (entry.replyCount > visibleReplies.length) {
         previews.append(action('共 ' + entry.replyCount + ' 条回复，点击查看', 'comment-view-replies', () => expand()));
@@ -484,6 +484,39 @@ async function setupWatchComments(videoId) {
   window.addEventListener('accountchange', () => { updateComposer(); load(signedIn() ? sort : 'hot'); });
   updateComposer();
   await load('hot');
+  const query = new URLSearchParams(location.search);
+  const targetKind = query.has('reply') ? 'reply' : 'comment';
+  const targetId = query.get(targetKind);
+  if (targetId && /^[0-9]{1,20}$/.test(targetId)) {
+    const version = requestVersion;
+    try {
+      const data = await api(endpoint + '/locate?' + new URLSearchParams({ kind: targetKind, target: targetId }));
+      if (version !== requestVersion || !list.isConnected) return;
+      const key = targetKind + ':' + targetId;
+      const existing = list.querySelector('[data-comment-key="comment:' + data.items[0]?.id + '"]');
+      const entry = data.items[0] && renderEntry(data.items[0], false, undefined, true);
+      if (entry) {
+        if (existing) existing.replaceWith(entry);
+        else list.prepend(entry);
+        list.querySelector('.comments-empty')?.remove();
+      }
+      const target = entry && [...entry.querySelectorAll('[data-comment-key]'), entry]
+        .find(element => element.dataset.commentKey === key);
+      if (target) {
+        target.classList.add('comment-located');
+        setTimeout(() => target.classList.remove('comment-located'), 3000);
+        target.tabIndex = -1;
+        target.focus({ preventScroll: true });
+        target.scrollIntoView({ block: 'center', behavior: 'instant' });
+      } else {
+        accountNotice('原评论已删除或暂时不可见');
+        list.scrollIntoView({ block: 'start' });
+      }
+    } catch {
+      accountNotice(signedIn() ? '原评论定位失败，请刷新重试' : '登录后可定位原评论');
+      list.scrollIntoView({ block: 'start' });
+    }
+  }
 }
 
 

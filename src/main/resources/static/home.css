@@ -33,11 +33,12 @@ svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke
 .search input:focus::placeholder,.discovery-search input:focus::placeholder,#space-search input:focus::placeholder{color:transparent}
 .search button{width:34px;height:32px;flex:none;border-radius:6px}
 .search button:hover{background:#e3e5e7}
-.home-search-nav .search{position:relative;min-width:0;max-width:500px;height:40px;padding:3px 5px;gap:6px;font-family:Arial,"PingFang SC","Microsoft YaHei",sans-serif}
-.home-search-nav .search input{flex:1;height:100%;padding:0 9px;border-radius:6px;font-size:14px;line-height:20px}
-.home-search-nav .search input:focus{background:#edf3f6}
-.home-search-nav .search>button{width:36px}
-.home-search-nav .search:has(>.home-search-history:not([hidden])){border-color:var(--line);border-bottom-color:transparent;border-radius:8px 8px 0 0;background:#fff}
+.navbar > .search{position:relative;min-width:0;max-width:500px;height:40px;padding:3px 5px;gap:6px;font-family:Arial,"PingFang SC","Microsoft YaHei",sans-serif}
+.navbar > .search input{flex:1;height:100%;padding:0 9px;border-radius:6px;font-size:14px;line-height:20px}
+.navbar > .search input:focus{background:#edf3f6}
+.navbar > .search>button{width:36px}
+.navbar > .search:has(>.home-search-history:not([hidden])){border-color:var(--line);border-bottom-color:transparent;border-radius:8px 8px 0 0;background:#fff}
+.search:has(>.home-search-history){position:relative}
 .home-search-history{position:absolute;z-index:10;top:100%;left:-1px;right:-1px;max-height:min(320px,65vh);overflow:auto;padding:14px 16px 16px;border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px;background:#fff;box-shadow:0 8px 16px -5px #18191c30}
 .home-search-history-header{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:14px}
 .home-search-history h2{margin:0;font-size:16px;font-weight:500;line-height:22px}

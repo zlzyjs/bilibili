@@ -956,11 +956,10 @@ function appendInteractionList(body, rows, render, className = 'interaction-list
   body.append(list);
 }
 
-function setupHomeSearchHistory() {
-  if (!home) return;
-  const form = document.querySelector('.navbar > .search');
+function setupNavSearchHistory() {
   const input = el('keyword');
-  form.parentElement.classList.add('home-search-nav');
+  const form = input?.closest('form.search');
+  if (!form) return;
   const panel = node('section', 'home-search-history');
   panel.id = 'home-search-history';
   panel.hidden = true;
@@ -1248,5 +1247,5 @@ function setupNav() {
 }
 
 setupNav();
-setupHomeSearchHistory();
+setupNavSearchHistory();
 recordSearchHistory();

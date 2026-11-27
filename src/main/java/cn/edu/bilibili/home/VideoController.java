@@ -190,6 +190,21 @@ class VideoController {
         return catalog.comments(id, sort.equals("latest"), page, member == null ? null : member.uid());
     }
 
+    @GetMapping("/videos/{id}/comments/locate")
+    MysqlVideoCatalog.CommentPage locateComment(@PathVariable String id, @RequestParam String kind,
+                                                @RequestParam String target,
+                                                jakarta.servlet.http.HttpServletRequest request,
+                                                jakarta.servlet.http.HttpServletResponse response) {
+        response.setHeader("Cache-Control", "no-store");
+        find(id);
+        if (!java.util.Set.of("comment", "reply").contains(kind) || !target.matches("[0-9]{1,20}")) {
+            throw new ResponseStatusException(BAD_REQUEST, "无效的评论定位");
+        }
+        var member = auth.currentMember(request);
+        if (member == null) throw new ResponseStatusException(UNAUTHORIZED, "登录后查看原评论");
+        return catalog.focusedComment(id, kind, target, member.uid());
+    }
+
     @PostMapping("/videos/{id}/viewers")
     ViewerCount viewers(@PathVariable String id, @RequestBody ViewerHeartbeat heartbeat) {
         if (heartbeat.sessionId() == null || !heartbeat.sessionId().matches("[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}")) {
@@ -244,6 +259,10 @@ class VideoController {
         var path = find(id).videoPath();
         URI remote = oss.location(path, "videos/");
         if (remote != null) return redirect(remote);
+        return videoFile(path);
+    }
+
+    ResponseEntity<Resource> videoFile(String path) {
         Path file = underMediaRoot(path, "media/videos/");
         if (!file.getFileName().toString().endsWith(".mp4")) {
             throw missingMedia();

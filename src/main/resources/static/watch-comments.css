@@ -229,3 +229,9 @@
 .watch-mini-toggle[aria-pressed="true"] { color:#00aeec; }
 
 .watch-mini-toggle[hidden] { display:none!important; }
+
+.comment-located{scroll-margin-top:90px;animation:comment-locate-pulse 1s ease-in-out 3}
+.comment-entry[tabindex="-1"]:focus,.comment-reply[tabindex="-1"]:focus{outline:none}
+@keyframes comment-locate-pulse{0%,100%{background-color:transparent}45%{background-color:#eaf6fd}}
+@media(prefers-reduced-motion:reduce){.comment-located{animation:comment-locate-fade 3s ease-out}}
+@keyframes comment-locate-fade{from{background-color:#eaf6fd}to{background-color:transparent}}

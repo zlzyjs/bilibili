@@ -75,13 +75,15 @@ class StudioController {
     private final AuthController auth;
     private final VideoController videoController;
     private final InteractionController interactions;
+    private final OssMedia oss;
 
     StudioController(JdbcClient jdbc, AuthController auth, VideoController videoController,
-                     InteractionController interactions) {
+                     InteractionController interactions, OssMedia oss) {
         this.jdbc = jdbc;
         this.auth = auth;
         this.videoController = videoController;
         this.interactions = interactions;
+        this.oss = oss;
     }
 
     @ModelAttribute
@@ -174,6 +176,18 @@ class StudioController {
         headers.putAll(response.getHeaders());
         headers.setCacheControl("no-store");
         return new ResponseEntity<>(response.getBody(), headers, response.getStatusCode());
+    }
+
+    @GetMapping("/videos/{id}/stream")
+    ResponseEntity<Resource> stream(@PathVariable String id, HttpServletRequest request,
+                                    HttpServletResponse response) throws java.io.IOException {
+        String path = ownVideo(member(request).uid(), id).content();
+        if (path == null || path.isBlank()) throw new ResponseStatusException(NOT_FOUND);
+        if (path.startsWith("oss://")) {
+            oss.streamVideo(path, request, response);
+            return null;
+        }
+        return videoController.videoFile(path);
     }
 
     @GetMapping("/videos/{id}/edit")
