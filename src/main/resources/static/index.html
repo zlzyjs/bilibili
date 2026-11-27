@@ -1,4 +1,4 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8">
@@ -7,7 +7,7 @@
   <title>dilidili · 第二组课程项目</title>
   <link rel="stylesheet" href="/nav-brand.css?v=1">
   <link rel="stylesheet" href="/home.css?v=94">
-  <link rel="stylesheet" href="/watch.css?v=47">
+  <link rel="stylesheet" href="/watch.css?v=64">
   <link rel="stylesheet" href="/watch-fullscreen.css?v=4">
   <link rel="stylesheet" href="/banner-leaves.css?v=1">
   <script src="/banner-leaves.js?v=3" defer></script>
@@ -22,13 +22,13 @@
   <script src="/watch-preferences.js?v=12" defer></script>
   <script src="/watch-sidebar.js?v=5" defer></script>
   <script src="/viewer-presence.js?v=1" defer></script>
-  <script src="/watch-comments.js?v=15" defer></script>
-  <script src="/watch.js?v=40" defer></script>
+  <script src="/watch-comments.js?v=16" defer></script>
+  <script src="/watch.js?v=54" defer></script>
   <script src="/home.js?v=46" defer></script>
   <script src="/login.js?v=16" defer></script>
-  <script src="/interactions.js?v=34" defer></script>
-  <link rel="stylesheet" href="/messages.css?v=54">
-  <script src="/messages.js?v=43" defer></script>
+  <script src="/interactions.js?v=35" defer></script>
+  <link rel="stylesheet" href="/messages.css?v=55">
+  <script src="/messages.js?v=44" defer></script>
   <link rel="stylesheet" href="/account-center.css?v=39">
   <script src="/account-center.js?v=21" defer></script>
 </head>
@@ -327,7 +327,7 @@
         <div class="watch-sidebar-content"><div class="watch-danmaku-slot"><div><details id="danmaku-panel" class="danmaku-panel"><summary><span id="danmaku-sidebar-title">弹幕列表</span><span class="sidebar-menu-wrap"><button id="danmaku-sidebar-menu" aria-label="切换弹幕面板" aria-expanded="false"><svg class="watch-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#more"/></svg></button><span id="danmaku-sidebar-menu-items" class="sidebar-menu" hidden><button id="sidebar-view-list">弹幕列表</button><button id="sidebar-view-block">屏蔽设定</button></span></span><i></i></summary><div id="sidebar-list-view"><div class="danmaku-columns"><span>时间</span><span>弹幕内容</span><span>发送时间</span></div><div id="danmaku-list" class="danmaku-list"></div><button class="history-danmaku" data-login="查看历史弹幕" data-login-only>查看历史弹幕</button></div>
 <div id="sidebar-block-view" class="sidebar-block-view" hidden><div class="block-heading"><label>屏蔽列表 <input id="shield-enabled" type="checkbox" role="switch" checked></label><button data-login="同步屏蔽列表" data-login-only>◌ 同步屏蔽列表</button></div><div id="shield-body"><div class="shield-input"><input id="shield-input" maxlength="100" placeholder='添加屏蔽词，正则以"/"开头"/"结尾'><button id="shield-add">添加</button></div><div class="shield-tabs" role="tablist"><button id="shield-tab-text" role="tab">屏蔽文本</button><button id="shield-tab-regex" role="tab">屏蔽正则</button><button id="shield-tab-user" role="tab">屏蔽用户</button></div><div class="shield-table"><div class="shield-table-head"><span id="shield-count">内容（-）</span><span>状态</span><span>操作</span></div><div id="shield-rows"></div></div></div></div>
         </details></div></div>
-        <section id="video-collection" class="video-collection" aria-labelledby="collection-title" hidden><div class="collection-heading"><span id="collection-title"></span><small id="collection-position"></small><button id="collection-expand" type="button" aria-label="展开合集列表" aria-expanded="false" aria-controls="collection-list"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 5 4-4 4 4"/><path d="m4 11 4 4 4-4"/></svg></button></div><div class="collection-meta"><span id="collection-plays"></span><button id="video-subscribe" type="button" aria-pressed="false">订阅合集</button></div><div id="collection-list" class="collection-list"></div></section><div class="related-heading"><h2>接下来播放</h2><label>自动连播 <input id="autoplay-next" type="checkbox" role="switch"></label></div><div id="related-videos"></div><button id="related-expand" class="related-expand" hidden>展开</button><div id="related-extra" hidden></div><button id="related-collapse" class="related-expand" hidden>收起</button>
+        <section id="video-collection" class="video-collection" aria-labelledby="collection-title" hidden><div class="collection-heading"><span id="collection-title"></span><small id="collection-position"></small><button id="collection-expand" type="button" aria-label="展开合集列表" aria-expanded="false" aria-controls="collection-list"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 5 4-4 4 4"/><path d="m4 11 4 4 4-4"/></svg></button></div><div class="collection-meta"><span id="collection-plays"></span><button id="video-subscribe" type="button" aria-pressed="false">订阅合集</button></div><div id="collection-list" class="collection-list"></div></section><section id="video-playlist" class="video-collection video-playlist" hidden><div class="collection-heading"><span id="playlist-title"></span><small id="playlist-position"></small><button id="playlist-order" type="button" class="playlist-toggle" aria-label="切换逆序播放" aria-pressed="false"><svg viewBox="0 0 20 20" aria-hidden="true"><g class="icon-off"><path d="M4 3v14M1.5 14.5 4 17l2.5-2.5"/><path d="M9 5h8M9 10h8M9 15h8"/></g><g class="icon-on"><path d="M4 17V3M1.5 5.5 4 3l2.5 2.5"/><path d="M9 5h8M9 10h8M9 15h8"/></g></svg></button><button id="playlist-shuffle" type="button" class="playlist-toggle" aria-label="切换随机播放" aria-pressed="false"><svg viewBox="0 0 20 20" aria-hidden="true"><g class="icon-off"><path d="M4 11V9.5A3.5 3.5 0 0 1 7.5 6h6"/><path d="m11.4 3.9 2.6 2.1-2.6 2.1"/><path d="M16 9v1.5a3.5 3.5 0 0 1-3.5 3.5h-6"/><path d="m8.6 11.9-2.6 2.1 2.6 2.1"/></g><g class="icon-on"><path d="M2 5.5h3c3.4 0 2.4 9 5.8 9h5.2"/><path d="m13.8 12 2.2 2.5-2.2 2.5"/><path d="M2 14.5h3c3.4 0 2.4-9 5.8-9h5.2"/><path d="m13.8 3 2.2 2.5-2.2 2.5"/></g></svg></button><button id="playlist-expand" type="button" aria-label="收起收藏夹列表" aria-expanded="true"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 10 4-4 4 4"/></svg></button></div><div class="collection-meta"><span id="playlist-creator"></span><button id="playlist-more" type="button">更多</button></div><div id="playlist-list" class="collection-list"></div></section><div class="related-heading"><h2>接下来播放</h2><label>自动连播 <input id="autoplay-next" type="checkbox" role="switch"></label></div><div id="related-videos"></div><button id="related-expand" class="related-expand" hidden>展开</button><div id="related-extra" hidden></div><button id="related-collapse" class="related-expand" hidden>收起</button>
         </div>
       </aside>
     </section>

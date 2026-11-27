@@ -431,6 +431,7 @@
       const menu = node('div', 'mc-msg-menu');
       menu.hidden = true;
       if (!mine) menu.append(button('举报', () => reportInteraction('message', row.id, () => loadLatest(true).catch(() => {})), 'mc-msg-action'));
+      menu.append(button('转发', () => forwardMessage(row), 'mc-msg-action'));
       menu.append(button('删除', () => mcConfirm('提示', '消息删除后不再显示在聊天记录里，确认删除吗？', () => changeMessage(row.id, false), '确认'), 'mc-msg-action'));
       if (mine) menu.append(button('撤回', () => changeMessage(row.id, true), 'mc-msg-action'));
       body.append(menu);
@@ -538,6 +539,57 @@
       } finally { updatingMessage = false; }
     }
 
+    async function uploadImage(uid, image, name) {
+      const data = new FormData();
+      name ? data.append('image', image, name) : data.append('image', image);
+      const token = (await authApi('csrf')).token;
+      const response = await fetch('/api/interactions/authors/' + encodeURIComponent(uid) + '/messages/image', {
+        method: 'POST', headers: { 'X-CSRF-Token': token }, body: data
+      });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).message || '发送图片失败');
+    }
+
+    async function forwardTo(uid, row) {
+      if (row.type === 2) {
+        if (!row.videoId) throw new Error('该视频已不可用，无法转发');
+        await interaction('/videos/' + encodeURIComponent(row.videoId) + '/forward', 'POST', { value: uid });
+      } else if (row.type === 1) {
+        const source = await fetch('/api/message-center/images/' + encodeURIComponent(row.id));
+        if (!source.ok) throw new Error('图片转发失败');
+        const blob = await source.blob();
+        await uploadImage(uid, blob, 'forward.' + (blob.type.split('/')[1] || 'png'));
+      } else {
+        await interaction('/authors/' + encodeURIComponent(uid) + '/messages', 'POST', { value: row.text });
+      }
+    }
+
+    function forwardMessage(row) {
+      mcDialog('转发给', async (content, actions, status, close) => {
+        const friends = await inbox('/threads?offset=0');
+        const list = node('div', 'mc-forward-list');
+        if (!friends.length) list.append(empty('暂无可转发的聊天'));
+        for (const friend of friends) {
+          const item = node('button', 'mc-forward-item');
+          item.type = 'button';
+          item.append(avatar(friend.uid), node('span', '', friend.name || '账号已注销'));
+          item.onclick = async () => {
+            item.disabled = true;
+            try {
+              await forwardTo(friend.uid, row);
+              close();
+              if (stillCurrent()) notice('转发成功');
+            } catch (error) {
+              status.textContent = error.message;
+              item.disabled = false;
+            }
+          };
+          list.append(item);
+        }
+        content.append(list);
+        actions.append(button('取消', close, 'mc-dialog-cancel'));
+      }, 'mc-dialog-forward');
+    }
+
     async function sendMessage(action, sent) {
       if (busy || !canSend || !stillCurrent()) return;
       busy = true;
@@ -578,18 +630,7 @@
         status.textContent = '图片大小不能超过 4 MB';
         return;
       }
-      const data = new FormData();
-      data.append('image', image);
-      sendMessage(async () => {
-        const token = (await authApi('csrf')).token;
-        const response = await fetch('/api/interactions/authors/' + encodeURIComponent(peer) + '/messages/image', {
-          method: 'POST', headers: { 'X-CSRF-Token': token }, body: data
-        });
-        if (!response.ok) {
-          const result = await response.json().catch(() => ({}));
-          throw new Error(result.message || '发送图片失败');
-        }
-      }, () => {});
+      sendMessage(() => uploadImage(peer, image), () => {});
     };
 
     updateComposer();

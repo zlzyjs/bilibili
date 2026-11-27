@@ -382,7 +382,7 @@ body:has(.watch-layout:not([hidden])) .layout { max-width: 2440px; width: 84%; m
 .collection-heading { display: flex; align-items: center; gap: 7px; }
 #collection-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #collection-position { color: #9499a0; font-size: 12px; flex-shrink: 0; }
-#collection-expand {
+#collection-expand, #playlist-expand {
   display: grid;
   place-items: center;
   flex: 0 0 24px;
@@ -395,10 +395,11 @@ body:has(.watch-layout:not([hidden])) .layout { max-width: 2440px; width: 84%; m
   color: #61666d;
   cursor: pointer;
 }
-#collection-expand:hover { background: #e3e5e7; }
-#collection-expand:focus-visible { outline: 2px solid #00aeec; }
-#collection-expand svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
-#collection-expand[aria-expanded="true"] path {
+#collection-expand:hover, #playlist-expand:hover { background: #e3e5e7; }
+#collection-expand:focus-visible, #playlist-expand:focus-visible { outline: 2px solid #00aeec; }
+#collection-expand svg, #playlist-expand svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
+#collection-expand[aria-expanded="true"] path,
+#playlist-expand[aria-expanded="false"] path {
   transform-box: fill-box;
   transform-origin: center;
   transform: scaleY(-1);
@@ -457,6 +458,32 @@ body:has(.watch-layout:not([hidden])) .layout { max-width: 2440px; width: 84%; m
 .collection-item-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .collection-item-duration { flex: none; color: #9499a0; font-variant-numeric: tabular-nums; }
 .collection-item .card-cover, .collection-item-stats { display: none; }
+.video-playlist .collection-heading { padding: 0 16px; }
+.video-playlist .collection-meta { margin: 8px 16px 4px; padding-bottom: 6px; border-bottom: 1px solid #e3e5e7; }
+.playlist-toggle { display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: #61666d; cursor: pointer; }
+.playlist-toggle svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.playlist-toggle .icon-on { display: none; }
+.playlist-toggle[aria-pressed="true"] .icon-off { display: none; }
+.playlist-toggle[aria-pressed="true"] .icon-on { display: block; }
+.playlist-toggle:hover { background: #e3e5e7; }
+.video-playlist:has(#playlist-expand[aria-expanded="false"]) .collection-meta,
+.video-playlist:has(#playlist-expand[aria-expanded="false"]) #playlist-list { display: none; }
+.video-playlist .collection-item { align-items: flex-start; gap: 8px; margin: 0; padding: 6px 0; }
+.video-playlist .collection-item .card-cover { display: block; flex: 0 0 96px; width: 96px; aspect-ratio: 16/9; border-radius: 4px; overflow: hidden; }
+.video-playlist .collection-item-title { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; white-space: normal; font-size: 14px; font-weight: 500; line-height: 19.6px; }
+.video-playlist .collection-item.current .collection-item-title, .video-playlist .collection-item:hover .collection-item-title { color: #00aeec; }
+.playlist-playing { display: inline-flex; align-items: flex-end; gap: 2px; width: 14px; height: 13px; margin-right: 4px; vertical-align: -2px; }
+.playlist-playing i { width: 3px; border-radius: 1.5px; background: #00aeec; transform-origin: bottom; animation: playlist-bar .9s ease-in-out infinite; }
+.playlist-playing i:nth-child(1) { height: 5px; }
+.playlist-playing i:nth-child(2) { height: 10px; animation-delay: .15s; }
+.playlist-playing i:nth-child(3) { height: 7px; animation-delay: .3s; }
+@keyframes playlist-bar { 0%, 100% { transform: scaleY(.55); } 50% { transform: scaleY(1); } }
+.video-playlist .playlist-author { display: block; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #9499a0; font-size: 12px; }
+.video-playlist { padding: 16px 0; }
+.video-playlist .collection-list { margin-inline-end: 0; padding: 8px 8px 0 16px; }
+.watch-sidebar-content:has(#video-playlist:not([hidden])) #video-collection { display: none; }
+.watch-sidebar-content:has(#video-playlist:not([hidden])) .related-heading { display: none; }
+.watch-sidebar-content:has(#video-playlist:not([hidden])) #related-videos { width: 96%; margin: 16px auto 0; padding-top: 16px; border-top: 1px solid #e3e5e7; }
 .collection-item.current { color: #00aeec; background: #fff; }
 .collection-item:hover { background: #fff9; }
 .collection-list[data-expanded="true"] { display: grid; gap: 12px; }

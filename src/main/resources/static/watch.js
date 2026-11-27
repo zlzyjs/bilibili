@@ -1,6 +1,6 @@
 ﻿async function loadWatchPage() {
   const player = el('player'), shell = el('player-shell');
-  const id = path.split('/')[2];
+  let id = path.split('/')[2];
   const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
   const save = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
   // Each visit gets its own trial budget; previous visits never lock this one.
@@ -428,62 +428,68 @@
     }));
     if (!danmaku.length) el('danmaku-list').append(node('p', 'status', '暂无弹幕'));
   }
-  try {
-    const { video, description, tags, mustWatch, bestSiteRank } = await api('/videos/' + encodeURIComponent(id));
-    startViewerPresence(id);
-    document.title = video.title + ' - dilidili'; el('video-title').textContent = video.title;
-    const metaStat = (name, count) => {
-      const stat = node('span', 'video-meta-stat');
-      stat.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="/assets/watch-icons.svg?v=2#meta-' + name + '"></use></svg>';
-      const label = node('span', '', shortCount(count));
-      if (name === 'danmaku') danmakuCountLabel = label;
-      stat.append(label);
-      return stat;
-    };
-    const accolades = [];
-    const accolade = (href, label, symbol, variant) => {
-      const badge = link(href, null, 'video-accolade video-accolade-' + variant);
-      badge.target = '_self';
-      badge.append(icon(symbol), label);
-      return badge;
-    };
-    if (mustWatch) accolades.push(accolade('/popular/must-watch', '入站必刷', 'popular-medal', 'must-watch'));
-    if (bestSiteRank) accolades.push(accolade('/popular/rank', '全站排行榜最高第' + bestSiteRank + '名', 'popular-podium', 'rank'));
-    el('video-meta').replaceChildren(...accolades, metaStat('play', video.plays), metaStat('danmaku', video.danmaku), node('time', '', video.publishedAt?.replace('T', ' ') || ''));
-    el('video-description').textContent = description || '-';
-    el('video-tags').replaceChildren(link('/channel/' + video.categoryId, video.category), ...tags.map(t => link('/search?tag=' + encodeURIComponent(t), t)));
-    el('fullscreen-title').textContent = video.title; el('watch-author-name').textContent = video.author; el('watch-author-link').href = '/space/' + video.authorId;
-    el('watch-avatar').src = '/api/authors/' + video.authorId + '/avatar'; el('watch-avatar').onerror = e => { e.target.removeAttribute('src'); e.target.alt = 'UP'; };
-    api('/authors/' + video.authorId).then(a => { el('watch-signature').textContent = a.signature || '这个人很神秘，什么都没有写'; }).catch(() => el('watch-signature').textContent = '');
-    el('player-author-avatar').src = '/api/authors/' + video.authorId + '/avatar';
-    el('player-author-avatar').onerror = e => { e.target.hidden = true; };
-    player.poster = video.coverUrl;
-    player.onerror = () => { el('player-status').hidden = false; el('player-status').textContent = '视频文件暂时不可用，请确认本地媒体文件与数据库路径一致'; };
-    if (video.streamUrl) player.src = video.streamUrl;
-    else { el('player-status').hidden = false; el('player-status').textContent = '暂无视频文件'; }
-    if (trialExpired()) gate(false);
-    else if (video.streamUrl && preferences.autoStart) { player.muted = preferences.muted; player.play().catch(() => {}); }
-    api('/videos/' + id + '/engagement').then(stats => { for (const key of ['like','coin','favorite','share']) el(key + '-count').textContent = shortCount(stats[key]); }).catch(() => { document.querySelector('.video-actions').title = '互动数据暂时加载失败'; });
-    api('/videos/' + id + '/danmaku').then(rows => {
-      danmaku = [...new Map([...rows, ...danmaku].filter(row => !withdrawn.has(row.id)).map(row => [row.id, row])).values()];
-      updateHeatmap();
-      renderDanmaku();
-      showTimedDanmaku();
-    }).catch(() => el('danmaku-list').append(node('p', 'status', '弹幕加载失败，请刷新重试')));
-    if (typeof setupVideoInteractions === 'function') {
-      setupVideoInteractions(id, video.authorId, player, video.duration, row => {
-        danmaku.push(row);
+  async function loadVideo() {
+    const videoId = id;
+    try {
+      const { video, description, tags, mustWatch, bestSiteRank } = await api('/videos/' + encodeURIComponent(videoId));
+      if (String(videoId) !== String(id)) return;
+      document.title = video.title + ' - dilidili'; el('video-title').textContent = video.title;
+      const metaStat = (name, count) => {
+        const stat = node('span', 'video-meta-stat');
+        stat.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><use href="/assets/watch-icons.svg?v=2#meta-' + name + '"></use></svg>';
+        const label = node('span', '', shortCount(count));
+        if (name === 'danmaku') danmakuCountLabel = label;
+        stat.append(label);
+        return stat;
+      };
+      const accolades = [];
+      const accolade = (href, label, symbol, variant) => {
+        const badge = link(href, null, 'video-accolade video-accolade-' + variant);
+        badge.target = '_self';
+        badge.append(icon(symbol), label);
+        return badge;
+      };
+      if (mustWatch) accolades.push(accolade('/popular/must-watch', '入站必刷', 'popular-medal', 'must-watch'));
+      if (bestSiteRank) accolades.push(accolade('/popular/rank', '全站排行榜最高第' + bestSiteRank + '名', 'popular-podium', 'rank'));
+      el('video-meta').replaceChildren(...accolades, metaStat('play', video.plays), metaStat('danmaku', video.danmaku), node('time', '', video.publishedAt?.replace('T', ' ') || ''));
+      el('video-description').textContent = description || '-';
+      el('video-tags').replaceChildren(link('/channel/' + video.categoryId, video.category), ...tags.map(t => link('/search?tag=' + encodeURIComponent(t), t)));
+      el('fullscreen-title').textContent = video.title; el('watch-author-name').textContent = video.author; el('watch-author-link').href = '/space/' + video.authorId;
+      el('watch-avatar').src = '/api/authors/' + video.authorId + '/avatar'; el('watch-avatar').onerror = e => { e.target.removeAttribute('src'); e.target.alt = 'UP'; };
+      api('/authors/' + video.authorId).then(a => { el('watch-signature').textContent = a.signature || '这个人很神秘，什么都没有写'; }).catch(() => el('watch-signature').textContent = '');
+      el('player-author-avatar').src = '/api/authors/' + video.authorId + '/avatar';
+      el('player-author-avatar').onerror = e => { e.target.hidden = true; };
+      player.poster = video.coverUrl;
+      player.onerror = () => { el('player-status').hidden = false; el('player-status').textContent = '视频文件暂时不可用，请确认本地媒体文件与数据库路径一致'; };
+      if (video.streamUrl) player.src = video.streamUrl;
+      else { el('player-status').hidden = false; el('player-status').textContent = '暂无视频文件'; }
+      if (trialExpired()) gate(false);
+      else if (video.streamUrl && preferences.autoStart) { player.muted = preferences.muted; player.play().catch(() => {}); }
+      api('/videos/' + videoId + '/engagement').then(stats => { if (String(videoId) !== String(id)) return; for (const key of ['like','coin','favorite','share']) el(key + '-count').textContent = shortCount(stats[key]); }).catch(() => { document.querySelector('.video-actions').title = '互动数据暂时加载失败'; });
+      api('/videos/' + videoId + '/danmaku').then(rows => {
+        if (String(videoId) !== String(id)) return;
+        danmaku = [...new Map([...rows, ...danmaku].filter(row => !withdrawn.has(row.id)).map(row => [row.id, row])).values()];
         updateHeatmap();
         renderDanmaku();
-        const mode = modeOf(row);
-        const time = player.currentTime;
-        const end = row.timestamp + (mode === 'scroll' ? 1 : fixedDanmakuSeconds);
-        if (enabled && !player.seeking && time >= row.timestamp && time < end
-            && watchSidebar.allowed(row) && watchPreferences.allows(mode, row.color)
-            && displayDanmaku(row, mode)) shown.add(row.id);
-      }, video.author);
-    }
-  } catch (error) { el('video-title').textContent = error.message === '404' ? '视频不存在或已下架' : '视频加载失败'; el('player-status').hidden = false; el('player-status').textContent = '请返回首页选择其他视频'; }
+        showTimedDanmaku();
+      }).catch(() => el('danmaku-list').append(node('p', 'status', '弹幕加载失败，请刷新重试')));
+      if (typeof setupVideoInteractions === 'function') {
+        setupVideoInteractions(videoId, video.authorId, player, video.duration, row => {
+          danmaku.push(row);
+          updateHeatmap();
+          renderDanmaku();
+          const mode = modeOf(row);
+          const time = player.currentTime;
+          const end = row.timestamp + (mode === 'scroll' ? 1 : fixedDanmakuSeconds);
+          if (enabled && !player.seeking && time >= row.timestamp && time < end
+              && watchSidebar.allowed(row) && watchPreferences.allows(mode, row.color)
+              && displayDanmaku(row, mode)) shown.add(row.id);
+        }, video.author);
+      }
+      return true;
+    } catch (error) { el('video-title').textContent = error.message === '404' ? '视频不存在或已下架' : '视频加载失败'; el('player-status').hidden = false; el('player-status').textContent = '请返回首页选择其他视频'; return false; }
+  }
+  if (await loadVideo()) startViewerPresence(id);
   let collectionNext = null, collectionPrevious = null;
   try {
     const collection = await api('/videos/' + id + '/collection');
@@ -537,17 +543,142 @@
       collectionNext = collection.items[index + 1] || null; collectionPrevious = collection.items[index - 1] || null;
     } else el('video-collection').hidden = true;
   } catch { el('video-collection').hidden = true; }
+  const folder = new URLSearchParams(location.search).get('fav');
+  let playlistNext = null, playlistDraw = null, switching = false;
+  if (folder) try {
+    const [space, items] = await Promise.all([api('/interactions/me/space'), api('/interactions/me/folders/' + encodeURIComponent(folder))]);
+    const info = space.folders.find(entry => String(entry.id) === folder);
+    if (info && items.length) {
+      const list = el('playlist-list');
+      const base = items.slice();
+      const modeKey = 'favMode:' + folder;
+      let saved = {};
+      try { saved = JSON.parse(sessionStorage.getItem(modeKey)) || {}; } catch { saved = {}; }
+      let view = base, reversed = Boolean(saved.desc), random = saved.random === true, queue = [];
+      const draw = () => {
+        list.replaceChildren(...view.map(v => {
+          const current = String(v.id) === id;
+          const item = link('/video/' + encodeURIComponent(v.id) + '?fav=' + encodeURIComponent(folder), null, 'collection-item' + (current ? ' current' : ''));
+          if (current) item.setAttribute('aria-current', 'true');
+          item.title = v.title;
+          item.onclick = event => {
+            if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;
+            event.preventDefault();
+            playFromPlaylist(v);
+          };
+          const cover = node('div', 'card-cover');
+          const image = node('img');
+          image.alt = '';
+          image.loading = 'lazy';
+          cover.append(image);
+          attachCover(image, '/api/videos/' + encodeURIComponent(v.id) + '/cover', '暂无封面');
+          const title = node('span', 'collection-item-title', v.title);
+          if (current) {
+            const playing = node('span', 'playlist-playing');
+            playing.setAttribute('aria-hidden', 'true');
+            playing.append(node('i'), node('i'), node('i'));
+            title.prepend(playing);
+          }
+          const details = node('div', 'collection-item-details');
+          details.append(title, node('span', 'playlist-author', v.author));
+          item.append(cover, details);
+          return item;
+        }));
+        const index = view.findIndex(v => String(v.id) === id);
+        el('playlist-position').textContent = (index + 1) + '/' + view.length;
+        playlistNext = view[index + 1] || null;
+        if (index >= 0) list.scrollTop = Math.max(0, list.children[index].offsetTop - 40);
+      };
+      playlistDraw = draw;
+      el('playlist-title').textContent = info.name;
+      el('playlist-creator').textContent = '创建者：' + (currentAccount?.name || '');
+      el('playlist-more').onclick = () => location.assign('/me?tab=favorites&folder=' + encodeURIComponent(folder));
+      const arrange = (now = true) => {
+        view = random ? queue.slice() : reversed ? base.slice().reverse() : base.slice();
+        if (now) draw();
+      };
+      let lastToggle = 0;
+      const ready = () => {
+        const now = performance.now();
+        if (switching || now - lastToggle < 600) return false;
+        lastToggle = now;
+        return true;
+      };
+      const orderButton = el('playlist-order');
+      orderButton.setAttribute('aria-pressed', String(reversed));
+      orderButton.onclick = () => {
+        if (!ready()) return;
+        reversed = !reversed;
+        orderButton.setAttribute('aria-pressed', String(reversed));
+        sessionStorage.setItem(modeKey, JSON.stringify({ desc: reversed, random }));
+        if (random) return;
+        arrange(false);
+        if (String(view[0].id) !== id) playFromPlaylist(view[0]); else playlistDraw?.();
+      };
+      const shuffleButton = el('playlist-shuffle');
+      shuffleButton.setAttribute('aria-pressed', String(random));
+      shuffleButton.onclick = () => {
+        if (!ready()) return;
+        random = !random;
+        shuffleButton.setAttribute('aria-pressed', String(random));
+        sessionStorage.setItem(modeKey, JSON.stringify({ desc: reversed, random }));
+        if (!random) {
+          arrange(false);
+          if (String(view[0].id) !== id) playFromPlaylist(view[0]); else playlistDraw?.();
+          return;
+        }
+        queue = base.slice().sort(() => Math.random() - .5);
+        arrange(false);
+        const others = base.filter(v => String(v.id) !== id);
+        if (others.length) playFromPlaylist(others[Math.floor(Math.random() * others.length)]); else playlistDraw?.();
+      };
+      const expand = el('playlist-expand');
+      expand.onclick = () => {
+        const collapsed = expand.getAttribute('aria-expanded') === 'false';
+        expand.setAttribute('aria-expanded', String(collapsed));
+        expand.setAttribute('aria-label', collapsed ? '展开收藏夹列表' : '收起收藏夹列表');
+      };
+      el('video-playlist').hidden = false;
+      el('video-collection').hidden = true;
+      collectionNext = collectionPrevious = null;
+      if (random) queue = base.slice().sort(() => Math.random() - .5);
+      arrange();
+    }
+  } catch { el('video-playlist').hidden = true; }
+  const playHref = video => '/video/' + encodeURIComponent(video.id) + (video === playlistNext ? '?fav=' + encodeURIComponent(folder) : '');
+  async function playFromPlaylist(video) {
+    if (switching || String(video.id) === String(id)) return;
+    switching = true;
+    id = video.id;
+    history.pushState(null, '', '/video/' + encodeURIComponent(id) + '?fav=' + encodeURIComponent(folder));
+    player.pause();
+    clearOnscreenDanmaku();
+    danmaku = []; withdrawn.clear(); shown.clear();
+    renderDanmaku();
+    collectionNext = collectionPrevious = null;
+    playlistDraw?.();
+    try {
+      await loadVideo();
+      setupWatchComments(id);
+      await loadRelated();
+    } finally { switching = false; }
+  }
   setupWatchComments(id);
   restoreFloatingPlayer = setupWatchScroll(player, shell);
-  try {
-    const result = await api('/videos?size=40');
-    const related = result.items.filter(v => String(v.id) !== id);
-    nextVideo = related[0];
-    setupRelatedExpansion(related);
-  } catch { el('related-videos').textContent = '暂无推荐视频'; }
-  el('fullscreen-prev').onclick = () => { if (collectionPrevious) location.assign('/video/' + collectionPrevious.id); else notice('没有上一集'); };
-  el('fullscreen-next').onclick = () => { if (collectionNext || nextVideo) location.assign('/video/' + (collectionNext || nextVideo).id); else notice('没有下一集'); };
-  player.addEventListener('ended', () => { if (el('autoplay-next').checked && (collectionNext || nextVideo) && !trialExpired()) location.assign('/video/' + (collectionNext || nextVideo).id); });
+  async function loadRelated() {
+    const videoId = id;
+    try {
+      const result = await api('/videos?size=40');
+      if (String(videoId) !== String(id)) return;
+      const related = result.items.filter(v => String(v.id) !== videoId);
+      nextVideo = related[0];
+      setupRelatedExpansion(related);
+    } catch { el('related-videos').textContent = '暂无推荐视频'; }
+  }
+  await loadRelated();
+  el('fullscreen-prev').onclick = () => { if (collectionPrevious) location.assign(playHref(collectionPrevious)); else notice('没有上一集'); };
+  el('fullscreen-next').onclick = () => { if (collectionNext || playlistNext || nextVideo) location.assign(playHref(collectionNext || playlistNext || nextVideo)); else notice('没有下一集'); };
+  player.addEventListener('ended', () => { if (el('autoplay-next').checked && (collectionNext || playlistNext || nextVideo) && !trialExpired()) location.assign(playHref(collectionNext || playlistNext || nextVideo)); });
 }
 
 function setupWatchHeatmap(player, { read, save, rows }) {

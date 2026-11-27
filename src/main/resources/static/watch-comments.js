@@ -1,3 +1,5 @@
+let commentsAccountHook = null;
+
 async function setupWatchComments(videoId) {
   const list = el('comment-list'), moreComments = el('comments-more');
   const endpoint = '/videos/' + encodeURIComponent(videoId) + '/comments';
@@ -192,7 +194,9 @@ async function setupWatchComments(videoId) {
     form.hidden = !uid;
     updateSend();
   }
-  window.addEventListener('accountchange', () => { updateComposer(); load(signedIn() ? sort : 'hot'); });
+  if (commentsAccountHook) window.removeEventListener('accountchange', commentsAccountHook);
+  commentsAccountHook = () => { updateComposer(); load(signedIn() ? sort : 'hot'); };
+  window.addEventListener('accountchange', commentsAccountHook);
   updateComposer();
   await load('hot');
 }

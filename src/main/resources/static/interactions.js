@@ -1001,7 +1001,7 @@ function setupFavoriteDropdown(button) {
     const main = node('div', 'dd-fav-main');
     main.append(list, panelFooter(
       ['查看全部', () => location.assign('/me?tab=favorites')],
-      ['播放全部', () => { if (playing) location.assign('/video/' + encodeURIComponent(playing.id)); }]
+      ['播放全部', () => { if (playing) location.assign('/video/' + encodeURIComponent(playing.id) + (active ? '?fav=' + encodeURIComponent(active) : '')); }]
     ));
     return folders.length ? [side, main] : [main];
   });
