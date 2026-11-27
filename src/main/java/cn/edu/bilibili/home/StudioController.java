@@ -42,7 +42,8 @@ class StudioController {
         (SELECT COUNT(*) FROM liketable l WHERE l.LikeTargetType=0 AND l.LikeTargetID=v.VideoID) AS likes,
         (SELECT COUNT(*) FROM commenttable c WHERE c.CommentStatus='active' AND c.VideoID=v.VideoID) AS comments,
         (SELECT COUNT(*) FROM danmakutable d WHERE d.DanmakuStatus='active' AND d.VideoID=v.VideoID) AS danmaku,
-        (SELECT COUNT(*) FROM collectvideotable c WHERE c.VideoID=v.VideoID) AS favorites,
+        (SELECT COUNT(DISTINCT f.UID) FROM collectvideotable c
+         JOIN favourittable f USING (FavouritID) WHERE c.VideoID=v.VideoID) AS favorites,
         (SELECT COUNT(*) FROM forwardtable f WHERE f.VideoID=v.VideoID) AS shares,
         (SELECT COALESCE(-SUM(c.CoinChange),0) FROM coinrecordtable c WHERE c.VideoID=v.VideoID AND c.CoinChange<0) AS coins
         """;
@@ -58,7 +59,8 @@ class StudioController {
           UNION ALL SELECT 'likes', l.LikeTime, 1 FROM liketable l JOIN own ON l.LikeTargetID=own.VideoID WHERE l.LikeTargetType=0
           UNION ALL SELECT 'comments', c.CommentTime, 1 FROM commenttable c JOIN own USING(VideoID) WHERE c.CommentStatus='active'
           UNION ALL SELECT 'danmaku', d.SendTime, 1 FROM danmakutable d JOIN own USING(VideoID) WHERE d.DanmakuStatus='active'
-          UNION ALL SELECT 'favorites', c.CollectTime, 1 FROM collectvideotable c JOIN own USING(VideoID)
+          UNION ALL SELECT 'favorites', MIN(c.CollectTime), 1 FROM collectvideotable c JOIN own USING(VideoID)
+                    JOIN favourittable f USING (FavouritID) GROUP BY c.VideoID, f.UID
           UNION ALL SELECT 'shares', f.ForwardTime, 1 FROM forwardtable f JOIN own USING(VideoID)
           UNION ALL SELECT 'coins', c.ChangeTime, -c.CoinChange FROM coinrecordtable c JOIN own USING(VideoID) WHERE c.CoinChange<0
           UNION ALL SELECT 'followers', r.CreationTime, 1 FROM relationtable r JOIN usertable u ON u.UID=r.UID

@@ -70,7 +70,10 @@ class MysqlVideoCatalog {
             case latest -> " ORDER BY v.UploadTime DESC, v.VideoID DESC";
             case popular -> " ORDER BY Plays DESC, v.VideoID ASC";
             case danmaku -> " ORDER BY Danmaku DESC, v.VideoID ASC";
-            case favorites -> " ORDER BY (SELECT COUNT(*) FROM collectvideotable cv WHERE cv.VideoID = v.VideoID) DESC, v.VideoID ASC";
+            case favorites -> """
+                 ORDER BY (SELECT COUNT(DISTINCT f.UID) FROM collectvideotable cv
+                           JOIN favourittable f USING (FavouritID) WHERE cv.VideoID = v.VideoID) DESC, v.VideoID ASC
+                """;
             case sequence -> " ORDER BY v.VideoID ASC";
             case reverse -> " ORDER BY v.VideoID DESC";
             case recommend -> query.keyword().isEmpty()
@@ -479,7 +482,8 @@ class MysqlVideoCatalog {
                 SELECT
                   (SELECT COUNT(*) FROM liketable WHERE LikeTargetID = CAST(:id AS UNSIGNED) AND LikeTargetType = 0) AS Likes,
                   (SELECT COALESCE(-SUM(CoinChange), 0) FROM coinrecordtable WHERE VideoID = CAST(:id AS UNSIGNED) AND CoinChange < 0) AS Coins,
-                  (SELECT COUNT(*) FROM collectvideotable WHERE VideoID = CAST(:id AS UNSIGNED)) AS Favorites,
+                  (SELECT COUNT(DISTINCT f.UID) FROM collectvideotable cv
+                   JOIN favourittable f USING (FavouritID) WHERE cv.VideoID = CAST(:id AS UNSIGNED)) AS Favorites,
                   (SELECT COUNT(*) FROM forwardtable WHERE VideoID = CAST(:id AS UNSIGNED)) AS Shares
                 """).param("id", id).query((rs, row) -> new Engagement(rs.getLong("Likes"), rs.getLong("Coins"),
                         rs.getLong("Favorites"), rs.getLong("Shares"))).single();
