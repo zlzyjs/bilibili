@@ -1,6 +1,9 @@
 ﻿async function loadWatchPage() {
   const player = el('player'), shell = el('player-shell');
   let id = path.split('/')[2];
+  const playlist = new URLSearchParams(location.search).get('playlist');
+  const folderPlaylist = /^folder-(\d+)$/.exec(playlist || '');
+
   const read = (key, fallback) => { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } };
   const save = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
   // Each visit gets its own trial budget; previous visits never lock this one.
@@ -464,7 +467,7 @@
       if (video.streamUrl) player.src = video.streamUrl;
       else { el('player-status').hidden = false; el('player-status').textContent = '暂无视频文件'; }
       if (trialExpired()) gate(false);
-      else if (video.streamUrl && preferences.autoStart) { player.muted = preferences.muted; player.play().catch(() => {}); }
+      else if (video.streamUrl && (preferences.autoStart || playlist === 'collection' || folderPlaylist)) { player.muted = preferences.muted; player.play().catch(() => {}); }
       api('/videos/' + videoId + '/engagement').then(stats => { if (String(videoId) !== String(id)) return; for (const key of ['like','coin','favorite','share']) el(key + '-count').textContent = shortCount(stats[key]); }).catch(() => { document.querySelector('.video-actions').title = '互动数据暂时加载失败'; });
       api('/videos/' + videoId + '/danmaku').then(rows => {
         if (String(videoId) !== String(id)) return;
@@ -543,8 +546,12 @@
       collectionNext = collection.items[index + 1] || null; collectionPrevious = collection.items[index - 1] || null;
     } else el('video-collection').hidden = true;
   } catch { el('video-collection').hidden = true; }
-  const folder = new URLSearchParams(location.search).get('fav');
-  let playlistNext = null, playlistDraw = null, switching = false;
+  const folder = new URLSearchParams(location.search).get('fav') || folderPlaylist?.[1];
+  const playHref = video => '/video/' + encodeURIComponent(video.id)
+    + (folderPlaylist ? '?playlist=folder-' + folderPlaylist[1]
+      : folder ? '?fav=' + encodeURIComponent(folder)
+      : playlist === 'collection' ? '?playlist=collection' : '');
+  let playlistNext = null, playlistPrevious = null, playlistDraw = null, switching = false;
   if (folder) try {
     const [space, items] = await Promise.all([api('/interactions/me/space'), api('/interactions/me/folders/' + encodeURIComponent(folder))]);
     const info = space.folders.find(entry => String(entry.id) === folder);
@@ -558,7 +565,7 @@
       const draw = () => {
         list.replaceChildren(...view.map(v => {
           const current = String(v.id) === id;
-          const item = link('/video/' + encodeURIComponent(v.id) + '?fav=' + encodeURIComponent(folder), null, 'collection-item' + (current ? ' current' : ''));
+          const item = link(playHref(v), null, 'collection-item' + (current ? ' current' : ''));
           if (current) item.setAttribute('aria-current', 'true');
           item.title = v.title;
           item.onclick = event => {
@@ -587,6 +594,7 @@
         const index = view.findIndex(v => String(v.id) === id);
         el('playlist-position').textContent = (index + 1) + '/' + view.length;
         playlistNext = view[index + 1] || null;
+        playlistPrevious = view[index - 1] || null;
         if (index >= 0) list.scrollTop = Math.max(0, list.children[index].offsetTop - 40);
       };
       playlistDraw = draw;
@@ -645,12 +653,11 @@
       arrange();
     }
   } catch { el('video-playlist').hidden = true; }
-  const playHref = video => '/video/' + encodeURIComponent(video.id) + (video === playlistNext ? '?fav=' + encodeURIComponent(folder) : '');
   async function playFromPlaylist(video) {
     if (switching || String(video.id) === String(id)) return;
     switching = true;
     id = video.id;
-    history.pushState(null, '', '/video/' + encodeURIComponent(id) + '?fav=' + encodeURIComponent(folder));
+    history.pushState(null, '', playHref(video));
     player.pause();
     clearOnscreenDanmaku();
     danmaku = []; withdrawn.clear(); shown.clear();
@@ -676,9 +683,12 @@
     } catch { el('related-videos').textContent = '暂无推荐视频'; }
   }
   await loadRelated();
-  el('fullscreen-prev').onclick = () => { if (collectionPrevious) location.assign(playHref(collectionPrevious)); else notice('没有上一集'); };
-  el('fullscreen-next').onclick = () => { if (collectionNext || playlistNext || nextVideo) location.assign(playHref(collectionNext || playlistNext || nextVideo)); else notice('没有下一集'); };
-  player.addEventListener('ended', () => { if (el('autoplay-next').checked && (collectionNext || playlistNext || nextVideo) && !trialExpired()) location.assign(playHref(collectionNext || playlistNext || nextVideo)); });
+  el('fullscreen-prev').onclick = () => { const previous = collectionPrevious || playlistPrevious; if (previous) location.assign(playHref(previous)); else notice('没有上一集'); };
+  el('fullscreen-next').onclick = () => { const next = collectionNext || playlistNext || nextVideo; if (next) location.assign(playHref(next)); else notice('没有下一集'); };
+  player.addEventListener('ended', () => {
+    const next = collectionNext || playlistNext || nextVideo;
+    if (next && !trialExpired() && (folder || playlist === 'collection' || el('autoplay-next').checked)) location.assign(playHref(next));
+  });
 }
 
 function setupWatchHeatmap(player, { read, save, rows }) {

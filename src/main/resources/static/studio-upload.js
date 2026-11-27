@@ -511,7 +511,21 @@ async function uploadVideo() {
     coverPreview.src = '/api/studio/videos/' + encodeURIComponent(original.id) + '/cover';
     coverPreview.hidden = false;
     dialogImage.src = coverPreview.src; dialogImage.hidden = false;
-    frameStatus.textContent = '可上传新封面，或更换视频后选择画面';
+    frameStatus.textContent = '正在读取已上传视频…';
+    source = '/api/studio/videos/' + encodeURIComponent(original.id) + '/stream';
+    const currentSource = source;
+    preview.onloadeddata = () => {
+      if (source !== currentSource || !preview.videoWidth || !Number.isFinite(preview.duration)) return;
+      preview.onloadeddata = null;
+      frameSlider.max = Math.max(0, preview.duration - 0.1);
+      capture.disabled = busy;
+      generateFrames(currentSource, frameGeneration);
+    };
+    preview.onerror = () => {
+      capture.disabled = true;
+      frameStatus.textContent = '已上传视频读取失败，请重试或上传封面';
+    };
+    preview.src = currentSource;
     token = Array.from(crypto.getRandomValues(new Uint8Array(16)), byte => byte.toString(16).padStart(2, '0')).join('');
   }
   return [result];

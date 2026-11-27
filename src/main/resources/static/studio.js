@@ -530,33 +530,68 @@ function drawChart(host, heading, data, format, fanData) {
   if (fanData) chart.append(series(fanData, 'series fan-series animate'));
   chart.append(series(data, 'series animate'));
   const guide = svg('line', { y1: top, y2: bottom });
-  const pointer = svg('circle', { r: 4, fill: 'var(--chart)' });
+  const pointer = svg('circle', { r: 5, fill: '#fff', stroke: 'var(--accent-bright)', 'stroke-width': 2.5 });
   chart.append(guide, pointer);
-  const focus = node('p', 'chart-focus studio-muted');
-  const range = node('input');
-  range.type = 'range';
-  range.min = 0;
-  range.max = data.length - 1;
-  range.setAttribute('aria-label', '查看指定日期的数据');
+  const plot = group('studio-chart-plot', chart);
+  const tooltip = node('div', 'studio-chart-tooltip');
+  tooltip.setAttribute('role', 'tooltip');
+  const date = node('strong');
+  const values = node('div', 'studio-chart-tooltip-values');
+  tooltip.append(date, values);
+  plot.append(tooltip);
+  const hide = () => {
+    tooltip.hidden = true;
+    guide.style.display = 'none';
+    pointer.style.display = 'none';
+  };
+  let activeIndex = data.length - 1;
   function inspect(index) {
+    activeIndex = index;
     const point = data[index];
+    tooltip.hidden = false;
+    guide.style.display = '';
+    pointer.style.display = '';
     guide.setAttribute('x1', x(index));
     guide.setAttribute('x2', x(index));
     pointer.setAttribute('cx', x(index));
     pointer.setAttribute('cy', y(point.value));
-    range.value = index;
-    focus.textContent = point.date + '　' + (fanData ? '总播放 ' + format(point.value) +
-      '　当前粉丝播放 ' + format(fanData[index].value) : format(point.value));
-    range.setAttribute('aria-valuetext', focus.textContent);
+    date.textContent = point.date.replaceAll('-', '/');
+    const row = (label, value, fan = false) => {
+      const item = node('div', 'studio-chart-tooltip-row' + (fan ? ' is-fan' : ''));
+      item.append(node('span', 'studio-chart-tooltip-dot'), node('span', '', label + '：'), node('b', '', format(value)));
+      return item;
+    };
+    values.replaceChildren(row(fanData ? '总播放量' : heading.replace(/^近\d+(天|年)/, ''), point.value));
+    if (fanData) values.append(row('当前粉丝播放量', fanData[index].value, true));
+    const matrix = chart.getScreenCTM();
+    if (!matrix) return;
+    const anchor = new DOMPoint(x(index), y(point.value)).matrixTransform(matrix);
+    const bounds = plot.getBoundingClientRect();
+    let tooltipX = anchor.x - bounds.left + 16;
+    if (tooltipX + tooltip.offsetWidth > bounds.width - 8) tooltipX = anchor.x - bounds.left - tooltip.offsetWidth - 16;
+    tooltip.style.left = Math.max(8, tooltipX) + 'px';
+    tooltip.style.top = Math.max(8, Math.min(anchor.y - bounds.top + 12, bounds.height - tooltip.offsetHeight - 8)) + 'px';
   }
   chart.onpointermove = event => {
-    const bounds = chart.getBoundingClientRect();
-    const relativeX = (event.clientX - bounds.left) * 840 / bounds.width;
+    const matrix = chart.getScreenCTM();
+    if (!matrix) return;
+    const position = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+    const relativeX = position.x;
+    if (relativeX < left || relativeX > right || position.y < top || position.y > bottom + 8) { hide(); return; }
     inspect(Math.max(0, Math.min(data.length - 1, Math.round((relativeX - left) / (right - left) * (data.length - 1)))));
   };
-  range.oninput = () => inspect(Number(range.value));
-  host.append(chart, focus, range);
-  inspect(data.length - 1);
+  chart.onpointerleave = hide;
+  chart.setAttribute('tabindex', '0');
+  chart.onfocus = () => inspect(activeIndex);
+  chart.onblur = hide;
+  chart.onkeydown = event => {
+    if (event.key === 'Escape') { hide(); return; }
+    if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+    event.preventDefault();
+    inspect(Math.max(0, Math.min(data.length - 1, activeIndex + (event.key === 'ArrowRight' ? 1 : -1))));
+  };
+  host.append(plot);
+  hide();
 }
 
 function exportTrend(label, data) {
@@ -605,7 +640,7 @@ async function trendPanel(settings, { endpoint, title, keys, ranges, variant, vi
   }
   update(settings.metric);
   return panel(subheading(title, node('span', 'studio-muted', '截至 ' + data.end),
-    group('studio-tools', filter, download)), group('studio-cards', ...cards.values()), graph);
+    group('studio-tools', filter, download)), group(variant === 'analytics' ? 'studio-cards studio-analytics-cards' : 'studio-cards', ...cards.values()), graph);
 }
 
 const incomeOptions = {
@@ -617,7 +652,7 @@ async function analytics() {
   const analyticsVideo = new URLSearchParams(location.search).get('video') || '';
   const keys = analyticsVideo
     ? ['plays', 'likes', 'favorites', 'coins', 'comments', 'danmaku', 'shares']
-    : ['plays', 'visitors', 'followers', 'likes', 'favorites', 'coins', 'comments', 'danmaku', 'shares'];
+    : ['plays', 'followers', 'likes', 'favorites', 'coins', 'comments', 'danmaku', 'shares'];
   const options = {
     endpoint: '/analytics', title: analyticsVideo ? '单稿件数据' : '核心数据概览', keys,
     ranges: [[7, '近7天'], [30, '近30天'], [90, '近90天']], variant: 'analytics', video: analyticsVideo,
@@ -625,7 +660,7 @@ async function analytics() {
   const primary = await trendPanel(analyticsChoice, options);
   primary.append(node('p', 'studio-muted', '播放趋势按有计数时间的会话统计，新增粉丝按当前关注记录统计。'));
   if (analyticsVideo) return [primary, link('/studio/videos', '返回稿件管理', 'studio-btn')];
-  return [primary, await trendPanel(incomeChoice, incomeOptions)];
+  return [primary];
 }
 
 async function income() {

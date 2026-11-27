@@ -64,6 +64,8 @@ button,select{cursor:pointer}
 .studio-btn[aria-pressed="true"],.studio-primary{color:#fff;border-color:var(--accent);background:var(--accent)}
 .studio-btn[aria-pressed="true"]:hover,.studio-primary:hover{color:#fff;border-color:var(--accent-hover);background:var(--accent-hover)}
 .studio-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:12px}
+.studio-analytics-cards{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:650px){.studio-analytics-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .studio-tile{min-width:0;display:grid;align-content:start;gap:7px;text-align:left;min-height:83px;padding:13px 15px;border:1px solid transparent;border-radius:10px;background:#f8f9fa;color:var(--muted)}
 button.studio-tile:hover{border-color:var(--accent)}
 .studio-tile[aria-pressed="true"]{border-color:var(--accent-bright);background:var(--accent-soft);color:var(--accent)}
@@ -81,7 +83,15 @@ button.studio-tile:hover{border-color:var(--accent)}
 @keyframes chart-in{from{opacity:.15;transform:translateY(3px)}to{opacity:1;transform:none}}
 .studio-chart text{fill:#526675;font:12px system-ui}
 .studio-chart line{stroke:#dbe5eb;stroke-dasharray:3 4}
-.chart-focus{min-height:1.6em;font-variant-numeric:tabular-nums}
+.studio-chart-plot{position:relative}
+.studio-chart-tooltip{position:absolute;z-index:1;pointer-events:none;max-width:calc(100% - 16px);padding:15px 18px;border:1px solid var(--line);border-radius:10px;background:#fff;box-shadow:0 8px 24px #17263014;color:#526675;font-size:14px;font-variant-numeric:tabular-nums}
+.studio-chart-tooltip>strong{display:block;margin-bottom:10px;font-size:16px}
+.studio-chart-tooltip-row{display:flex;align-items:center;gap:7px;white-space:nowrap}
+.studio-chart-tooltip-row+.studio-chart-tooltip-row{margin-top:7px}
+.studio-chart-tooltip-row b{color:var(--accent-bright)}
+.studio-chart-tooltip-dot{width:10px;height:10px;flex:none;border:3px solid var(--accent-bright);border-radius:50%}
+.studio-chart-tooltip-row.is-fan b{color:#a63da1}
+.studio-chart-tooltip-row.is-fan .studio-chart-tooltip-dot{border-color:#a63da1}
 .studio-chart input{width:100%;accent-color:var(--accent)}
 .studio-list{padding:0;margin:0;list-style:none}
 .studio-video,.fan{display:flex;align-items:center;gap:14px;padding:15px 0;border-bottom:1px solid var(--line)}

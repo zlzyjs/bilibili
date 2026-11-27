@@ -81,6 +81,43 @@ class OssMedia {
         return putImage("media/avatars/uploads/" + uid + "/", "image/png", png);
     }
 
+    void streamVideo(String path, jakarta.servlet.http.HttpServletRequest request,
+                     jakarta.servlet.http.HttpServletResponse response) throws IOException {
+        String object = objectKey(path, "videos/");
+        requireClient();
+        try {
+            long length = client.getObjectMetadata(bucket, object).getContentLength();
+            long start = 0, end = length - 1;
+            String range = request.getHeader("Range");
+            if (range != null) {
+                try {
+                    var ranges = org.springframework.http.HttpRange.parseRanges(range);
+                    if (ranges.size() != 1) throw new IllegalArgumentException();
+                    start = ranges.get(0).getRangeStart(length);
+                    end = ranges.get(0).getRangeEnd(length);
+                    if (start > end || start >= length) throw new IllegalArgumentException();
+                } catch (IllegalArgumentException ex) {
+                    response.setStatus(416);
+                    response.setHeader("Content-Range", "bytes */" + length);
+                    return;
+                }
+                response.setStatus(206);
+                response.setHeader("Content-Range", "bytes " + start + "-" + end + "/" + length);
+            }
+            response.setContentType("video/mp4");
+            response.setHeader("Cache-Control", "no-store");
+            response.setHeader("Accept-Ranges", "bytes");
+            response.setContentLengthLong(end - start + 1);
+            var get = new com.aliyun.oss.model.GetObjectRequest(bucket, object);
+            get.setRange(start, end);
+            try (var stored = client.getObject(get)) {
+                stored.getObjectContent().transferTo(response.getOutputStream());
+            }
+        } catch (OSSException | ClientException ex) {
+            throw new ResponseStatusException(SERVICE_UNAVAILABLE, "OSS 暂时无法读取视频", ex);
+        }
+    }
+
     String putImage(String prefix, String mime, byte[] bytes) {
         String hash;
         try {

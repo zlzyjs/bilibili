@@ -3,8 +3,9 @@ let commentsAccountHook = null;
 async function setupWatchComments(videoId) {
   const list = el('comment-list'), moreComments = el('comments-more');
   const endpoint = '/videos/' + encodeURIComponent(videoId) + '/comments';
+  const mentionCards = setupCommentMentionCards();
   const signedIn = () => typeof currentAccount !== 'undefined' && Boolean(currentAccount);
-  let requestVersion = 0, sort = 'hot', page = 1;
+  let requestVersion = 0, sort = 'hot', page = 1, openMenu;
   function action(text, className, callback) {
     const button = node('button', className, text);
     button.type = 'button';
@@ -28,32 +29,227 @@ async function setupWatchComments(videoId) {
     img.src = '/api/authors/' + encodeURIComponent(entry.userId) + '/avatar';
     img.onerror = () => { img.hidden = true; a.textContent = entry.author.slice(0, 1); };
     a.append(img);
+    mentionCards.bind(a, entry.userId);
     return a;
   }
-  function renderEntry(entry, reply = false, reload = () => load(sort)) {
+
+  function closeMenu(restoreFocus = false) {
+    if (!openMenu) return;
+    const { popup, toggle } = openMenu;
+    popup.hidden = true;
+    toggle.setAttribute('aria-expanded', 'false');
+    openMenu = undefined;
+    if (restoreFocus) toggle.focus();
+  }
+
+  document.addEventListener('pointerdown', event => {
+    if (openMenu && !openMenu.root.contains(event.target)) closeMenu();
+  });
+  list.addEventListener('keydown', event => {
+    if (openMenu && event.key === 'Escape') {
+      event.preventDefault();
+      closeMenu(true);
+    }
+  });
+
+  function commentMenu(entry, kind, own) {
+    const root = node('div', 'comment-menu');
+    const toggle = node('button', 'comment-menu-toggle');
+    const popup = node('div', 'comment-menu-popup');
+    popup.hidden = true;
+    toggle.type = 'button';
+    toggle.setAttribute('aria-label', kind === 'reply' ? '回复选项' : '评论选项');
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.append(svg('more'));
+    toggle.onclick = () => {
+      if (!signedIn()) return openLogin(toggle);
+      const activate = openMenu?.root !== root;
+      closeMenu();
+      if (!activate) return;
+      mentionCards.hide();
+      popup.hidden = false;
+      toggle.setAttribute('aria-expanded', 'true');
+      openMenu = { root, popup, toggle };
+    };
+    const option = (label, callback) => action(label, 'comment-menu-item', () => {
+      closeMenu(true);
+      return callback();
+    });
+    if (own) {
+      popup.append(option('删除', async () => {
+        if (!window.confirm(kind === 'reply' ? '确定删除这条回复？' : '确定删除这条评论？')) return;
+        await interaction('/' + (kind === 'reply' ? 'replies' : 'comments') + '/' + encodeURIComponent(entry.id), 'DELETE');
+        await load(sort);
+      }));
+    } else {
+      popup.append(option('加入黑名单', () => confirmCommentBlock(entry)),
+        option('举报', () => reportComment(entry, kind)));
+    }
+    root.append(toggle, popup);
+    return root;
+  }
+
+  function moderationDialog(body, className) {
+    const dialog = body.closest('dialog');
+    dialog.classList.add(className);
+    const closeButton = dialog.querySelector('.interaction-close');
+    closeButton.textContent = '×';
+    closeButton.setAttribute('aria-label', '关闭');
+    return { dialog, closeButton };
+  }
+
+  function moderationActions(close) {
+    const actions = node('div', 'comment-moderation-actions');
+    const cancel = node('button', 'comment-moderation-cancel', '取消');
+    cancel.type = 'button';
+    cancel.onclick = close;
+    const confirm = node('button', 'comment-moderation-confirm', '确定');
+    confirm.type = 'submit';
+    actions.append(cancel, confirm);
+    return { actions, cancel, confirm };
+  }
+
+  function hideModeratedComments(matches) {
+    mentionCards.hide();
+    for (const article of list.querySelectorAll('[data-comment-author]')) {
+      if (matches(article.dataset)) article.remove();
+    }
+    return load(sort, 1, true);
+  }
+
+  function confirmCommentBlock(entry) {
+    const viewer = currentAccount.uid;
+    interactionPanel('拉黑用户', (body, status, close) => {
+      const { dialog, closeButton } = moderationDialog(body, 'comment-block-dialog');
+      const { actions, cancel, confirm } = moderationActions(close);
+      const form = node('form');
+      form.append(node('p', 'comment-block-explanation',
+        '加入黑名单后，将解除你对该用户的关注和合集订阅，并隐藏该用户的评论和回复。'), actions);
+      body.append(form);
+      dialog.addEventListener('cancel', event => { if (confirm.disabled) event.preventDefault(); });
+      form.onsubmit = async event => {
+        event.preventDefault();
+        if (confirm.disabled) return;
+        if (currentAccount?.uid !== viewer) { close(); return; }
+        confirm.disabled = cancel.disabled = closeButton.disabled = true;
+        status.textContent = '';
+        try {
+          await interaction('/authors/' + encodeURIComponent(entry.userId) + '/relation/block', 'PUT', { enabled: true });
+          close();
+          if (currentAccount?.uid === viewer) {
+            accountNotice('拉黑成功', 'comment-block');
+            await hideModeratedComments(data => data.commentAuthor === entry.userId);
+          }
+        } catch (error) {
+          status.textContent = error.message;
+        } finally {
+          confirm.disabled = cancel.disabled = closeButton.disabled = false;
+        }
+      };
+    });
+  }
+
+  function reportComment(entry, kind) {
+    const viewer = currentAccount.uid;
+    interactionPanel('举报', async (body, status, close) => {
+      const { dialog, closeButton } = moderationDialog(body, 'comment-report-dialog');
+      const resource = '/reports/' + kind;
+      const reasons = await interaction(resource + '/reasons');
+      if (!dialog.open) return;
+      if (!reasons.length) { status.textContent = '当前没有可选的举报原因'; return; }
+      const form = node('form', 'comment-report-form');
+      const choices = node('fieldset', 'comment-report-choices');
+      choices.setAttribute('aria-label', '举报原因');
+      const details = node('label', 'comment-report-details');
+      const description = node('textarea');
+      description.maxLength = 200;
+      description.placeholder = '请描述具体违规内容，帮助审核人员判断';
+      details.append(node('span', '', '详细描述（选填）'), description);
+      const footer = node('div', 'comment-report-footer');
+      const blockLabel = node('label', 'comment-report-block');
+      const block = node('input', 'report-check');
+      block.type = 'checkbox';
+      block.checked = true;
+      blockLabel.append(block, node('span', '', '拉黑 @' + entry.author));
+      const { actions, cancel, confirm } = moderationActions(close);
+      footer.append(blockLabel, actions);
+      confirm.disabled = true;
+      let selected, submitting = false;
+      for (const reason of reasons) {
+        const row = node('div', 'comment-report-row');
+        const label = node('label', 'comment-report-reason');
+        const radio = node('input', 'report-radio');
+        radio.type = 'radio';
+        radio.name = 'comment-report-reason';
+        radio.value = reason.id;
+        radio.onchange = () => {
+          if (!radio.checked) return;
+          selected = reason.id;
+          confirm.disabled = false;
+          status.textContent = '';
+          row.append(details);
+          details.scrollIntoView({ block: 'nearest' });
+        };
+        const name = reason.name === '引战不友善言论' ? '引战、不友善言论' : reason.name;
+        label.append(node('span', '', name), radio);
+        row.append(label);
+        choices.append(row);
+      }
+      dialog.addEventListener('cancel', event => { if (submitting) event.preventDefault(); });
+      form.append(choices, status, footer);
+      body.append(form);
+      form.onsubmit = async event => {
+        event.preventDefault();
+        if (!selected || submitting) return;
+        if (currentAccount?.uid !== viewer) { close(); return; }
+        submitting = choices.disabled = block.disabled = cancel.disabled = confirm.disabled = closeButton.disabled = true;
+        const blockAuthor = block.checked;
+        status.textContent = '';
+        try {
+          await interaction(resource + '/' + encodeURIComponent(entry.id), 'POST', {
+            reason: selected, description: description.value.trim(), blockAuthor
+          });
+          close();
+          if (currentAccount?.uid === viewer) {
+            const message = blockAuthor ? '已拉黑并为你隐藏该评论，举报已受理' : '已为您隐藏该评论，举报已受理';
+            accountNotice(message, 'comment-block');
+            await hideModeratedComments(data => blockAuthor
+              ? data.commentAuthor === entry.userId
+              : data.commentKey === kind + ':' + entry.id);
+          }
+        } catch (error) {
+          status.textContent = error.message;
+        } finally {
+          submitting = choices.disabled = block.disabled = cancel.disabled = confirm.disabled = closeButton.disabled = false;
+        }
+      };
+    });
+  }
+
+  function renderEntry(entry, reply = false, refreshThread, expanded = false) {
     const kind = reply ? 'reply' : 'comment';
     const article = node('article', reply ? 'comment-reply' : 'comment-entry');
+    article.dataset.commentAuthor = entry.userId;
+    article.dataset.commentKey = kind + ':' + entry.id;
     const body = node('div', 'comment-body'), byline = node('div', 'comment-byline');
     byline.append(link('/space/' + encodeURIComponent(entry.userId), entry.author));
     if (entry.level) byline.append(node('span', 'comment-level', entry.level));
-    const content = node('p', 'comment-content', entry.content), actions = node('div', 'comment-actions');
+    const content = node('p', 'comment-content'), actions = node('div', 'comment-actions');
+    if (reply && entry.replyToUserId && entry.replyToName) {
+      const recipient = link('/space/' + encodeURIComponent(entry.replyToUserId), '@' + entry.replyToName, 'comment-mention-text');
+      mentionCards.bind(recipient, entry.replyToUserId);
+      content.append('回复 ', recipient, '：');
+    }
+    mentionCards.render(content, entry.content, entry.tags);
     actions.append(node('time', '', (entry.sentAt || '').replace('T', ' ').slice(0, 16)));
     const like = action('', '', () => {});
     const count = node('span', '', shortCount(entry.likes));
     like.setAttribute('aria-label', '点赞');
     like.append(svg('like-outline'), count);
     if (typeof bindLike === 'function') bindLike(like, kind, entry.id, value => { count.textContent = shortCount(value); });
-    const replyButton = action('回复', '', () => textInteraction('回复评论', '回复内容', 1000, async value => {
-      await interaction('/replies/' + kind + '/' + entry.id, 'POST', { value });
-      await reload();
-    }));
+    const replyButton = action('回复', '', () => openInlineReply(entry, kind, body, refreshThread));
     const own = signedIn() && currentAccount.uid === entry.userId;
-    const options = own ? action('删除', 'comment-delete', async () => {
-      if (!window.confirm(reply ? '确定删除这条回复？' : '确定删除这条评论？')) return;
-      await interaction((reply ? '/replies/' : '/comments/') + encodeURIComponent(entry.id), 'DELETE');
-      await load(sort);
-    }) : action('举报', 'comment-options', () => reportInteraction(kind, entry.id));
-    actions.append(like, replyButton, options);
+    actions.append(like, replyButton, commentMenu(entry, kind, own));
     content.hidden = !entry.content;
     body.append(byline, content);
     if (!reply && entry.hasImage) {
@@ -67,27 +263,33 @@ async function setupWatchComments(videoId) {
     article.append(avatar(entry), body);
     if (!reply) {
       const previews = node('div', 'comment-replies');
-      const expand = async () => {
-        const rows = await interaction('/comments/' + entry.id + '/replies');
-        previews.replaceChildren(...rows.map(row => renderEntry(row, true, expand)));
+      const expand = async (recent = false) => {
+        const version = requestVersion;
+        const rows = await interaction('/comments/' + entry.id + '/replies' + (recent ? '?recent=true' : ''));
+        if (version !== requestVersion || !previews.isConnected) return;
+        if (previews.contains(replyComposer)) closeInlineReply();
+        previews.replaceChildren(...rows.map(row => renderEntry(row, true, refreshThread)));
       };
-      const visibleReplies = (entry.replies || []).slice(0, 2);
-      visibleReplies.forEach(row => previews.append(renderEntry(row, true, expand)));
+      refreshThread = () => expand(true);
+      const visibleReplies = expanded ? (entry.replies || []) : (entry.replies || []).slice(0, 2);
+      visibleReplies.forEach(row => previews.append(renderEntry(row, true, refreshThread)));
       if (entry.replyCount > visibleReplies.length) {
-        previews.append(action('共 ' + entry.replyCount + ' 条回复，点击查看', 'comment-view-replies', expand));
+        previews.append(action('共 ' + entry.replyCount + ' 条回复，点击查看', 'comment-view-replies', () => expand()));
       }
       body.append(previews);
     }
     return article;
   }
 
-  async function load(nextSort, nextPage = 1) {
+  async function load(nextSort, nextPage = 1, keepRows = false) {
+    closeMenu();
+    if (nextPage === 1) closeInlineReply();
     const version = ++requestVersion;
     const member = signedIn();
     sort = nextSort;
     el('comments-hot').setAttribute('aria-pressed', String(sort === 'hot'));
     el('comments-latest').setAttribute('aria-pressed', String(sort === 'latest'));
-    if (nextPage === 1) {
+    if (nextPage === 1 && !keepRows) {
       list.setAttribute('data-preview', 'false');
       list.textContent = '正在加载评论…';
     }
@@ -106,7 +308,7 @@ async function setupWatchComments(videoId) {
       moreComments.hidden = member ? page * 20 >= data.total : data.total === 0;
     } catch {
       if (version !== requestVersion) return;
-      if (nextPage === 1) list.textContent = '评论加载失败，请刷新重试';
+      if (nextPage === 1 && !keepRows) list.textContent = '评论加载失败，请刷新重试';
       else { moreComments.hidden = false; accountNotice('评论加载失败，请重试'); }
     }
   }
@@ -119,11 +321,93 @@ async function setupWatchComments(videoId) {
   const fileInput = el('comment-image-file'), preview = el('comment-image-preview'), previewImage = el('comment-preview-image');
   const emptyNotice = el('comment-empty-notice');
   let selectedImage = null, previewUrl, posting = false, composerUid, emptyNoticeTimer;
+
+  function showEmptyNotice(message) {
+    clearTimeout(emptyNoticeTimer);
+    emptyNotice.textContent = message;
+    emptyNoticeTimer = setTimeout(() => { emptyNotice.textContent = ''; }, 1800);
+  }
+
+  const replyComposer = node('div', 'comment-compose reply-compose');
+  const replyAvatar = node('img', 'guest-avatar');
+  replyAvatar.alt = '';
+  replyAvatar.onerror = () => { replyAvatar.onerror = null; replyAvatar.src = '/assets/guest-avatar.gif'; };
+  const replyForm = form.cloneNode(true);
+  replyForm.hidden = false;
+  replyForm.id = 'reply-entry-form';
+  replyForm.classList.add('reply-entry-form');
+  for (const imageControl of replyForm.querySelectorAll('#comment-image-preview, #comment-image-select, #comment-image-file')) {
+    imageControl.remove();
+  }
+  for (const element of replyForm.querySelectorAll('[id]')) element.id = element.id.replace(/^comment-/, 'reply-');
+  for (const button of replyForm.querySelectorAll('[aria-controls]')) {
+    button.setAttribute('aria-controls', button.getAttribute('aria-controls').replace(/^comment-/, 'reply-'));
+  }
+  const replyInput = replyForm.querySelector('textarea');
+  const replySend = replyForm.querySelector('.comment-send');
+  replyComposer.append(replyAvatar, replyForm);
+  let replyTarget, replyPosting = false;
+  const updateReplySend = () => {
+    replyForm.setAttribute('data-has-content', String(Boolean(replyInput.value.trim())));
+    replySend.disabled = replyPosting;
+  };
+  const replyTools = setupCommentTools(replyForm, replyInput, updateReplySend);
+
+  function closeInlineReply() {
+    if (!replyTarget) return;
+    replyTarget = undefined;
+    replyComposer.remove();
+    replyInput.value = '';
+    replyTools.reset();
+  }
+
+  function openInlineReply(entry, kind, body, refreshThread) {
+    if (replyPosting) return;
+    const uid = currentAccount.uid;
+    if (replyTarget?.id !== entry.id || replyTarget.kind !== kind || replyTarget.uid !== uid) {
+      closeInlineReply();
+      replyTarget = { id: entry.id, kind, uid, refreshThread };
+      const prompt = '回复 @' + entry.author + '：';
+      replyInput.placeholder = prompt;
+      replyInput.setAttribute('aria-label', prompt);
+      replyAvatar.src = '/api/authors/' + encodeURIComponent(uid) + '/avatar';
+      body.append(replyComposer);
+    }
+    replyInput.focus();
+  }
+
+  replyForm.onsubmit = async event => {
+    event.preventDefault();
+    const target = replyTarget;
+    if (!target || replyPosting || currentAccount?.uid !== target.uid) return;
+    const value = replyInput.value.trim();
+    if (!value) { showEmptyNotice('你还没有填写回复！'); return; }
+    clearTimeout(emptyNoticeTimer);
+    emptyNotice.textContent = '';
+    const tags = replyTools.tagsForTrimmedText();
+    replyTools.close();
+    replyPosting = replyInput.readOnly = true;
+    updateReplySend();
+    try {
+      await interaction('/replies/' + target.kind + '/' + encodeURIComponent(target.id), 'POST', { value, tags });
+      if (replyTarget !== target || currentAccount?.uid !== target.uid) return;
+      closeInlineReply();
+      try { await target.refreshThread(); }
+      catch { accountNotice('回复已发布，列表加载失败'); }
+    } catch (error) {
+      if (replyTarget === target) accountNotice(error.message);
+    } finally {
+      replyPosting = replyInput.readOnly = false;
+      updateReplySend();
+    }
+  };
+
   function updateSend() {
     const hasContent = Boolean(input.value?.trim());
     form.setAttribute('data-has-content', String(hasContent));
     send.disabled = posting;
   }
+  const commentTools = setupCommentTools(form, input, updateSend);
   function showImage(file) {
     if (previewUrl) {
       previewImage.removeAttribute('src');
@@ -139,7 +423,6 @@ async function setupWatchComments(videoId) {
     updateSend();
   }
   guest.onclick = () => openLogin(guest);
-  input.oninput = updateSend;
   el('comment-image-select').onclick = () => fileInput.click();
   el('comment-image-remove').onclick = () => { showImage(null); input.focus(); };
   fileInput.onchange = () => {
@@ -154,13 +437,14 @@ async function setupWatchComments(videoId) {
     if (!signedIn()) return openLogin(guest);
     const value = input.value.trim(), image = selectedImage, uid = composerUid;
     if (posting) return;
-    clearTimeout(emptyNoticeTimer);
     if (!value) {
-      emptyNotice.textContent = '你还没有评论！';
-      emptyNoticeTimer = setTimeout(() => { emptyNotice.textContent = ''; }, 1800);
+      showEmptyNotice('你还没有评论！');
       return;
     }
+    clearTimeout(emptyNoticeTimer);
     emptyNotice.textContent = '';
+    const tags = commentTools.tagsForTrimmedText();
+    commentTools.close();
     posting = true;
     updateSend();
     try {
@@ -168,12 +452,16 @@ async function setupWatchComments(videoId) {
         const payload = new FormData();
         payload.append('image', image);
         payload.append('value', value);
+        payload.append('tags', JSON.stringify(tags));
         await interaction(endpoint + '/image', 'POST', payload);
       } else {
-        await interaction(endpoint, 'POST', { value });
+        await interaction(endpoint, 'POST', { value, tags });
       }
       if (composerUid !== uid) return;
-      if (input.value.trim() === value) input.value = '';
+      if (input.value.trim() === value) {
+        input.value = '';
+        commentTools.reset();
+      }
       if (selectedImage === image) showImage(null);
       await load('latest');
     } catch (error) { accountNotice(error.message); }
@@ -187,6 +475,7 @@ async function setupWatchComments(videoId) {
         showImage(null);
       }
       composerUid = uid;
+      commentTools.reset();
       avatarImage.onerror = () => { avatarImage.onerror = null; avatarImage.src = '/assets/guest-avatar.gif'; };
       avatarImage.src = uid ? '/api/authors/' + encodeURIComponent(uid) + '/avatar' : '/api/avatar/default';
     }
@@ -199,6 +488,39 @@ async function setupWatchComments(videoId) {
   window.addEventListener('accountchange', commentsAccountHook);
   updateComposer();
   await load('hot');
+  const query = new URLSearchParams(location.search);
+  const targetKind = query.has('reply') ? 'reply' : 'comment';
+  const targetId = query.get(targetKind);
+  if (targetId && /^[0-9]{1,20}$/.test(targetId)) {
+    const version = requestVersion;
+    try {
+      const data = await api(endpoint + '/locate?' + new URLSearchParams({ kind: targetKind, target: targetId }));
+      if (version !== requestVersion || !list.isConnected) return;
+      const key = targetKind + ':' + targetId;
+      const existing = list.querySelector('[data-comment-key="comment:' + data.items[0]?.id + '"]');
+      const entry = data.items[0] && renderEntry(data.items[0], false, undefined, true);
+      if (entry) {
+        if (existing) existing.replaceWith(entry);
+        else list.prepend(entry);
+        list.querySelector('.comments-empty')?.remove();
+      }
+      const target = entry && [...entry.querySelectorAll('[data-comment-key]'), entry]
+        .find(element => element.dataset.commentKey === key);
+      if (target) {
+        target.classList.add('comment-located');
+        setTimeout(() => target.classList.remove('comment-located'), 3000);
+        target.tabIndex = -1;
+        target.focus({ preventScroll: true });
+        target.scrollIntoView({ block: 'center', behavior: 'instant' });
+      } else {
+        accountNotice('原评论已删除或暂时不可见');
+        list.scrollIntoView({ block: 'start' });
+      }
+    } catch {
+      accountNotice(signedIn() ? '原评论定位失败，请刷新重试' : '登录后可定位原评论');
+      list.scrollIntoView({ block: 'start' });
+    }
+  }
 }
 
 

@@ -6,29 +6,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>dilidili · 第二组课程项目</title>
   <link rel="stylesheet" href="/nav-brand.css?v=1">
-  <link rel="stylesheet" href="/home.css?v=94">
-  <link rel="stylesheet" href="/watch.css?v=64">
+  <link rel="stylesheet" href="/home.css?v=96">
+  <link rel="stylesheet" href="/watch.css?v=65">
   <link rel="stylesheet" href="/watch-fullscreen.css?v=4">
   <link rel="stylesheet" href="/banner-leaves.css?v=1">
   <script src="/banner-leaves.js?v=3" defer></script>
-  <link rel="stylesheet" href="/watch-comments.css?v=14">
-  <link rel="stylesheet" href="/interactions.css?v=12">
+  <link rel="stylesheet" href="/watch-comments.css?v=20">
+  <link rel="stylesheet" href="/interactions.css?v=17">
   <link rel="stylesheet" href="/space.css?v=12">
   <script src="/space.js?v=7" defer></script>
-  <link rel="stylesheet" href="/personal-space.css?v=6">
-  <script src="/personal-space.js?v=8" defer></script>
+  <link rel="stylesheet" href="/personal-space.css?v=23">
+  <script src="/personal-space.js?v=24" defer></script>
   <link rel="stylesheet" href="/search.css?v=10">
   <script src="/search.js?v=9" defer></script>
   <script src="/watch-preferences.js?v=12" defer></script>
   <script src="/watch-sidebar.js?v=5" defer></script>
   <script src="/viewer-presence.js?v=1" defer></script>
-  <script src="/watch-comments.js?v=16" defer></script>
-  <script src="/watch.js?v=54" defer></script>
-  <script src="/home.js?v=46" defer></script>
-  <script src="/login.js?v=16" defer></script>
-  <script src="/interactions.js?v=35" defer></script>
-  <link rel="stylesheet" href="/messages.css?v=55">
-  <script src="/messages.js?v=44" defer></script>
+  <script src="/message-emoji.js?v=1" defer></script>
+  <script src="/comment-mentions.js?v=4" defer></script>
+  <script src="/watch-comments.js?v=23" defer></script>
+  <script src="/watch.js?v=55" defer></script>
+  <script src="/home.js?v=47" defer></script>
+  <script src="/login.js?v=19" defer></script>
+  <script src="/interactions.js?v=42" defer></script>
+  <link rel="stylesheet" href="/messages.css?v=56">
+  <script src="/messages.js?v=46" defer></script>
   <link rel="stylesheet" href="/account-center.css?v=39">
   <script src="/account-center.js?v=21" defer></script>
 </head>
@@ -44,10 +46,23 @@
     <symbol id="i-cake" viewBox="0 0 24 24"><path d="M4 14h16v7H4zM4 17c2 2 3-2 5 0s3-2 5 0 4-2 6 0M6 14V9h12v5M8 9V6m4 3V5m4 4V6M8 3v1m4-2v1m4 0v1"/></symbol>
     <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></symbol>
     <symbol id="i-password-eye" viewBox="0 0 24 24"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+    <symbol id="i-space-private" viewBox="0 0 24 24"><use href="#i-password-eye"/><path d="M3 21 21 3"/></symbol>
     <symbol id="i-tv" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"/><path d="m8 2 4 4 4-4M8 12l2 1m6-1-2 1"/></symbol>
+    <symbol id="i-space-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/></symbol>
+    <symbol id="i-space-folder" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+    <symbol id="i-space-folder-lock" viewBox="0 0 24 24"><path d="M21 10V8a2 2 0 0 0-2-2h-8L9 4H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6m6-4v-2a2 2 0 0 1 4 0v2"/><rect x="15" y="16" width="8" height="6" rx="1"/></symbol>
+    <symbol id="i-space-folder-add" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10v6m-3-3h6"/></symbol>
     <symbol id="i-play" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="m10 9 5 3-5 3z"/></symbol>
+    <symbol id="i-space-play-all" viewBox="0 0 12 12" fill="currentColor" stroke="none"><path d="M1.5 2.65a1.4 1.4 0 0 1 2.1-1.21l5.7 3.36a1.4 1.4 0 0 1 0 2.4l-5.7 3.36a1.4 1.4 0 0 1-2.1-1.21z"/></symbol>
+    <symbol id="i-space-following" viewBox="0 0 24 24"><path d="M3 21c.5-2.6 2-4.2 4.6-5.2a6.2 6.2 0 1 1 5.1 0c2.6 1 4.1 2.6 4.6 5.2M17 4a6 6 0 0 1 1.7 10.7c1.7 1 2.8 2.6 3.3 4.8"/></symbol>
+    <symbol id="i-space-followers" viewBox="0 0 24 24"><path d="M3 21c.5-2.6 2-4.2 4.6-5.2A6.2 6.2 0 1 1 16 12m-2 6 3 3 5-6"/></symbol>
+    <symbol id="i-space-follow-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
     <symbol id="i-list" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M6 9h5m3 0h4M8 13h5m3 0h2"/></symbol>
     <symbol id="i-archive-box" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9m-9 4h4"/></symbol>
+    <symbol id="i-space-house" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m2.5 11 9.5-8.3 9.5 8.3M5 10.6v8.3a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-8.3M9 13.2a3.1 3.1 0 0 0 6 0"/></symbol>
+    <symbol id="i-space-upload" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="14.5" rx="4"/><path d="m7.5 2.8 2.8 3.1m6.2-3.1-2.8 3.1m-3.7 7.7a2.2 2.2 0 0 0 4 0"/></symbol>
+    <symbol id="i-space-layers" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11.2 3.3a2 2 0 0 1 1.6 0l8 3.8a1 1 0 0 1 0 1.8l-8 3.8a2 2 0 0 1-1.6 0l-8-3.8a1 1 0 0 1 0-1.8zM3 12l8.2 4a2 2 0 0 0 1.6 0l8.2-4M3 16l8.2 4a2 2 0 0 0 1.6 0l8.2-4"/></symbol>
+    <symbol id="i-space-favorite" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11.2 3.3a.9.9 0 0 1 1.6 0l2.4 4.6 5.1.8a.9.9 0 0 1 .5 1.5l-3.7 3.7.8 5.1a.9.9 0 0 1-1.3 1l-4.6-2.4L7.4 20a.9.9 0 0 1-1.3-1l.8-5.1-3.7-3.7a.9.9 0 0 1 .5-1.5l5.1-.8zM10.2 13a2.1 2.1 0 0 0 3.6 0"/></symbol>
     <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3 2.8 5.6 6.2.9-4.5 4.4 1.1 6.2-5.6-2.9-5.6 2.9 1.1-6.2L3 9.5l6.2-.9z"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l4 2"/></symbol>
     <symbol id="i-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></symbol>
@@ -109,7 +124,7 @@
             <div class="account-card-stats">
               <a href="/me?tab=following"><strong id="card-following">0</strong><span>关注</span></a>
               <a href="/me?tab=followers"><strong id="card-followers">0</strong><span>粉丝</span></a>
-              <a href="/me?tab=dynamic"><strong id="card-videos">0</strong><span>动态</span></a>
+              <a href="/me?tab=uploads"><strong id="card-videos">0</strong><span>投稿</span></a>
             </div>
             <nav class="account-card-menu" aria-label="账号菜单">
               <a href="/account" target="_self"><svg><use href="#i-home-outline"/></svg>个人中心<svg class="account-card-arrow"><use href="#i-right"/></svg></a>
@@ -301,8 +316,8 @@
         <p id="player-status" class="status" role="status" hidden></p></div>
         <div class="watch-details"><div class="video-actions">
           <button id="video-like" aria-label="点赞"><svg class="action-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#action-like"/></svg><span id="like-count">—</span></button>
-          <button id="video-coin" aria-label="投币"><svg class="action-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#action-coin"/></svg><span id="coin-count">—</span></button>
-          <button id="video-favorite" aria-label="收藏视频"><svg class="action-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#action-favorite"/></svg><span id="favorite-count">—</span></button>
+          <button id="video-coin" aria-label="投币" aria-pressed="false"><svg class="action-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#action-coin"/></svg><span id="coin-count">—</span></button>
+          <button id="video-favorite" aria-label="收藏视频" aria-pressed="false"><svg class="action-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#action-favorite"/></svg><span id="favorite-count">—</span></button>
           <button id="video-share" aria-label="转发"><svg class="action-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#action-share"/></svg><span id="share-count">—</span></button>
           <span class="control-spacer"></span><button id="video-report"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#report"/></svg><span>稿件举报</span></button>
         </div>
@@ -311,12 +326,23 @@
   <img id="comment-current-avatar" class="guest-avatar" src="/api/avatar/default" onerror="this.onerror=null;this.src='/assets/guest-avatar.gif'" alt="" width="48" height="48">
   <button id="comment-guest" type="button" aria-label="登录后发表评论">与其赞同别人的话语，不如自己畅所欲言。</button>
   <form id="comment-entry-form" class="comment-entry-form" data-has-content="false" hidden>
-    <textarea id="comment-text" aria-label="评论内容" placeholder="与其赞同别人的话语，不如自己畅所欲言。" maxlength="1000"></textarea>
+    <div class="comment-editor">
+      <div id="comment-mention-highlight" class="comment-mention-highlight" aria-hidden="true"></div>
+      <textarea id="comment-text" aria-label="评论内容" placeholder="与其赞同别人的话语，不如自己畅所欲言。" maxlength="1000"></textarea>
+    </div>
     <div id="comment-image-preview" class="comment-image-preview" hidden><img id="comment-preview-image" alt="待发布的图片"><button id="comment-image-remove" type="button" aria-label="移除图片">×</button></div>
     <div class="comment-compose-tools">
+      <div class="comment-picker-anchor">
+        <button id="comment-emoji-toggle" class="comment-picker-toggle comment-emoji-toggle" type="button" aria-label="表情" aria-expanded="false" aria-controls="comment-emoji-picker">☺</button>
+        <div id="comment-emoji-picker" class="comment-tool-popup comment-emoji-picker" aria-label="选择表情" hidden></div>
+      </div>
+      <div class="comment-picker-anchor">
+        <button id="comment-mention-toggle" class="comment-picker-toggle comment-mention-toggle" type="button" aria-label="提及用户" aria-expanded="false" aria-controls="comment-mention-picker">@</button>
+        <div id="comment-mention-picker" class="comment-tool-popup comment-mention-picker" aria-label="选择提及对象" hidden></div>
+      </div>
       <button id="comment-image-select" type="button" aria-label="添加图片" title="添加图片"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="9" r="1.5"/><path d="m5 17 4-4 3 3 3-4 4 4"/></svg></button>
       <input id="comment-image-file" type="file" accept="image/png,image/jpeg,image/gif" hidden>
-      <button id="comment-send" type="submit">发布</button>
+      <button id="comment-send" class="comment-send" type="submit">发布</button>
     </div>
   </form>
 </div><div id="comment-list" aria-live="polite"></div><button id="comments-more" class="comments-more" type="button" hidden>登录后查看更多评论</button></section>

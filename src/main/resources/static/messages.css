@@ -196,6 +196,16 @@ html:has(body.message-center-page){scrollbar-gutter:auto}
   .mc-context{grid-column:2;-webkit-line-clamp:2}
 }
 
+.mc-message-controls{display:flex;gap:10px}
+.mc-chat.mc-forward{grid-template-columns:minmax(0,1fr)}
+.mc-forward .mc-threads{border-right:0}
+.mc-forward .mc-thread-list{height:auto;flex:1}
+.mc-forward .mc-thread{text-align:left;cursor:pointer}
+.mc-forward .mc-thread:has(.mc-forward-check:checked){background:var(--mc-tint)}
+.mc-forward-check{width:17px;height:17px;flex:none;margin:0 6px 0 0;accent-color:var(--mc-accent)}
+.mc-forward-footer{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex:none;padding:10px 16px;border-top:1px solid #e3e5e7}
+.mc-forward-recipients{max-height:min(200px,35dvh);margin:0 0 14px;padding-inline-start:22px;overflow:auto;color:#61666d;font-size:14px;overflow-wrap:anywhere}
+.mc-thread-copy .mc-forward-error{color:#b42318;white-space:normal}
 .mc-msg-menu{position:fixed;z-index:30;display:flex;flex-direction:column;min-width:96px;padding:6px;border-radius:8px;background:#e9eaec;box-shadow:0 4px 16px rgba(24,25,28,.16)}
 .mc-msg-action{padding:7px 12px;border:0;border-radius:4px;background:none;color:#18191c;text-align:left;white-space:nowrap;font:inherit;font-size:14px;line-height:1.4;cursor:pointer}
 .mc-msg-action:hover{color:var(--mc-accent)}
