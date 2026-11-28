@@ -6,13 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>dilidili · 第二组课程项目</title>
   <link rel="stylesheet" href="/nav-brand.css?v=1">
-  <link rel="stylesheet" href="/home.css?v=96">
-  <link rel="stylesheet" href="/watch.css?v=50">
+  <link rel="stylesheet" href="/home.css?v=97">
+  <link rel="stylesheet" href="/watch.css?v=20261128">
   <link rel="stylesheet" href="/watch-fullscreen.css?v=4">
   <link rel="stylesheet" href="/banner-leaves.css?v=1">
   <script src="/banner-leaves.js?v=3" defer></script>
   <link rel="stylesheet" href="/watch-comments.css?v=20">
-  <link rel="stylesheet" href="/interactions.css?v=17">
+  <link rel="stylesheet" href="/interactions.css?v=18">
   <link rel="stylesheet" href="/space.css?v=12">
   <script src="/space.js?v=7" defer></script>
   <link rel="stylesheet" href="/personal-space.css?v=23">
@@ -20,17 +20,17 @@
   <link rel="stylesheet" href="/search.css?v=10">
   <script src="/search.js?v=9" defer></script>
   <script src="/watch-preferences.js?v=12" defer></script>
-  <script src="/watch-sidebar.js?v=5" defer></script>
-  <script src="/viewer-presence.js?v=1" defer></script>
+  <script src="/watch-sidebar.js?v=7" defer></script>
+  <script src="/viewer-presence.js?v=20261128" defer></script>
   <script src="/message-emoji.js?v=1" defer></script>
-  <script src="/comment-mentions.js?v=4" defer></script>
-  <script src="/watch-comments.js?v=22" defer></script>
-  <script src="/watch.js?v=41" defer></script>
+  <script src="/comment-mentions.js?v=20261128" defer></script>
+  <script src="/watch-comments.js?v=20261128" defer></script>
+  <script src="/watch.js?v=20261128" defer></script>
   <script src="/home.js?v=47" defer></script>
   <script src="/login.js?v=19" defer></script>
-  <script src="/interactions.js?v=41" defer></script>
-  <link rel="stylesheet" href="/messages.css?v=55">
-  <script src="/messages.js?v=45" defer></script>
+  <script src="/interactions.js?v=20261128" defer></script>
+  <link rel="stylesheet" href="/messages.css?v=20261128">
+  <script src="/messages.js?v=20261128" defer></script>
   <link rel="stylesheet" href="/account-center.css?v=39">
   <script src="/account-center.js?v=21" defer></script>
 </head>
@@ -350,14 +350,21 @@
       </article>
       <aside class="watch-sidebar">
         <div class="watch-author"><div class="watch-author-heading"><a id="watch-author-link"><img id="watch-avatar" alt="UP主头像"><strong id="watch-author-name"></strong></a><button data-interaction="message" class="author-message"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#message"/></svg> 发消息</button></div><p id="watch-signature"></p><div class="watch-author-actions"><button data-login="充电" data-login-only class="charge-button"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#charge"/></svg><span class="watch-charge-label">充电</span></button><button data-interaction="follow" class="follow-button"><svg class="watch-icon " aria-hidden="true"><use href="/assets/watch-icons.svg#plus"/></svg><span class="watch-follow-label"><span data-follow-label>关注</span> <span id="watch-followers"></span></span></button></div></div>
-        <div class="watch-sidebar-content"><div class="watch-danmaku-slot"><div><details id="danmaku-panel" class="danmaku-panel"><summary><span id="danmaku-sidebar-title">弹幕列表</span><span class="sidebar-menu-wrap"><button id="danmaku-sidebar-menu" aria-label="切换弹幕面板" aria-expanded="false"><svg class="watch-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#more"/></svg></button><span id="danmaku-sidebar-menu-items" class="sidebar-menu" hidden><button id="sidebar-view-list">弹幕列表</button><button id="sidebar-view-block">屏蔽设定</button></span></span><i></i></summary><div id="sidebar-list-view"><div class="danmaku-columns"><span>时间</span><span>弹幕内容</span><span>发送时间</span></div><div id="danmaku-list" class="danmaku-list"></div><button class="history-danmaku" data-login="查看历史弹幕" data-login-only>查看历史弹幕</button></div>
-<div id="sidebar-block-view" class="sidebar-block-view" hidden><div class="block-heading"><label>屏蔽列表 <input id="shield-enabled" type="checkbox" role="switch" checked></label><button data-login="同步屏蔽列表" data-login-only>◌ 同步屏蔽列表</button></div><div id="shield-body"><div class="shield-input"><input id="shield-input" maxlength="100" placeholder='添加屏蔽词，正则以"/"开头"/"结尾'><button id="shield-add">添加</button></div><div class="shield-tabs" role="tablist"><button id="shield-tab-text" role="tab">屏蔽文本</button><button id="shield-tab-regex" role="tab">屏蔽正则</button><button id="shield-tab-user" role="tab">屏蔽用户</button></div><div class="shield-table"><div class="shield-table-head"><span id="shield-count">内容（-）</span><span>状态</span><span>操作</span></div><div id="shield-rows"></div></div></div></div>
+        <div class="watch-sidebar-content"><div class="watch-danmaku-slot"><div><details id="danmaku-panel" class="danmaku-panel"><summary><span id="danmaku-sidebar-title">弹幕列表</span><span class="sidebar-menu-wrap"><button id="danmaku-sidebar-menu" aria-label="切换弹幕面板" aria-expanded="false"><svg class="watch-icon" aria-hidden="true"><use href="/assets/watch-icons.svg#more"/></svg></button><span id="danmaku-sidebar-menu-items" class="sidebar-menu" hidden><button id="sidebar-view-list">弹幕列表</button><button id="sidebar-view-block">屏蔽设定</button><button id="sidebar-view-mine" type="button">我的弹幕</button></span></span><i></i></summary><div id="sidebar-list-view"><div class="danmaku-columns"><span>时间</span><span id="danmaku-content-heading">弹幕内容</span><span>发送时间</span></div><div id="danmaku-list" class="danmaku-list"></div><div id="danmaku-history" class="danmaku-history"><button id="danmaku-history-toggle" class="history-danmaku" type="button" aria-expanded="false" aria-controls="danmaku-history-calendar">查看历史弹幕</button>
+<div id="danmaku-history-calendar" class="danmaku-history-calendar" role="group" aria-label="历史弹幕日期" hidden>
+  <div class="danmaku-history-month"><button type="button" id="danmaku-history-previous" aria-label="上个月">‹</button><span id="danmaku-history-month" aria-live="polite"></span><button type="button" id="danmaku-history-next" aria-label="下个月">›</button></div>
+  <div class="danmaku-history-grid" aria-hidden="true"><span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span></div>
+  <div id="danmaku-history-days" class="danmaku-history-grid"></div>
+  <button type="button" id="danmaku-history-reset" hidden>返回当前弹幕</button>
+</div></div></div>
+<div id="sidebar-block-view" class="sidebar-block-view" hidden><div class="block-heading"><label>屏蔽列表 <input id="shield-enabled" type="checkbox" role="switch" checked></label></div><div id="shield-body"><div class="shield-input"><input id="shield-input" maxlength="100" placeholder='添加屏蔽词，正则以"/"开头"/"结尾'><button id="shield-add">添加</button></div><div class="shield-tabs" role="tablist"><button id="shield-tab-text" role="tab">屏蔽文本</button><button id="shield-tab-regex" role="tab">屏蔽正则</button><button id="shield-tab-user" role="tab">屏蔽用户</button></div><div class="shield-table"><div class="shield-table-head"><span id="shield-count">内容（-）</span><span>状态</span><span>操作</span></div><div id="shield-rows"></div></div></div></div>
         </details></div></div>
-        <section id="video-collection" class="video-collection" aria-labelledby="collection-title" hidden><div class="collection-heading"><span id="collection-title"></span><small id="collection-position"></small><button id="collection-expand" type="button" aria-label="展开合集列表" aria-expanded="false" aria-controls="collection-list"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m4 5 4-4 4 4"/><path d="m4 11 4 4 4-4"/></svg></button></div><div class="collection-meta"><span id="collection-plays"></span><button id="video-subscribe" type="button" aria-pressed="false">订阅合集</button></div><div id="collection-list" class="collection-list"></div></section><div class="related-heading"><h2>接下来播放</h2><label>自动连播 <input id="autoplay-next" type="checkbox" role="switch"></label></div><div id="related-videos"></div><button id="related-expand" class="related-expand" hidden>展开</button><div id="related-extra" hidden></div><button id="related-collapse" class="related-expand" hidden>收起</button>
+        <section id="video-collection" class="video-collection" aria-labelledby="collection-title" hidden><div class="collection-heading"><span id="collection-title"></span><small id="collection-position"></small><div id="folder-playback-modes" class="folder-playback-modes" role="group" aria-label="收藏夹播放方式" hidden><button id="folder-playback-sequence" type="button" aria-label="顺序播放" data-tooltip="顺序播放" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="folder-playback-order-icon" d="M10 6h11M10 12h11M10 18h11M5 6v12m-3-3 3 3 3-3"/></svg></button><button id="folder-playback-loop" type="button" aria-label="列表循环" data-tooltip="列表循环" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path id="folder-playback-cycle-icon" d="M3 11a5 5 0 0 1 5-5h12m-3-3 3 3-3 3m4 4a5 5 0 0 1-5 5H4m3-3-3 3 3 3"/></svg></button></div><button id="collection-expand" type="button" aria-label="展开合集列表" aria-expanded="false" aria-controls="collection-list"><svg class="collection-expand-pair" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 5 4-4 4 4"/><path d="m4 11 4 4 4-4"/></svg><svg class="folder-expand-chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="m3.5 6 4.5 4.5L12.5 6"/></svg></button></div><div id="collection-meta" class="collection-meta"><span id="collection-plays"></span><button id="video-subscribe" type="button" aria-pressed="false">订阅合集</button><a id="folder-more" hidden>更多</a></div><div id="collection-list" class="collection-list"></div></section><div id="related-heading" class="related-heading"><h2>接下来播放</h2><label>自动连播 <input id="autoplay-next" type="checkbox" role="switch"></label></div><div id="related-videos"></div><button id="related-expand" class="related-expand" hidden>展开</button><div id="related-extra" hidden></div><button id="related-collapse" class="related-expand" hidden>收起</button>
         </div>
       </aside>
     </section>
     <div id="sender-tooltip" class="sender-tooltip" role="tooltip" hidden></div>
+    <div id="danmaku-report-feedback" class="sender-tooltip" role="status" hidden></div>
     <section id="service-page" class="service-page" hidden>
       <h1 id="service-title"></h1>
       <p id="service-message"></p>

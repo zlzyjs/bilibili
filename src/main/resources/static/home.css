@@ -9,6 +9,7 @@ button{cursor:pointer;color:inherit;border:0;background:none}
 button,a{-webkit-tap-highlight-color:transparent}
 a{color:inherit;text-decoration:none}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+input:is(:not([type]),[type=text],[type=search],[type=email],[type=password],[type=tel],[type=url],[type=number]):focus-visible{outline:1px solid #9499a0;outline-offset:-1px}
 [hidden]{display:none!important}
 .symbols{position:absolute;width:0;height:0;overflow:hidden}
 svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none;vertical-align:middle}

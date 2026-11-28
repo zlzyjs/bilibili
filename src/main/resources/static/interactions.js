@@ -90,14 +90,14 @@ function reportInteraction(kind, id, done) {
   }, document.fullscreenElement || document.body);
 }
 
-async function danmakuReportInteraction(playerShell, danmaku, shieldDanmaku) {
-  if (playerShell.querySelector('.danmaku-report[open]')) return;
+async function danmakuReportInteraction(container, danmaku, onComplete, sidebar = false) {
+  if (document.querySelector('.danmaku-report[open]')) return;
 
-  const dialog = node('dialog', 'danmaku-report');
+  const dialog = node('dialog', sidebar ? 'danmaku-report danmaku-report-sidebar' : 'danmaku-report');
   const title = node('h2', 'danmaku-report-title', danmaku.content);
   title.id = 'danmaku-report-title';
   dialog.setAttribute('aria-labelledby', title.id);
-  const close = node('button', 'danmaku-report-close', '×');
+  const close = node('button', 'danmaku-report-close');
   close.type = 'button';
   close.setAttribute('aria-label', '关闭弹幕举报');
   close.onclick = () => dialog.close();
@@ -109,7 +109,7 @@ async function danmakuReportInteraction(playerShell, danmaku, shieldDanmaku) {
     event.stopPropagation();
     if (event.key === 'Escape') dialog.close();
   });
-  playerShell.append(dialog);
+  container.append(dialog);
   dialog.show();
 
   try {
@@ -124,7 +124,7 @@ async function danmakuReportInteraction(playerShell, danmaku, shieldDanmaku) {
     const details = node('label', 'danmaku-report-details');
     const description = node('textarea');
     description.maxLength = 200;
-    description.placeholder = '请填写违规内容出现的时间点和详细描述';
+    description.placeholder = '请填写具体违规内容出现时间点和详细描述，更容易举报成功';
     details.append(node('span', '', '详细描述（选填）'), description);
 
     const options = node('div', 'danmaku-report-options');
@@ -132,7 +132,7 @@ async function danmakuReportInteraction(playerShell, danmaku, shieldDanmaku) {
     const shield = node('input', 'report-check');
     shield.type = 'checkbox';
     shield.checked = true;
-    shieldLabel.append(shield, '屏蔽相同弹幕与该用户发送的弹幕');
+    shieldLabel.append(shield, '屏蔽相同弹幕与该用户发送弹幕');
     const blockLabel = node('label', 'danmaku-report-check');
     const block = node('input', 'report-check');
     block.type = 'checkbox';
@@ -165,7 +165,7 @@ async function danmakuReportInteraction(playerShell, danmaku, shieldDanmaku) {
         const bounds = choices.getBoundingClientRect();
         const top = row.getBoundingClientRect().top - bounds.top;
         const overflow = details.getBoundingClientRect().bottom - bounds.bottom;
-        if (top < 0) choices.scrollTop += top;
+        if (sidebar || top < 0) choices.scrollTop += top;
         else if (overflow > 0) choices.scrollTop += Math.min(top, overflow);
       };
       label.append(node('span', '', reason.name), radio);
@@ -178,7 +178,7 @@ async function danmakuReportInteraction(playerShell, danmaku, shieldDanmaku) {
       event.preventDefault();
       if (submitting || !selected) return;
       submitting = true;
-      send.disabled = choices.disabled = true;
+      send.disabled = choices.disabled = shield.disabled = block.disabled = true;
       status.textContent = '';
       const shouldShield = shield.checked;
       try {
@@ -187,14 +187,18 @@ async function danmakuReportInteraction(playerShell, danmaku, shieldDanmaku) {
           description: description.value.trim(),
           blockAuthor: block.checked
         });
-        if (shouldShield) shieldDanmaku();
         dialog.close();
-        accountNotice('举报已提交');
+        onComplete('举报已受理', shouldShield);
       } catch (error) {
-        status.textContent = error.message;
+        if (error.status === 409) {
+          dialog.close();
+          onComplete('已举报', false);
+        } else {
+          status.textContent = error.message;
+        }
       } finally {
         submitting = false;
-        send.disabled = choices.disabled = false;
+        send.disabled = choices.disabled = shield.disabled = block.disabled = false;
       }
     };
   } catch (error) {
@@ -372,13 +376,14 @@ function showVideoLikeCelebration(button, enabled) {
   artwork.decode().then(() => { celebration.hidden = false; }).catch(() => celebration.remove());
 }
 
-function setupAuthorInteractions(id, root, renderFollowers) {
+function setupAuthorInteractions(id, root, renderFollowers, signal) {
   const follow = [...root.querySelectorAll('[data-interaction=follow]')];
   const block = root.querySelector('[data-interaction=block]');
   const message = root.querySelector('[data-interaction=message]');
   const report = root.querySelector('[data-interaction=account-report]');
   const resource = '/authors/' + id + '/relation';
   const apply = (result) => {
+    if (signal?.aborted) return;
     if (renderFollowers) renderFollowers(result.followers);
     for (const button of follow) {
       pressInteraction(button, result.following);
@@ -393,7 +398,7 @@ function setupAuthorInteractions(id, root, renderFollowers) {
     const uid = currentAccount?.uid;
     [...follow, block, message, report].filter(Boolean).forEach(button => { button.hidden = uid === id; });
     const result = await interaction(resource);
-    if (currentAccount?.uid === uid) apply(result);
+    if (!signal?.aborted && currentAccount?.uid === uid) apply(result);
   };
   follow.forEach(button => memberAction(button, async () => {
     const state = await interaction(resource);
@@ -408,7 +413,7 @@ function setupAuthorInteractions(id, root, renderFollowers) {
   });
   if (report) memberAction(report, () => reportInteraction('account', id));
   const refreshQuietly = () => refresh().catch(() => {});
-  window.addEventListener('accountchange', refreshQuietly);
+  window.addEventListener('accountchange', refreshQuietly, { signal });
   refreshQuietly();
 }
 
@@ -689,11 +694,15 @@ function videoFavoriteInteraction(resource, uid, applyFavorite) {
 }
 
 function setupVideoInteractions(id, author, player, duration, onDanmaku, authorName) {
+  const lifecycle = new AbortController();
+  const signal = lifecycle.signal;
+  const listen = (target, name, fn, options = {}) => target.addEventListener(name, fn, { ...options, signal });
   const root = el('video-page');
   const resource = '/videos/' + id;
   const like = el('video-like'), coin = el('video-coin'), favorite = el('video-favorite'), subscribe = el('video-subscribe');
   let coinViewer, coinsGiven = 0;
   const applyCoins = total => {
+    if (signal.aborted) return 0;
     const uid = currentAccount?.uid;
     coinsGiven = coinViewer === uid ? Math.max(coinsGiven, total) : total;
     coinViewer = uid;
@@ -701,16 +710,18 @@ function setupVideoInteractions(id, author, player, duration, onDanmaku, authorN
     return Math.max(0, Math.floor(2 - coinsGiven));
   };
   const showCoinLimit = () => accountNotice('对本稿件的投币枚数已用完', 'coin-limit', coin);
-  if (root) setupAuthorInteractions(author, root, followers => { el('watch-followers').textContent = shortCount(followers); });
+  if (root) setupAuthorInteractions(author, root, followers => { el('watch-followers').textContent = shortCount(followers); }, signal);
   const renderLikeCount = count => { el('like-count').textContent = shortCount(count); };
   bindLike(like, 'video', id, renderLikeCount, false, enabled => showVideoLikeCelebration(like, enabled));
   let favoriteRevision = 0;
   memberAction(favorite, () => videoFavoriteInteraction(resource + '/folders', currentAccount.uid, result => {
+    if (signal.aborted) return;
     favoriteRevision++;
     pressInteraction(favorite, result.enabled);
     el('favorite-count').textContent = shortCount(result.count);
   }));
   const applyCoinLike = result => {
+    if (signal.aborted) return;
     const wasLiked = like.getAttribute('aria-pressed') === 'true';
     pressInteraction(like, result.enabled);
     renderLikeCount(result.count);
@@ -720,19 +731,20 @@ function setupVideoInteractions(id, author, player, duration, onDanmaku, authorN
     const uid = currentAccount.uid;
     if (coinViewer === uid && coinsGiven > 1) return showCoinLimit();
     const state = await interaction(resource + '/state');
-    if (currentAccount?.uid !== uid) return;
+    if (signal.aborted || currentAccount?.uid !== uid) return;
     const remaining = applyCoins(state.coinsGiven);
     if (remaining === 0) return showCoinLimit();
     videoCoinInteraction(id, uid, remaining, applyCoins, applyCoinLike, showCoinLimit);
   });
   memberAction(el('video-share'), () => location.assign('/messages?' + new URLSearchParams({ forward: id })));
-  window.addEventListener('pageshow', event => {
+  listen(window, 'pageshow', event => {
     if (event.persisted) {
       api(resource + '/engagement').then(stats => { el('share-count').textContent = shortCount(stats.share); }).catch(() => {});
     }
   });
   memberAction(el('video-report'), () => videoReportInteraction(id, author, authorName));
   const renderSubscription = (on) => {
+    if (signal.aborted) return;
     pressInteraction(subscribe, on);
     subscribe.textContent = on ? '已订阅' : '订阅合集';
   };
@@ -808,12 +820,12 @@ function setupVideoInteractions(id, author, player, duration, onDanmaku, authorN
     } catch {} finally { saving = false; }
   }
   const record = () => { played = true; saveProgress(); };
-  player.addEventListener('play', record);
-  player.addEventListener('timeupdate', () => {
+  listen(player, 'play', record);
+  listen(player, 'timeupdate', () => {
     if (lastSaved === undefined || Math.abs(currentPosition() - lastSaved) >= 10) saveProgress();
   });
-  player.addEventListener('pause', () => saveProgress());
-  window.addEventListener('pagehide', () => saveProgress(true));
+  listen(player, 'pause', () => saveProgress());
+  listen(window, 'pagehide', () => saveProgress(true));
 
   async function refresh() {
     const uid = currentAccount?.uid;
@@ -830,7 +842,7 @@ function setupVideoInteractions(id, author, player, duration, onDanmaku, authorN
     }
     const revision = favoriteRevision;
     const [state, csrf] = await Promise.all([interaction(resource + '/state'), uid ? authApi('csrf') : undefined]);
-    if (currentAccount?.uid !== uid) return;
+    if (signal.aborted || currentAccount?.uid !== uid) return;
     applyCoins(state.coinsGiven);
     if (!like.disabled) pressInteraction(like, state.liked);
     if (revision === favoriteRevision) pressInteraction(favorite, state.favorited);
@@ -839,16 +851,22 @@ function setupVideoInteractions(id, author, player, duration, onDanmaku, authorN
     progressToken = csrf.token;
     progressReady = true;
     if (state.position > 0 && state.position < duration && player.currentTime < 1) {
-      const resume = () => { if (viewer === uid && player.currentTime < 1) player.currentTime = state.position; };
+      const resume = () => { if (!signal.aborted && viewer === uid && player.currentTime < 1) player.currentTime = state.position; };
       if (player.readyState >= 1) resume();
-      else player.addEventListener('loadedmetadata', resume, { once: true });
+      else listen(player, 'loadedmetadata', resume, { once: true });
       lastSaved = state.position;
     }
     saveProgress();
   }
   const refreshQuietly = () => refresh().catch(() => {});
-  window.addEventListener('accountchange', refreshQuietly);
+  listen(window, 'accountchange', refreshQuietly);
   refreshQuietly();
+  return () => {
+    saveProgress(true);
+    lifecycle.abort();
+    finishSend();
+    likeBindings.delete(like);
+  };
 }
 
 function videoRow(v, note) {
@@ -896,7 +914,9 @@ function openHistoryPanel() {
   });
 }
 
+let watchDanmakuColor;
 function setupDanmakuStyle() {
+  if (watchDanmakuColor) return watchDanmakuColor;
   const control = el('dm-style-control'), toggle = el('dm-style-toggle'), panel = el('dm-style-panel');
   const color = el('dm-color'), palette = el('dm-color-palette');
   const swatches = ['#FF0000','#FF7300','#FFAA00','#FFD000','#FFFF00','#A0EE00','#00CD00',
@@ -943,6 +963,7 @@ function setupDanmakuStyle() {
   document.addEventListener('pointerdown', event => {
     if (!control.contains(event.target)) setOpen(false);
   });
+  watchDanmakuColor = color;
   return color;
 }
 
@@ -1153,7 +1174,7 @@ function setupFavoriteDropdown(button) {
     const side = node('aside', 'dd-fav-folders');
     const list = node('ul', 'dd-video-list');
     let active = folders[0]?.id;
-    let playing = favorites.find(v => v.folderId === active) || favorites[0];
+    let playing;
     const renderVideos = () => {
       const rows = active ? favorites.filter(v => v.folderId === active) : favorites;
       playing = rows[0];
@@ -1175,11 +1196,13 @@ function setupFavoriteDropdown(button) {
       const item = node('button', 'dd-fav-folder' + (folder.id === active ? ' active' : ''));
       item.type = 'button';
       item.append(node('span', '', folder.name), node('span', 'dd-fav-count', String(folder.count)));
-      item.addEventListener('mouseenter', () => {
+      const activate = () => {
         active = folder.id;
         buttons.forEach(other => other.classList.toggle('active', other === item));
         renderVideos();
-      });
+      };
+      item.addEventListener('mouseenter', activate);
+      item.addEventListener('focus', activate);
       side.append(item);
       return item;
     });
@@ -1187,7 +1210,12 @@ function setupFavoriteDropdown(button) {
     const main = node('div', 'dd-fav-main');
     main.append(list, panelFooter(
       ['查看全部', () => location.assign('/me?tab=favorites')],
-      ['播放全部', () => { if (playing) location.assign('/video/' + encodeURIComponent(playing.id)); }]
+      ['播放全部', () => {
+        const folder = folders.find(item => item.id === active);
+        const first = playing?.id ?? folder?.coverVideoId;
+        const folderId = folder?.id ?? playing?.folderId;
+        if (first && folderId) location.assign('/video/' + encodeURIComponent(first) + '?playlist=folder-' + encodeURIComponent(folderId));
+      }]
     ));
     return folders.length ? [side, main] : [main];
   });

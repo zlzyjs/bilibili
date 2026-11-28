@@ -154,6 +154,12 @@ html:has(body.message-center-page){scrollbar-gutter:auto}
 .mc-dialog-ok{border:1px solid var(--mc-accent);background:var(--mc-accent);color:#fff}
 .mc-dialog-ok:hover{background:#00a1d6;border-color:#00a1d6}
 .mc-dialog-confirm{--mc-accent:#00a1d7;width:min(400px,calc(100% - 32px));border-radius:8px}
+.mc-dialog-forward{width:min(420px,calc(100% - 32px))}
+.mc-forward-list{display:flex;flex-direction:column;gap:2px;max-height:320px;margin:12px 0 4px;overflow-y:auto;scrollbar-width:thin}
+.mc-forward-item{display:flex;align-items:center;gap:10px;width:100%;padding:6px 8px;border:0;border-radius:8px;background:#fff;color:#18191c;font-size:14px;text-align:left;cursor:pointer}
+.mc-forward-item:hover{background:#f1f2f3}
+.mc-forward-item:disabled{opacity:.6;cursor:default}
+.mc-forward-item span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .mc-dialog-confirm .mc-dialog-head{padding:24px 24px 6px}
 .mc-dialog-confirm .mc-dialog-head h2{font-size:20px}
 .mc-dialog-confirm .mc-dialog-text{margin:10px 0 20px;font-size:16px;text-align:center}

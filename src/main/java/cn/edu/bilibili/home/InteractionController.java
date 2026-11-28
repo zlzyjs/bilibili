@@ -233,14 +233,20 @@ class InteractionController {
     ToggleView subscription(@PathVariable String id, @RequestBody Toggle input, HttpServletRequest request) {
         var member = write(request, "订阅", "Lv1");
         requireTarget(Target.VIDEO, id);
-        String collection = jdbc.sql("SELECT CompilationID FROM videotable WHERE VideoID=CAST(:id AS UNSIGNED) AND CompilationID IS NOT NULL")
-                .param("id", id).query(String.class).optional().orElseThrow(() -> error(NOT_FOUND, "该视频没有合集"));
+        CollectionSubscription collection = jdbc.sql("""
+                SELECT c.CompilationID, c.UID, v.UID FROM videotable v JOIN compilationtable c USING(CompilationID)
+                WHERE v.VideoID=CAST(:id AS UNSIGNED) FOR SHARE
+                """).param("id", id).query((rs, row) -> new CollectionSubscription(rs.getString(1), rs.getString(2), rs.getString(3)))
+                .optional().orElseThrow(() -> error(NOT_FOUND, "该视频没有合集"));
         boolean on = enabled(input);
+        if (on && (member.uid().equals(collection.owner()) || member.uid().equals(collection.uploader()))) {
+            throw error(FORBIDDEN, "不能订阅自己的合集");
+        }
         String sql = on ? """
                 INSERT INTO subscriptionsummarytable (UID,CollectionID) VALUES (:uid,:id)
                 ON DUPLICATE KEY UPDATE SubscribeTime=SubscribeTime
                 """ : "DELETE FROM subscriptionsummarytable WHERE UID=CAST(:uid AS UNSIGNED) AND CollectionID=CAST(:id AS UNSIGNED)";
-        jdbc.sql(sql).param("uid", member.uid()).param("id", collection).update();
+        jdbc.sql(sql).param("uid", member.uid()).param("id", collection.id()).update();
         return new ToggleView(on, 0);
     }
 
@@ -731,6 +737,16 @@ class InteractionController {
                     rs.getString(4), rs.getString(5), rs.getInt(6), null)).list();
     }
 
+    @GetMapping("/videos/{id}/danmaku/reports")
+    List<String> reportedDanmaku(@PathVariable String id, HttpServletRequest request) {
+        var member = read(request);
+        requireTarget(Target.VIDEO, id);
+        return jdbc.sql("""
+                SELECT DISTINCT r.TargetID FROM reporttable r JOIN danmakutable d ON d.DanmakuID=r.TargetID
+                WHERE r.UID=CAST(:uid AS UNSIGNED) AND r.TargetType=:type AND d.VideoID=CAST(:id AS UNSIGNED)
+                """).param("uid", member.uid()).param("type", Target.DANMAKU.code).param("id", id).query(String.class).list();
+    }
+
     @GetMapping("/reports/{kind}/reasons")
     List<Reason> reportReasons(@PathVariable String kind, HttpServletRequest request) {
         read(request);
@@ -960,6 +976,7 @@ class InteractionController {
     record Report(String reason, String description, Boolean blockAuthor) {}
     record Reason(String id, String name, String description) {}
     record ToggleView(boolean enabled, long count) {}
+    private record CollectionSubscription(String id, String owner, String uploader) {}
     record VideoState(boolean liked, boolean favorited, boolean subscribed, int position, double coinsGiven) {}
     record CoinResult(long count, double coinsGiven) {}
     record Folder(String id, String name, boolean selected, boolean privateFolder, long count, Integer capacity) {}

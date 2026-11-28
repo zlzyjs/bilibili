@@ -16,11 +16,14 @@ function commentMentionAvatar(uid) {
   return img;
 }
 
-function setupCommentTools(form, input, updateSend) {
+function setupCommentTools(form, input, updateSend, signal) {
+  const listen = (target, name, fn, options = {}) => target.addEventListener(name, fn, { ...options, signal });
   const highlight = form.querySelector('.comment-mention-highlight');
   const emojiPicker = form.querySelector('.comment-emoji-picker'), emojiToggle = form.querySelector('.comment-emoji-toggle');
   const picker = form.querySelector('.comment-mention-picker'), mentionToggle = form.querySelector('.comment-mention-toggle');
   let tags = [], value = input.value, active, version = 0, timer;
+  emojiPicker.replaceChildren();
+  signal?.addEventListener('abort', close, { once: true });
 
   function setOpen(button, panel, open) {
     panel.hidden = !open;
@@ -111,7 +114,7 @@ function setupCommentTools(form, input, updateSend) {
   async function load(query, request, results, offset = 0) {
     try {
       const users = await interaction('/comment-mention-users?' + new URLSearchParams({ q: query.keyword, offset }));
-      if (request !== version) return;
+      if (signal?.aborted || request !== version) return;
       if (!offset) results.replaceChildren();
       if (!users.length && !offset) results.append(node('p', 'comment-mention-empty', query.keyword ? '没有匹配的用户' : '暂无关注'));
       for (const user of users) {
@@ -139,7 +142,7 @@ function setupCommentTools(form, input, updateSend) {
         results.append(more);
       }
     } catch (error) {
-      if (request !== version) return;
+      if (signal?.aborted || request !== version) return;
       const retry = node('button', 'comment-mention-more', '加载失败，重试');
       retry.type = 'button';
       retry.onclick = () => { retry.remove(); load(query, request, results, offset); };
@@ -163,11 +166,11 @@ function setupCommentTools(form, input, updateSend) {
     timer = setTimeout(() => load(query, request, results), query.keyword ? 140 : 0);
   }
 
-  input.addEventListener('input', event => { syncInput(); if (!event.isComposing) showQuery(); });
-  input.addEventListener('compositionend', showQuery);
-  input.addEventListener('scroll', syncScroll);
-  input.addEventListener('click', () => { if (active) showQuery(); });
-  input.addEventListener('keyup', event => { if (active && event.key.startsWith('Arrow')) showQuery(); });
+  listen(input, 'input', event => { syncInput(); if (!event.isComposing) showQuery(); });
+  listen(input, 'compositionend', showQuery);
+  listen(input, 'scroll', syncScroll);
+  listen(input, 'click', () => { if (active) showQuery(); });
+  listen(input, 'keyup', event => { if (active && event.key.startsWith('Arrow')) showQuery(); });
   mentionToggle.onclick = () => {
     if (active) { closeMention(); input.focus(); return; }
     if (currentQuery() || replace(input.selectionStart, input.selectionEnd, '@')) showQuery();
@@ -185,8 +188,8 @@ function setupCommentTools(form, input, updateSend) {
     };
     emojiPicker.append(option);
   }
-  document.addEventListener('pointerdown', event => { if (!form.contains(event.target)) close(); });
-  form.addEventListener('keydown', event => {
+  listen(document, 'pointerdown', event => { if (!form.contains(event.target)) close(); });
+  listen(form, 'keydown', event => {
     if (event.key === 'Escape' && (active || !emojiPicker.hidden)) { close(); input.focus(); }
   });
   return {
@@ -201,11 +204,13 @@ function setupCommentTools(form, input, updateSend) {
   };
 }
 
-function setupCommentMentionCards({ onFollowChange, preferAbove = false } = {}) {
+function setupCommentMentionCards({ onFollowChange, preferAbove = false, signal } = {}) {
+  const listen = (target, name, fn, options = {}) => target.addEventListener(name, fn, { ...options, signal });
   const card = node('aside', 'comment-mention-card');
   card.setAttribute('aria-label', '用户资料');
   card.hidden = true;
   document.body.append(card);
+  signal?.addEventListener('abort', () => { hide(); card.remove(); }, { once: true });
   let current, hideTimer;
   const profiles = new Map();
 
@@ -302,18 +307,18 @@ function setupCommentMentionCards({ onFollowChange, preferAbove = false } = {}) 
     }
   }
 
-  card.addEventListener('pointerenter', () => clearTimeout(hideTimer));
-  card.addEventListener('pointerleave', scheduleHide);
-  card.addEventListener('focusout', scheduleHide);
-  document.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
-  window.addEventListener('scroll', hide, { passive: true });
-  window.addEventListener('resize', hide);
-  window.addEventListener('accountchange', hide);
+  listen(card, 'pointerenter', () => clearTimeout(hideTimer));
+  listen(card, 'pointerleave', scheduleHide);
+  listen(card, 'focusout', scheduleHide);
+  listen(document, 'keydown', event => { if (event.key === 'Escape') hide(); });
+  listen(window, 'scroll', hide, { passive: true });
+  listen(window, 'resize', hide);
+  listen(window, 'accountchange', hide);
   function bind(anchor, uid) {
-    anchor.addEventListener('pointerenter', () => show(anchor, uid));
-    anchor.addEventListener('pointerleave', scheduleHide);
-    anchor.addEventListener('focus', () => show(anchor, uid));
-    anchor.addEventListener('blur', scheduleHide);
+    listen(anchor, 'pointerenter', () => show(anchor, uid));
+    listen(anchor, 'pointerleave', scheduleHide);
+    listen(anchor, 'focus', () => show(anchor, uid));
+    listen(anchor, 'blur', scheduleHide);
   }
 
   function render(target, text = '', tags = []) {

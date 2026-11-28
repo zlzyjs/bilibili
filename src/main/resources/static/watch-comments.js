@@ -1,7 +1,15 @@
+let commentsAccountHook = null;
+let commentsLifecycle;
+
 async function setupWatchComments(videoId) {
+  commentsLifecycle?.abort();
+  const lifecycle = commentsLifecycle = new AbortController();
+  const current = () => !lifecycle.signal.aborted;
+  const listen = (target, name, fn) => target.addEventListener(name, fn, { signal: lifecycle.signal });
+  const listenDocument = (name, fn) => document.addEventListener(name, fn, { signal: lifecycle.signal });
   const list = el('comment-list'), moreComments = el('comments-more');
   const endpoint = '/videos/' + encodeURIComponent(videoId) + '/comments';
-  const mentionCards = setupCommentMentionCards();
+  const mentionCards = setupCommentMentionCards({ signal: lifecycle.signal });
   const signedIn = () => typeof currentAccount !== 'undefined' && Boolean(currentAccount);
   let requestVersion = 0, sort = 'hot', page = 1, openMenu;
   function action(text, className, callback) {
@@ -40,10 +48,11 @@ async function setupWatchComments(videoId) {
     if (restoreFocus) toggle.focus();
   }
 
-  document.addEventListener('pointerdown', event => {
+  listenDocument('pointerdown', event => {
     if (openMenu && !openMenu.root.contains(event.target)) closeMenu();
   });
-  list.addEventListener('keydown', event => {
+  listen(list, 'keydown', event => {
+    if (!current()) return;
     if (openMenu && event.key === 'Escape') {
       event.preventDefault();
       closeMenu(true);
@@ -280,6 +289,7 @@ async function setupWatchComments(videoId) {
   }
 
   async function load(nextSort, nextPage = 1, keepRows = false) {
+    if (!current()) return;
     closeMenu();
     if (nextPage === 1) closeInlineReply();
     const version = ++requestVersion;
@@ -294,7 +304,7 @@ async function setupWatchComments(videoId) {
     moreComments.hidden = true;
     try {
       const data = await api(endpoint + '?sort=' + sort + '&page=' + nextPage);
-      if (version !== requestVersion) return;
+      if (!current() || version !== requestVersion) return;
       page = nextPage;
       el('comment-total').textContent = shortCount(data.total);
       const rows = (member ? data.items : data.items.slice(0, 2)).map(entry => renderEntry(entry));
@@ -305,7 +315,7 @@ async function setupWatchComments(videoId) {
       moreComments.textContent = member ? '加载更多评论' : '登录后查看 ' + data.total + ' 条评论';
       moreComments.hidden = member ? page * 20 >= data.total : data.total === 0;
     } catch {
-      if (version !== requestVersion) return;
+      if (!current() || version !== requestVersion) return;
       if (nextPage === 1 && !keepRows) list.textContent = '评论加载失败，请刷新重试';
       else { moreComments.hidden = false; accountNotice('评论加载失败，请重试'); }
     }
@@ -319,6 +329,17 @@ async function setupWatchComments(videoId) {
   const fileInput = el('comment-image-file'), preview = el('comment-image-preview'), previewImage = el('comment-preview-image');
   const emptyNotice = el('comment-empty-notice');
   let selectedImage = null, previewUrl, posting = false, composerUid, emptyNoticeTimer;
+  input.value = '';
+  input.readOnly = false;
+  preview.hidden = true;
+  fileInput.value = '';
+  emptyNotice.textContent = '';
+  lifecycle.signal.addEventListener('abort', () => {
+    clearTimeout(emptyNoticeTimer);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    closeMenu();
+    closeInlineReply();
+  }, { once: true });
 
   function showEmptyNotice(message) {
     clearTimeout(emptyNoticeTimer);
@@ -349,7 +370,7 @@ async function setupWatchComments(videoId) {
     replyForm.setAttribute('data-has-content', String(Boolean(replyInput.value.trim())));
     replySend.disabled = replyPosting;
   };
-  const replyTools = setupCommentTools(replyForm, replyInput, updateReplySend);
+  const replyTools = setupCommentTools(replyForm, replyInput, updateReplySend, lifecycle.signal);
 
   function closeInlineReply() {
     if (!replyTarget) return;
@@ -388,7 +409,7 @@ async function setupWatchComments(videoId) {
     updateReplySend();
     try {
       await interaction('/replies/' + target.kind + '/' + encodeURIComponent(target.id), 'POST', { value, tags });
-      if (replyTarget !== target || currentAccount?.uid !== target.uid) return;
+      if (!current() || replyTarget !== target || currentAccount?.uid !== target.uid) return;
       closeInlineReply();
       try { await target.refreshThread(); }
       catch { accountNotice('回复已发布，列表加载失败'); }
@@ -405,7 +426,7 @@ async function setupWatchComments(videoId) {
     form.setAttribute('data-has-content', String(hasContent));
     send.disabled = posting;
   }
-  const commentTools = setupCommentTools(form, input, updateSend);
+  const commentTools = setupCommentTools(form, input, updateSend, lifecycle.signal);
   function showImage(file) {
     if (previewUrl) {
       previewImage.removeAttribute('src');
@@ -455,15 +476,15 @@ async function setupWatchComments(videoId) {
       } else {
         await interaction(endpoint, 'POST', { value, tags });
       }
-      if (composerUid !== uid) return;
+      if (!current() || composerUid !== uid) return;
       if (input.value.trim() === value) {
         input.value = '';
         commentTools.reset();
       }
       if (selectedImage === image) showImage(null);
       await load('latest');
-    } catch (error) { accountNotice(error.message); }
-    finally { posting = false; updateSend(); }
+    } catch (error) { if (current()) accountNotice(error.message); }
+    finally { posting = false; if (current()) updateSend(); }
   };
   function updateComposer() {
     const uid = signedIn() ? currentAccount.uid : null;
@@ -481,9 +502,12 @@ async function setupWatchComments(videoId) {
     form.hidden = !uid;
     updateSend();
   }
-  window.addEventListener('accountchange', () => { updateComposer(); load(signedIn() ? sort : 'hot'); });
+  if (commentsAccountHook) window.removeEventListener('accountchange', commentsAccountHook);
+  commentsAccountHook = () => { updateComposer(); load(signedIn() ? sort : 'hot'); };
+  window.addEventListener('accountchange', commentsAccountHook);
   updateComposer();
   await load('hot');
+  if (!current()) return;
   const query = new URLSearchParams(location.search);
   const targetKind = query.has('reply') ? 'reply' : 'comment';
   const targetId = query.get(targetKind);
@@ -491,6 +515,7 @@ async function setupWatchComments(videoId) {
     const version = requestVersion;
     try {
       const data = await api(endpoint + '/locate?' + new URLSearchParams({ kind: targetKind, target: targetId }));
+      if (!current()) return;
       if (version !== requestVersion || !list.isConnected) return;
       const key = targetKind + ':' + targetId;
       const existing = list.querySelector('[data-comment-key="comment:' + data.items[0]?.id + '"]');
@@ -523,7 +548,20 @@ async function setupWatchComments(videoId) {
 
 function setupRelatedExpansion(videos) {
   const first=videos.slice(0,20),extra=videos.slice(20);
-  el('related-videos').replaceChildren(...first.map(card));el('related-extra').replaceChildren(...extra.map(card));
+  function relatedCard(video) {
+    const entry = card(video);
+    const stats = node('div', 'related-stats');
+    for (const [symbol, label, count] of [['play', '播放', video.plays], ['list', '弹幕', video.danmaku]]) {
+      const total = shortCount(count);
+      const stat = node('span');
+      stat.append(icon(symbol), total);
+      stat.setAttribute('aria-label', label + ' ' + total);
+      stats.append(stat);
+    }
+    entry.append(stats);
+    return entry;
+  }
+  el('related-videos').replaceChildren(...first.map(relatedCard));el('related-extra').replaceChildren(...extra.map(relatedCard));
   el('related-extra').hidden=true;el('related-collapse').hidden=true;
   el('related-expand').hidden=extra.length===0;
   el('related-expand').onclick=()=>{el('related-extra').hidden=false;el('related-expand').hidden=true;el('related-collapse').hidden=false;};
@@ -566,7 +604,7 @@ function setupWatchScroll(player,shell) {
     if(pastPlayer)float();else restore();
     syncMiniButton();
   },{rootMargin:'-76px 0px 0px 0px',threshold:0});observer.observe(home);
-  document.addEventListener('fullscreenchange',()=>{if(document.fullscreenElement)restore();});
+  listenDocument('fullscreenchange',()=>{if(document.fullscreenElement)restore();});
   el('wide-toggle').addEventListener('click',restore);
   miniToggle.onclick=()=>{dismissed=!dismissed;if(dismissed)restore();else if(pastPlayer)float();syncMiniButton();};
   el('mini-close').onclick=()=>{dismissed=true;restore();syncMiniButton();};
